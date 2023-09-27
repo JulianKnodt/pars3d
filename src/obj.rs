@@ -15,9 +15,9 @@ pub type MatIdx = usize;
 /// A single triangular mesh face.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct MeshFace {
-    v: [usize; 3],
-    vt: Option<[usize; 3]>,
-    vn: Option<[usize; 3]>,
+    pub v: [usize; 3],
+    pub vt: Option<[usize; 3]>,
+    pub vn: Option<[usize; 3]>,
 }
 
 /// A single polygonal mesh face.
@@ -41,13 +41,13 @@ pub struct Obj {
 // TODO need to implement a way to fuse a bunch of MTL files into a single super Material.
 #[derive(Debug, Clone, Default)]
 pub struct ObjObject {
-    v: Vec<Vec3>,
-    vt: Vec<Vec2>,
-    vn: Vec<Vec3>,
+    pub v: Vec<Vec3>,
+    pub vt: Vec<Vec2>,
+    pub vn: Vec<Vec3>,
 
-    f: Vec<PolyMeshFace>,
+    pub f: Vec<PolyMeshFace>,
 
-    mat: Vec<(Range<FaceIdx>, MatIdx)>,
+    pub mat: Vec<(Range<FaceIdx>, MatIdx)>,
 }
 
 

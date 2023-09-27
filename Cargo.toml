@@ -1,5 +1,5 @@
 [package]
-name = "mesh_parser"
+name = "pars3d"
 version = "0.1.0"
 edition = "2021"
 
