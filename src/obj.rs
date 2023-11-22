@@ -541,7 +541,7 @@ impl Obj {
     /// Writes this set of obj objects and mtls to writers.
     pub fn write(&self, mut dst: impl Write, dst_dir: &str) -> io::Result<()> {
         for mtllib in &self.mtllibs {
-            writeln!(dst, "usemtl {mtllib}")?;
+            writeln!(dst, "mtllib {mtllib}")?;
         }
         for object in &self.objects {
             object.write(&mut dst, &self.mtls)?;
