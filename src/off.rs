@@ -27,7 +27,7 @@ pub fn parse(p: impl AsRef<Path>) -> io::Result<OFF> {
     let pusize = |s: &str| s.parse::<usize>().unwrap();
     let pf = |s: &str| s.parse::<F>().unwrap();
 
-    for (_i, l) in buf_read.lines().enumerate() {
+    for l in buf_read.lines() {
         let l = l?;
         let mut iter = l.split_whitespace();
         let Some(first) = iter.next() else { continue };

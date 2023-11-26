@@ -61,8 +61,8 @@ impl PolyMeshFace {
     fn from_mesh_face(mf: MeshFace) -> Self {
         Self {
             v: mf.v.to_vec(),
-            vn: mf.vn.map(|vn| vn.to_vec()).unwrap_or(vec![]),
-            vt: mf.vt.map(|vt| vt.to_vec()).unwrap_or(vec![]),
+            vn: mf.vn.map(|vn| vn.to_vec()).unwrap_or_default(),
+            vt: mf.vt.map(|vt| vt.to_vec()).unwrap_or_default(),
         }
     }
     // Does a simple fan of faces
@@ -407,7 +407,7 @@ pub fn parse_mtl(p: impl AsRef<Path>) -> io::Result<Vec<(String, MTL)>> {
                     windows_file.clone().with_extension("jpg"),
                     windows_file.clone().with_extension("jpeg"),
                 ];
-                let c = choices.into_iter().find_map(|c| image::open(&c).ok());
+                let c = choices.into_iter().find_map(|c| image::open(c).ok());
                 let Some(img) = c else {
                     // TODO retry with appending mtl path with texture.
                     eprintln!("Failed to load image {f:?}");
@@ -475,58 +475,34 @@ impl MTL {
         dst.write_all(b"newmtl default_mat\n")?;
 
         macro_rules! write_image {
-            ($img : expr, $name_format : expr, $mtl_line: expr $(,)?) => {
+            ($img : expr, $name_suffix : expr, $mtl_img_string: expr $(,)?) => {
                 if let Some(map) = $img {
-                    let name = $name_format();
+                    let name = format!("{name_prefix}_{}.png", $name_suffix);
                     map.save(&name)
                         .unwrap_or_else(|_| panic!("Failed to save {name}"));
                     let name = Path::new(&name).file_name().unwrap().to_str().unwrap();
-                    $mtl_line(name)?;
+                    writeln!(dst, "{} {name}", $mtl_img_string)?;
                 }
             };
         }
 
-        write_image!(
-            &self.map_kd,
-            || format!("{name_prefix}_kd.png"),
-            |name| writeln!(dst, "map_Kd {name}"),
-        );
+        write_image!(&self.map_kd, "kd", "map_Kd",);
         writeln!(dst, "Kd {} {} {}", self.kd[0], self.kd[1], self.kd[2])?;
 
-        write_image!(
-            &self.map_ks,
-            || format!("{name_prefix}_ks.png"),
-            |name| writeln!(dst, "map_Ks {name}"),
-        );
+        write_image!(&self.map_ks, "ks", "map_Ks",);
         writeln!(dst, "Ks {} {} {}", self.ks[0], self.ks[1], self.ks[2])?;
 
-        write_image!(
-            &self.map_ka,
-            || format!("{name_prefix}_ka.png"),
-            |name| writeln!(dst, "map_Ka {name}"),
-        );
+        write_image!(&self.map_ka, "ka", "map_Ka",);
         writeln!(dst, "Ka {} {} {}", self.ka[0], self.ka[1], self.ka[2])?;
 
         // TODO emissive texture here
         writeln!(dst, "Ke {} {} {}", self.ke[0], self.ke[1], self.ke[2])?;
 
-        write_image!(
-            &self.bump_normal,
-            || format!("{name_prefix}_n.png"),
-            |name| writeln!(dst, "bump {name}"),
-        );
+        write_image!(&self.bump_normal, "n", "bump",);
 
-        write_image!(
-            &self.disp,
-            || format!("{name_prefix}_displacement.png"),
-            |name| writeln!(dst, "disp {name}"),
-        );
+        write_image!(&self.disp, "disp", "disp",);
 
-        write_image!(
-            &self.map_ao,
-            || format!("{name_prefix}_ao.png"),
-            |name| writeln!(dst, "map_ao {name}"),
-        );
+        write_image!(&self.map_ao, "ao", "map_ao",);
 
         writeln!(dst, "Ns {}", self.ns)?;
         writeln!(dst, "Ni {}", self.ni)?;

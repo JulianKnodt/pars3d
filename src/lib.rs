@@ -11,3 +11,6 @@ pub mod obj;
 
 /// OFF parsing
 pub mod off;
+
+/// STL parsing
+pub mod stl;
