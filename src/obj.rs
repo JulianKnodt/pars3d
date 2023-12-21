@@ -375,9 +375,13 @@ pub fn parse_mtl(p: impl AsRef<Path>) -> io::Result<Vec<(String, MTL)>> {
             },
             "map_kd" | "map_ka" | "map_ke" | "map_ks" | "disp" | "bump_normal" | "map_normal"
             | "bump" | "map_bump" | "map_ao" | "map_ns" | "refl" | "map_d" => {
-                let Some(f) = iter.remainder() else {
-                    panic!("Missing file from {l}");
+                let f = match [iter.next(), iter.next(), iter.next()] {
+                    [Some(f), None, _] => f,
+                    [Some(_), Some(_), Some(f)] => f,
+                    [Some(_), Some(_), None] => panic!("Unknown format for line {l}"),
+                    [None, _, _] => panic!("Missing file in {l}"),
                 };
+                assert_eq!(iter.remainder(), None, "Unknown format for line {l}");
                 let file_path = PathBuf::from(f);
 
                 let mtl_path = if file_path.is_absolute() {
