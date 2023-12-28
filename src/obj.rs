@@ -530,7 +530,6 @@ impl Obj {
         // unless it's tracked from the beginning
         for mtllib in &self.mtllibs {
             let mtl_path = Path::new(dst_dir).join(mtllib);
-            println!("{}", mtl_path.display());
             let f = File::create(mtl_path)?;
             let mut f = BufWriter::new(f);
             for (name, mtl) in self.mtls.iter() {
