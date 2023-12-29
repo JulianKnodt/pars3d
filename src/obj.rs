@@ -173,7 +173,7 @@ fn parse_face(
         Ok(x) if x < 0 => {
             let x = (-x) as usize;
             assert!(x <= num_v, "{x} {num_v}");
-            num_v - x
+            num_v - x + 1
         }
         Ok(x) => x as usize,
         Err(e) => panic!("Invalid face {v}: {e:?}"),
@@ -182,7 +182,7 @@ fn parse_face(
         Ok(x) if x < 0 => {
             let x = (-x) as usize;
             assert!(x <= lim, "{x} {lim}");
-            Some(lim - x)
+            Some(lim - x + 1)
         }
         Ok(x) => Some(x as usize),
         Err(e) => panic!("Invalid face {}: {e:?}", v.unwrap()),
@@ -209,7 +209,7 @@ fn parse_poly_face(fs: &[&str], num_v: usize, num_vt: usize, num_vn: usize) -> P
         Ok(x) if x < 0 => {
             let x = (-x) as usize;
             assert!(x <= num_v, "{x} {num_v}");
-            num_v - x
+            num_v - x + 1
         }
         Ok(x) => x as usize,
         Err(e) => panic!("Invalid face {v}: {e:?}"),
@@ -218,7 +218,7 @@ fn parse_poly_face(fs: &[&str], num_v: usize, num_vt: usize, num_vn: usize) -> P
         Ok(x) if x < 0 => {
             let x = (-x) as usize;
             assert!(x <= lim, "{x} {lim}");
-            Some(lim - x)
+            Some(lim - x + 1)
         }
         Ok(x) => Some(x as usize),
         Err(e) => panic!("Invalid face {}: {e:?}", v.unwrap()),
