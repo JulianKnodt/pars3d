@@ -156,20 +156,43 @@ impl MTL {
             return diffuse.clone();
         }
         let mut out = DynamicImage::new_rgb32f(1, 1).into_rgb32f();
-        out.put_pixel(0, 0, image::Rgb(self.kd.map(|v| v as f32)));
+        out.put_pixel(0, 0, image::Rgb(self.kd));
         out.into()
     }
 }
 
-fn parse_face(f0: &str, f1: &str, f2: &str) -> MeshFace {
-    let pusize = |v: &str| v.parse::<usize>().unwrap();
-    let popt = |v: Option<&str>| v.and_then(|v| v.parse::<usize>().ok());
+fn parse_face(
+    f0: &str,
+    f1: &str,
+    f2: &str,
+    num_v: usize,
+    num_vt: usize,
+    num_vn: usize,
+) -> MeshFace {
+    let pusize = |v: &str| match v.parse::<i64>() {
+        Ok(x) if x < 0 => {
+            let x = (-x) as usize;
+            assert!(x <= num_v);
+            num_v - x
+        }
+        Ok(x) => x as usize,
+        Err(e) => panic!("Invalid face {v}: {e:?}"),
+    };
+    let popt = |v: Option<&str>, lim: usize| match v?.parse::<i64>() {
+        Ok(x) if x < 0 => {
+            let x = (-x) as usize;
+            assert!(x <= lim, "{x} {lim}");
+            Some(lim - x)
+        }
+        Ok(x) => Some(x as usize),
+        Err(e) => panic!("Invalid face {}: {e:?}", v.unwrap()),
+    };
 
     let split_slash = |v: &str| -> (usize, Option<usize>, Option<usize>) {
         let mut iter = v.split('/');
         match [iter.next(), iter.next(), iter.next()] {
             [None, _, _] => panic!("Missing vertex index in {v}"),
-            [Some(a), b, c] => (pusize(a), popt(b), popt(c)),
+            [Some(a), b, c] => (pusize(a), popt(b, num_vt), popt(c, num_vn)),
         }
     };
     let (v0, vt0, vn0) = split_slash(f0);
@@ -181,15 +204,31 @@ fn parse_face(f0: &str, f1: &str, f2: &str) -> MeshFace {
     MeshFace { v, vt, vn }
 }
 
-fn parse_poly_face(fs: &[&str]) -> PolyMeshFace {
-    let pusize = |v: &str| v.parse::<usize>().unwrap();
-    let popt = |v: Option<&str>| v.and_then(|v| v.parse::<usize>().ok());
+fn parse_poly_face(fs: &[&str], num_v: usize, num_vt: usize, num_vn: usize) -> PolyMeshFace {
+    let pusize = |v: &str| match v.parse::<i64>() {
+        Ok(x) if x < 0 => {
+            let x = (-x) as usize;
+            assert!(x <= num_v);
+            num_v - x
+        }
+        Ok(x) => x as usize,
+        Err(e) => panic!("Invalid face {v}: {e:?}"),
+    };
+    let popt = |v: Option<&str>, lim: usize| match v?.parse::<i64>() {
+        Ok(x) if x < 0 => {
+            let x = (-x) as usize;
+            assert!(x <= lim);
+            Some(lim - x)
+        }
+        Ok(x) => Some(x as usize),
+        Err(e) => panic!("Invalid face {}: {e:?}", v.unwrap()),
+    };
 
     let split_slash = |v: &str| -> (usize, Option<usize>, Option<usize>) {
         let mut iter = v.split('/');
         match [iter.next(), iter.next(), iter.next()] {
             [None, _, _] => panic!("Missing vertex index in {v}"),
-            [Some(a), b, c] => (pusize(a), popt(b), popt(c)),
+            [Some(a), b, c] => (pusize(a), popt(b, num_vt), popt(c, num_vn)),
         }
     };
     let (v, (vt, vn)): (Vec<_>, (Vec<_>, Vec<_>)) = fs
@@ -243,7 +282,13 @@ pub fn parse(p: impl AsRef<Path>, split_by_object: bool, split_by_group: bool) -
                 [Some(a), Some(b), Some(c), Some(d)] => {
                     let mut all_verts = vec![a, b, c, d];
                     all_verts.extend(iter);
-                    curr_obj.f.push(parse_poly_face(&all_verts));
+                    let co = &curr_obj;
+                    curr_obj.f.push(parse_poly_face(
+                        &all_verts,
+                        co.v.len(),
+                        co.vn.len(),
+                        co.vt.len(),
+                    ));
                 }
                 [None, _, _, _] | [_, None, _, _] | [_, _, None, _] => {
                     panic!("Unsupported `f` format {l}")
@@ -253,7 +298,9 @@ pub fn parse(p: impl AsRef<Path>, split_by_object: bool, split_by_group: bool) -
                         eprintln!("Face contains multiple of the same vertex, ignoring");
                         continue;
                     }
-                    curr_obj.f.push(parse_face(a, b, c).into());
+                    let co = &curr_obj;
+                    let f = parse_face(a, b, c, co.v.len(), co.vn.len(), co.vt.len()).into();
+                    curr_obj.f.push(f);
                 }
             },
             "g" if !split_by_group => continue,
