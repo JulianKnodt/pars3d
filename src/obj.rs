@@ -172,7 +172,7 @@ fn parse_face(
     let pusize = |v: &str| match v.parse::<i64>() {
         Ok(x) if x < 0 => {
             let x = (-x) as usize;
-            assert!(x <= num_v);
+            assert!(x <= num_v, "{x} {num_v}");
             num_v - x
         }
         Ok(x) => x as usize,
@@ -208,7 +208,7 @@ fn parse_poly_face(fs: &[&str], num_v: usize, num_vt: usize, num_vn: usize) -> P
     let pusize = |v: &str| match v.parse::<i64>() {
         Ok(x) if x < 0 => {
             let x = (-x) as usize;
-            assert!(x <= num_v);
+            assert!(x <= num_v, "{x} {num_v}");
             num_v - x
         }
         Ok(x) => x as usize,
@@ -217,7 +217,7 @@ fn parse_poly_face(fs: &[&str], num_v: usize, num_vt: usize, num_vn: usize) -> P
     let popt = |v: Option<&str>, lim: usize| match v?.parse::<i64>() {
         Ok(x) if x < 0 => {
             let x = (-x) as usize;
-            assert!(x <= lim);
+            assert!(x <= lim, "{x} {lim}");
             Some(lim - x)
         }
         Ok(x) => Some(x as usize),
