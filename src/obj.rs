@@ -286,8 +286,8 @@ pub fn parse(p: impl AsRef<Path>, split_by_object: bool, split_by_group: bool) -
                     curr_obj.f.push(parse_poly_face(
                         &all_verts,
                         co.v.len(),
-                        co.vn.len(),
                         co.vt.len(),
+                        co.vn.len(),
                     ));
                 }
                 [None, _, _, _] | [_, None, _, _] | [_, _, None, _] => {
@@ -299,7 +299,7 @@ pub fn parse(p: impl AsRef<Path>, split_by_object: bool, split_by_group: bool) -
                         continue;
                     }
                     let co = &curr_obj;
-                    let f = parse_face(a, b, c, co.v.len(), co.vn.len(), co.vt.len()).into();
+                    let f = parse_face(a, b, c, co.v.len(), co.vt.len(), co.vn.len()).into();
                     curr_obj.f.push(f);
                 }
             },
