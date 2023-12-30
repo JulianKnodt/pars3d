@@ -48,6 +48,7 @@ pub struct ObjObject {
 
     pub f: Vec<PolyMeshFace>,
 
+    /// # faces -> Material
     pub mat: Vec<(Range<FaceIdx>, MatIdx)>,
 }
 
@@ -88,8 +89,15 @@ impl PolyMeshFace {
 }
 
 impl ObjObject {
+    /// Checks if this ObjObject contains any data
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.v.is_empty() && self.vt.is_empty() && self.vn.is_empty() && self.f.is_empty()
+    }
+    /// Returns the set of poly mesh faces in this corresponding to a specific material index.
+    #[inline]
+    pub fn mat_faces(&self) -> impl Iterator<Item = (&[PolyMeshFace], MatIdx)> + '_ {
+        self.mat.iter().map(|(fs, mi)| (&self.f[fs.clone()], *mi))
     }
 }
 
