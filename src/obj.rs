@@ -382,11 +382,16 @@ pub fn parse(p: impl AsRef<Path>, split_by_object: bool, split_by_group: bool) -
                 curr_mtl = Some(mtl_idx);
             }
             "l" => {
-                // TODO actually handle line elements
-                todo!();
+                static mut DID_WARN_LINES: bool = false;
+                unsafe {
+                    if !DID_WARN_LINES {
+                        eprintln!("Line elements not currently handled: {l}");
+                        DID_WARN_LINES = true;
+                    }
+                }
             }
             // TODO
-            k => println!("[ERROR]: Unknown line in OBJ {l} with {k:?}"),
+            k => eprintln!("[ERROR]: Unknown line in OBJ {l} with {k:?}"),
         };
     }
     if let Some(idx) = curr_mtl {
