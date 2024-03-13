@@ -14,3 +14,6 @@ pub mod off;
 
 /// STL parsing
 pub mod stl;
+
+/// PLY handling
+pub mod ply;
