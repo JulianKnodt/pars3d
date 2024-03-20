@@ -556,7 +556,9 @@ impl MTL {
         }
 
         write_image!(&self.map_kd, "kd", "map_Kd",);
-        writeln!(dst, "Kd {} {} {}", self.kd[0], self.kd[1], self.kd[2])?;
+        if !self.kd.iter().all(|&v| v == 0.) {
+            writeln!(dst, "Kd {} {} {}", self.kd[0], self.kd[1], self.kd[2])?;
+        }
 
         write_image!(&self.map_ks, "ks", "map_Ks",);
         writeln!(dst, "Ks {} {} {}", self.ks[0], self.ks[1], self.ks[2])?;
