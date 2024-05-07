@@ -112,8 +112,10 @@ pub struct MTL {
     pub map_kd: Option<DynamicImage>,
     /// specular map
     pub map_ks: Option<DynamicImage>,
-    /// specular map
+    /// ambient map
     pub map_ka: Option<DynamicImage>,
+    /// emissive map
+    pub map_ke: Option<DynamicImage>,
     /// Normal Map
     pub bump_normal: Option<DynamicImage>,
 
@@ -142,6 +144,7 @@ impl Default for MTL {
             map_kd: None,
             map_ks: None,
             map_ka: None,
+            map_ke: None,
             bump_normal: None,
             disp: None,
             map_ao: None,
@@ -482,11 +485,11 @@ pub fn parse_mtl(p: impl AsRef<Path>) -> io::Result<Vec<(String, MTL)>> {
                     "map_kd" => &mut curr_mtl.map_kd,
                     "map_ks" => &mut curr_mtl.map_ks,
                     "map_ka" => &mut curr_mtl.map_ka,
+                    "map_ke" => &mut curr_mtl.map_ke,
                     "disp" => &mut curr_mtl.disp,
                     "map_ao" => &mut curr_mtl.map_ao,
                     "bump" | "map_bump" | "map_normal" | "bump_normal" => &mut curr_mtl.bump_normal,
                     // TODO need to implement these
-                    "map_ke" => continue,
                     "map_ns" => continue,
                     "map_d" => continue,
                     "refl" => continue,
@@ -564,7 +567,7 @@ impl MTL {
         write_image!(&self.map_ka, "ka", "map_Ka",);
         writeln!(dst, "Ka {} {} {}", self.ka[0], self.ka[1], self.ka[2])?;
 
-        // TODO emissive texture here
+        write_image!(&self.map_ke, "ke", "map_Ke",);
         writeln!(dst, "Ke {} {} {}", self.ke[0], self.ke[1], self.ke[2])?;
 
         write_image!(&self.bump_normal, "n", "bump",);
