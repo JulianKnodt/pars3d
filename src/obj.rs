@@ -196,6 +196,7 @@ fn parse_face(
             Some(lim - x + 1)
         }
         Ok(x) => Some(x as usize),
+        Err(e) if e.kind() == &std::num::IntErrorKind::Empty => None,
         Err(e) => panic!("Invalid face {}: {e:?}", v.unwrap()),
     };
 
@@ -232,6 +233,7 @@ fn parse_poly_face(fs: &[&str], num_v: usize, num_vt: usize, num_vn: usize) -> P
             Some(lim - x + 1)
         }
         Ok(x) => Some(x as usize),
+        Err(e) if e.kind() == &std::num::IntErrorKind::Empty => None,
         Err(e) => panic!("Invalid face {}: {e:?}", v.unwrap()),
     };
 
