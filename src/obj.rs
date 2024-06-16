@@ -167,7 +167,7 @@ impl MTL {
             return diffuse.clone();
         }
         let mut out = DynamicImage::new_rgb32f(1, 1).into_rgb32f();
-        out.put_pixel(0, 0, image::Rgb(self.kd));
+        out.put_pixel(0, 0, image::Rgb(self.kd.map(|f| f as f32)));
         out.into()
     }
 }
