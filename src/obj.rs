@@ -86,6 +86,10 @@ impl PolyMeshFace {
             }),
         })
     }
+    /// Mutable iterator over all vertex indices
+    pub fn v_mut(&mut self) -> impl Iterator<Item = &mut usize> + '_ {
+        self.v.iter_mut()
+    }
 }
 
 impl ObjObject {
