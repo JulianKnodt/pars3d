@@ -1,4 +1,5 @@
-use super::{Vec2, Vec3, F};
+use super::{into, Vec2, Vec3, F};
+
 use image::DynamicImage;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
@@ -130,9 +131,9 @@ pub struct MTL {
     pub map_ao: Option<DynamicImage>,
 
     /// Read but don't do anything yet
-    pub ns: F,
-    pub ni: F,
-    pub d: F,
+    pub ns: f32,
+    pub ni: f32,
+    pub d: f32,
 
     pub illum: u8,
 }
@@ -171,7 +172,7 @@ impl MTL {
             return diffuse.clone();
         }
         let mut out = DynamicImage::new_rgb32f(1, 1).into_rgb32f();
-        out.put_pixel(0, 0, image::Rgb(self.kd.map(|f| f as f32)));
+        out.put_pixel(0, 0, image::Rgb(self.kd.map(|f| into(f) as f32)));
         out.into()
     }
 }
@@ -268,7 +269,8 @@ pub fn parse(p: impl AsRef<Path>, split_by_object: bool, split_by_group: bool) -
     let mut mtl_start_face = 0;
     let mut curr_mtl_name = String::from("");
 
-    let pf = |v: &str| v.parse::<F>().unwrap();
+    use num_traits::FromPrimitive;
+    let pf = |v: &str| F::from_f64(v.parse::<f64>().unwrap()).unwrap();
 
     for (i, l) in buf_read.lines().enumerate() {
         let l = l?;
@@ -519,11 +521,11 @@ pub fn parse_mtl(p: impl AsRef<Path>) -> io::Result<Vec<(String, MTL)>> {
                     "ns" => &mut curr_mtl.ns,
                     "d" => &mut curr_mtl.d,
                     "tr" => {
-                        curr_mtl.d = 1. - pf(v);
+                        curr_mtl.d = 1. - into(pf(v)) as f32;
                         continue;
                     }
                     _ => unreachable!(),
-                } = pf(v);
+                } = into(pf(v)) as f32;
             }
             "illum" => {
                 let Some(n) = iter.next() else {
@@ -618,17 +620,18 @@ impl ObjObject {
     /// Writes this obj object out to a writer
     pub fn write(&self, mut dst: impl Write, mtl_names: &[(String, MTL)]) -> io::Result<()> {
         for v in &self.v {
-            let [x, y, z] = v;
+            // always write out as a float.
+            let [x, y, z] = v.map(into);
             writeln!(dst, "v {x} {y} {z}")?;
         }
 
         for vt in &self.vt {
-            let [u, v] = vt;
+            let [u, v] = vt.map(into);
             writeln!(dst, "vt {u} {v}")?;
         }
 
         for vn in &self.vn {
-            let [x, y, z] = vn;
+            let [x, y, z] = vn.map(into);
             writeln!(dst, "vn {x} {y} {z}")?;
         }
 

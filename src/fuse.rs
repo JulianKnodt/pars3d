@@ -26,7 +26,7 @@ pub fn fuse_vertices(vertices: &[Vec3], dist: F) -> Vec<usize> {
             return v.map(|v| unsafe { std::mem::transmute::<U, I>(v.to_bits()) });
         }
 
-        v.map(|v| (v * inv_dist) as I)
+        v.map(|v| f64::from(v * inv_dist) as I)
     };
 
     for (i, v) in vertices.iter().enumerate() {

@@ -6,7 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+num-rational = { version = "0.4.2", optional = true }
 image = "0.24.7"
+num-traits = "0.2.19"
 
 [features]
 f64 = []
+num-rational = ["dep:num-rational"]

@@ -1,4 +1,4 @@
-use super::{Vec3, F};
+use super::{into, Vec3, F};
 use std::io::{self, BufRead, BufReader, Read};
 
 use std::collections::HashMap;
@@ -62,7 +62,7 @@ pub fn stl_raw_to_tri_mesh(v: &[STLFace], merge_distance: F) -> (Vec<Vec3>, Vec<
     let mut out_verts = vec![];
     let mut out_faces = vec![];
 
-    let vert_key = |xyz: [F; 3]| xyz.map(|v| (v / merge_distance) as u32);
+    let vert_key = |xyz: [F; 3]| xyz.map(|v| into(v / merge_distance) as u32);
 
     for face in v {
         let vis = face.pos.map(|v| {
