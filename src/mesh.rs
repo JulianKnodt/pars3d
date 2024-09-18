@@ -11,6 +11,25 @@ pub enum FaceKind {
     Poly(Vec<usize>),
 }
 
+impl FaceKind {
+    pub fn as_slice(&self) -> &[usize] {
+        use FaceKind::*;
+        match self {
+            Tri(t) => t.as_slice(),
+            Quad(q) => q.as_slice(),
+            Poly(v) => v.as_slice(),
+        }
+    }
+    pub fn as_mut_slice(&mut self) -> &mut [usize] {
+        use FaceKind::*;
+        match self {
+            Tri(t) => t.as_mut_slice(),
+            Quad(q) => q.as_mut_slice(),
+            Poly(v) => v.as_mut_slice(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 struct Mesh {
     v: Vec<[F; 3]>,

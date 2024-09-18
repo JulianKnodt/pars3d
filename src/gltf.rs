@@ -1,23 +1,5 @@
 use super::F;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum FaceKind {
-    Tri([usize; 3]),
-    Quad([usize; 4]),
-    Poly(Vec<usize>),
-}
-
-impl FaceKind {
-    pub fn as_slice(&self) -> &[usize] {
-        use FaceKind::*;
-        match self {
-            Tri(t) => t.as_slice(),
-            Quad(q) => q.as_slice(),
-            Poly(v) => v.as_slice(),
-        }
-    }
-}
-
 #[derive(Default, Clone, PartialEq)]
 pub struct GLTFMesh {
     pub v: Vec<[F; 3]>,
@@ -26,7 +8,6 @@ pub struct GLTFMesh {
     // For each vertex, associate it with 4 bones
     pub joint_idxs: Vec<[u16; 4]>,
     pub joint_weights: Vec<[F; 4]>,
-    //nodes: Vec<[
 }
 
 pub fn load<P>(path: P) -> gltf::Result<GLTFMesh>
