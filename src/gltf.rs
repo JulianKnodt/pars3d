@@ -20,12 +20,12 @@ impl FaceKind {
 
 #[derive(Default, Clone, PartialEq)]
 pub struct GLTFMesh {
-    v: Vec<[F; 3]>,
-    uvs: Vec<[F; 2]>,
-    f: Vec<[usize; 3]>,
+    pub v: Vec<[F; 3]>,
+    pub uvs: Vec<[F; 2]>,
+    pub f: Vec<[usize; 3]>,
     // For each vertex, associate it with 4 bones
-    joint_idxs: Vec<[u16; 4]>,
-    joint_weights: Vec<[F; 4]>,
+    pub joint_idxs: Vec<[u16; 4]>,
+    pub joint_weights: Vec<[F; 4]>,
     //nodes: Vec<[
 }
 

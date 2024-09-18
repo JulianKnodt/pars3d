@@ -57,3 +57,6 @@ pub mod fuse;
 
 #[cfg(feature = "gltf")]
 pub mod gltf;
+
+/// Unified mesh representation.
+pub mod mesh;
