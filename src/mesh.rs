@@ -73,6 +73,9 @@ impl From<ObjObject> for Mesh {
 #[cfg(feature = "gltf")]
 impl From<GLTFMesh> for Mesh {
     fn from(gltf_mesh: GLTFMesh) -> Self {
+        if !gltf_mesh.joint_idxs.is_empty() {
+            assert_eq!(gltf_mesh.v.len(), gltf_mesh.joint_idxs.len());
+        }
         let f = gltf_mesh
             .f
             .into_iter()
