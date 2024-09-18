@@ -32,7 +32,7 @@ where
                 });
                 let mut num_pos = 0;
                 for p in reader.read_positions().into_iter().flatten() {
-                    out.v.push(p);
+                    out.v.push(p.map(|v| v as F));
                     num_pos += 1;
                 }
 
@@ -41,7 +41,8 @@ where
                         .read_tex_coords(0)
                         .map(|v| v.into_f32())
                         .into_iter()
-                        .flatten(),
+                        .flatten()
+                        .map(|uvs| uvs.map(|uv| uv as F)),
                 );
 
                 if let Some(jr) = reader.read_joints(0) {
@@ -54,7 +55,8 @@ where
                     let Some(jwr) = reader.read_weights(0) else {
                         panic!("has joints but no weights?");
                     };
-                    out.joint_weights.extend(jwr.into_f32());
+                    out.joint_weights
+                        .extend(jwr.into_f32().map(|ws| ws.map(|w| w as F)));
                 }
 
                 let idxs = reader
