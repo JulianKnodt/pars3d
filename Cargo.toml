@@ -9,7 +9,9 @@ edition = "2021"
 num-rational = { version = "0.4.2", optional = true }
 image = "0.24.7"
 num-traits = "0.2.19"
+gltf = { version = "1.4.1", features = ["utils"], optional = true }
 
 [features]
 f64 = []
 num-rational = ["dep:num-rational"]
+gltf = ["dep:gltf"]

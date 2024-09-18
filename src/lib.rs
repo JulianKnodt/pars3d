@@ -1,5 +1,6 @@
 #![feature(str_split_whitespace_remainder)]
 #![feature(array_windows)]
+#![feature(iter_array_chunks)]
 #![feature(cfg_match)]
 
 #[cfg(all(not(feature = "f64"), not(feature = "num-rational")))]
@@ -32,6 +33,9 @@ fn into(f: F) -> f64 {
     n as f64 / d as f64
 }
 
+#[cfg(all(feature = "num-rational", feature = "gltf"))]
+compile_error!("Rational and GLTF features are mutually exclusive for pars3d.");
+
 /// Alias for array of floats.
 pub type Vector<const N: usize, T = F> = [T; N];
 
@@ -50,3 +54,6 @@ pub mod stl;
 /// Fuse vertices of a mesh together by distance.
 #[cfg(not(feature = "num-rational"))]
 pub mod fuse;
+
+#[cfg(feature = "gltf")]
+pub mod gltf;

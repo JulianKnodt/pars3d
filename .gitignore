@@ -1,2 +1,6 @@
 *.swp
 /target
+*.obj
+*.glb
+*.fbx
+*.mtl
