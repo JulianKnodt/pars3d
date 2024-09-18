@@ -4,7 +4,7 @@ use super::F;
 #[cfg(feature = "gltf")]
 use super::gltf::GLTFMesh;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum FaceKind {
     Tri([usize; 3]),
     Quad([usize; 4]),
@@ -28,16 +28,24 @@ impl FaceKind {
             Poly(v) => v.as_mut_slice(),
         }
     }
+    pub fn len(&self) -> usize {
+        use FaceKind::*;
+        match self {
+            Tri(_) => 3,
+            Quad(_) => 4,
+            Poly(v) => v.len(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-struct Mesh {
-    v: Vec<[F; 3]>,
-    f: Vec<FaceKind>,
+pub struct Mesh {
+    pub v: Vec<[F; 3]>,
+    pub f: Vec<FaceKind>,
 
     /// 1-1 relation between vertices and joint/idxs weights.
-    joint_idxs: Vec<[u16; 4]>,
-    joint_weights: Vec<[F; 4]>,
+    pub joint_idxs: Vec<[u16; 4]>,
+    pub joint_weights: Vec<[F; 4]>,
 }
 
 impl From<ObjObject> for Mesh {
