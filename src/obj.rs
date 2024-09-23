@@ -1,4 +1,4 @@
-use super::{into, Vec2, Vec3, F};
+use super::{Vec2, Vec3, F};
 
 use image::DynamicImage;
 use std::fs::File;
@@ -172,7 +172,7 @@ impl MTL {
             return diffuse.clone();
         }
         let mut out = DynamicImage::new_rgb32f(1, 1).into_rgb32f();
-        out.put_pixel(0, 0, image::Rgb(self.kd.map(|f| into(f) as f32)));
+        out.put_pixel(0, 0, image::Rgb(self.kd.map(|f| f as f32)));
         out.into()
     }
 }
@@ -269,8 +269,7 @@ pub fn parse(p: impl AsRef<Path>, split_by_object: bool, split_by_group: bool) -
     let mut mtl_start_face = 0;
     let mut curr_mtl_name = String::from("");
 
-    use num_traits::FromPrimitive;
-    let pf = |v: &str| F::from_f64(v.parse::<f64>().unwrap()).unwrap();
+    let pf = |v: &str| v.parse::<F>().unwrap();
 
     for (i, l) in buf_read.lines().enumerate() {
         let l = l?;
@@ -521,11 +520,11 @@ pub fn parse_mtl(p: impl AsRef<Path>) -> io::Result<Vec<(String, MTL)>> {
                     "ns" => &mut curr_mtl.ns,
                     "d" => &mut curr_mtl.d,
                     "tr" => {
-                        curr_mtl.d = 1. - into(pf(v)) as f32;
+                        curr_mtl.d = (1. - pf(v)) as f32;
                         continue;
                     }
                     _ => unreachable!(),
-                } = into(pf(v)) as f32;
+                } = pf(v) as f32;
             }
             "illum" => {
                 let Some(n) = iter.next() else {
@@ -621,17 +620,17 @@ impl ObjObject {
     pub fn write(&self, mut dst: impl Write, mtl_names: &[(String, MTL)]) -> io::Result<()> {
         for v in &self.v {
             // always write out as a float.
-            let [x, y, z] = v.map(into);
+            let [x, y, z] = v;
             writeln!(dst, "v {x} {y} {z}")?;
         }
 
         for vt in &self.vt {
-            let [u, v] = vt.map(into);
+            let [u, v] = vt;
             writeln!(dst, "vt {u} {v}")?;
         }
 
         for vn in &self.vn {
-            let [x, y, z] = vn.map(into);
+            let [x, y, z] = vn;
             writeln!(dst, "vn {x} {y} {z}")?;
         }
 
