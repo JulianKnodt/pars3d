@@ -24,13 +24,20 @@ pub mod off;
 /// STL parsing
 pub mod stl;
 
+/// PLY parsing
+pub mod ply;
+
 /// Fuse vertices of a mesh together by distance.
 pub mod fuse;
 
+/// Coloring data for visualizing features.
+pub mod coloring;
+
+/// Visualize per-element attributes.
+pub mod visualization;
+
 #[cfg(feature = "gltf")]
 pub mod gltf;
-
-pub mod ply;
 
 /// Unified mesh representation.
 pub mod mesh;
@@ -67,4 +74,16 @@ impl FaceKind {
             Poly(v) => v.len(),
         }
     }
+}
+
+pub(crate) fn kmul(k: F, [x, y, z]: [F; 3]) -> [F; 3] {
+    [x * k, y * k, z * k]
+}
+
+pub(crate) fn add([a, b, c]: [F; 3], [x, y, z]: [F; 3]) -> [F; 3] {
+    [a + x, b + y, c + z]
+}
+
+pub(crate) fn edges(vis: &[usize]) -> impl Iterator<Item = [usize; 2]> + '_ {
+    (0..vis.len()).map(|vi| [vis[vi], vis[(vi + 1) % vis.len()]])
 }

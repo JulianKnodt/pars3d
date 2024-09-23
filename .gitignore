@@ -5,3 +5,4 @@
 *.fbx
 *.mtl
 *.ply
+.DS_Store
