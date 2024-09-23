@@ -59,10 +59,10 @@ where
                     out.joint_weights
                         .extend(jwr.into_f32().map(|ws| ws.map(|w| w as F)));
                 } else if !out.joint_idxs.is_empty() {
-                  let num_missing = out.v.len() - out.joint_idxs.len();
-                  out.joint_idxs.extend((0..num_missing).map(|i| [0; 4]));
-                  out.joint_weights.extend((0..num_missing).map(|i| [0.; 4]));
-                  assert_eq!(out.joint_idxs.len(), out.v.len());
+                    let num_missing = out.v.len() - out.joint_idxs.len();
+                    out.joint_idxs.extend((0..num_missing).map(|i| [0; 4]));
+                    out.joint_weights.extend((0..num_missing).map(|i| [0.; 4]));
+                    assert_eq!(out.joint_idxs.len(), out.v.len());
                 }
 
                 let idxs = reader
@@ -91,13 +91,13 @@ where
 #[test]
 fn test_load_gltf() {
     let mesh = load("jacket.glb").unwrap();
-    for [x,y,z] in &mesh.v {
-      println!("v {x} {y} {z}");
+    for [x, y, z] in &mesh.v {
+        println!("v {x} {y} {z}");
     }
     for ijk in &mesh.f {
-      let [i,j,k] = ijk.map(|i| i + 1);
-      println!("f {i} {j} {k}");
+        let [i, j, k] = ijk.map(|i| i + 1);
+        println!("f {i} {j} {k}");
     }
     /*
-    */
+     */
 }
