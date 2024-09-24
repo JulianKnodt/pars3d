@@ -43,6 +43,13 @@ pub fn fuse_vertices(vertices: &[Vec3], dist: F) -> Vec<usize> {
     out
 }
 
+/// Given a remapping, set the vertices to be exactly overlapped on top of each other.
+pub fn set_equal(remap: &[usize], verts: &mut [[F; 3]]) {
+    for (dst_vi, &src_vi) in remap.iter().enumerate() {
+        verts[dst_vi] = verts[src_vi];
+    }
+}
+
 /// Applies a mapping to a set of indices.
 pub fn apply_fuse<'a>(remap: &[usize], to: impl Iterator<Item = &'a mut usize>) {
     for vi in to {
