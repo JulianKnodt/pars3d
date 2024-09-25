@@ -2,15 +2,24 @@ use super::{cross, dot, edges, normalize, sub, FaceKind, F};
 use std::cmp::minmax;
 use std::collections::HashMap;
 
+use std::collections::BinaryHeap;
+
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+struct OrdFloat(F);
+impl Eq for OrdFloat {}
+
+impl Ord for OrdFloat {
+    fn cmp(&self, f: &Self) -> std::cmp::Ordering {
+        self.0.total_cmp(&f.0)
+    }
+}
+
 pub fn quadrangulate(
     vs: &[[F; 3]],
     faces: &[FaceKind],
     planarity_eps: F,
     angle_eps: F,
 ) -> Vec<FaceKind> {
-    let mut new_faces = vec![];
-    let mut deleted = vec![false; faces.len()];
-
     let mut edge_adj: HashMap<[usize; 2], EdgeKind> = HashMap::new();
 
     let mut tri_normals = vec![[0.; 3]; faces.len()];
@@ -32,13 +41,12 @@ pub fn quadrangulate(
         tri_normals[fi] = normalize(cross(sub(v2, v0), sub(v1, v0)));
     }
 
+    let mut merge_heap = BinaryHeap::new();
+
     for ([e0, e1], ek) in edge_adj.into_iter() {
         let EdgeKind::Manifold([a, b]) = ek else {
             continue;
         };
-        if deleted[a] || deleted[b] {
-            continue;
-        }
         let align = dot(tri_normals[a], tri_normals[b]);
         // same normals
         if align < 1. - planarity_eps {
@@ -63,25 +71,42 @@ pub fn quadrangulate(
             tri_a.rotate_left(1);
         }
 
-        let new_quad: [usize; 4] = std::array::from_fn(|i| {
-            match i {
-              0 | 1 => tri_a[i],
-              2 => corner_b,
-              _ => tri_a[2],
-            }
+        let new_quad: [usize; 4] = std::array::from_fn(|i| match i {
+            0 | 1 => tri_a[i],
+            2 => corner_b,
+            _ => tri_a[2],
         });
         let [v0, v1, v2, v3] = new_quad.map(|vi| vs[vi]);
         let new_angle0 = dot(normalize(sub(v0, v1)), normalize(sub(v2, v1)))
             .clamp(-1., 1.)
             .acos();
-        if (new_angle0 - std::f64::consts::FRAC_PI_2 as F).abs() > angle_eps {
+        const HALF_PI: F = std::f64::consts::FRAC_PI_2 as F;
+        if (new_angle0 - HALF_PI).abs() > angle_eps {
             continue;
         }
 
         let new_angle1 = dot(normalize(sub(v2, v3)), normalize(sub(v0, v3)))
             .clamp(-1., 1.)
             .acos();
-        if (new_angle1 - std::f64::consts::FRAC_PI_2 as F).abs() > angle_eps {
+        if (new_angle1 - HALF_PI).abs() > angle_eps {
+            continue;
+        }
+
+        use std::cmp::Reverse;
+        merge_heap.push((
+            Reverse(OrdFloat((new_angle0 - HALF_PI).abs() + (new_angle1 - HALF_PI).abs())),
+            // higher is better for this one
+            OrdFloat(align),
+            new_quad,
+            [a, b],
+        ));
+    }
+
+    let mut new_faces = vec![];
+    let mut deleted = vec![false; faces.len()];
+
+    for (_, _, new_quad, [a, b]) in merge_heap.into_iter_sorted() {
+        if deleted[a] || deleted[b] {
             continue;
         }
 
@@ -189,7 +214,6 @@ pub fn tri_to_quad(
     (quads, tris)
 }
 */
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum EdgeKind {

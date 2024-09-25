@@ -3,6 +3,7 @@
 #![feature(iter_array_chunks)]
 #![feature(cfg_match)]
 #![feature(cmp_minmax)]
+#![feature(binary_heap_into_iter_sorted)]
 
 #[cfg(not(feature = "f64"))]
 pub type F = f32;
