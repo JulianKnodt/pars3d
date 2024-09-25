@@ -3,10 +3,10 @@
 #![feature(iter_array_chunks)]
 #![feature(cfg_match)]
 
-#[cfg(all(not(feature = "f64")))]
+#[cfg(not(feature = "f64"))]
 pub type F = f32;
 
-#[cfg(all(feature = "f64"))]
+#[cfg(feature = "f64")]
 pub type F = f64;
 
 /// Alias for array of floats.
@@ -72,6 +72,14 @@ impl FaceKind {
             Tri(_) => 3,
             Quad(_) => 4,
             Poly(v) => v.len(),
+        }
+    }
+    pub fn is_empty(&self) -> bool {
+        use FaceKind::*;
+        match self {
+            Tri(_) => false,
+            Quad(_) => false,
+            Poly(v) => v.is_empty(),
         }
     }
 }
