@@ -2,6 +2,7 @@
 #![feature(array_windows)]
 #![feature(iter_array_chunks)]
 #![feature(cfg_match)]
+#![feature(cmp_minmax)]
 
 #[cfg(not(feature = "f64"))]
 pub type F = f32;
@@ -41,6 +42,9 @@ pub mod gltf;
 
 /// Unified mesh representation.
 pub mod mesh;
+
+/// Approximately convert a triangle mesh to a mixed tri/quad mesh.
+pub mod tri_to_quad;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum FaceKind {
@@ -90,6 +94,22 @@ pub(crate) fn kmul(k: F, [x, y, z]: [F; 3]) -> [F; 3] {
 
 pub(crate) fn add([a, b, c]: [F; 3], [x, y, z]: [F; 3]) -> [F; 3] {
     [a + x, b + y, c + z]
+}
+
+pub(crate) fn sub([a, b, c]: [F; 3], [x, y, z]: [F; 3]) -> [F; 3] {
+    [a - x, b - y, c - z]
+}
+
+pub(crate) fn cross([a, b, c]: [F; 3], [x, y, z]: [F; 3]) -> [F; 3] {
+    [b * z - c * y, c * x - a * z, a * y - b * z]
+}
+
+pub(crate) fn dot([a, b, c]: [F; 3], [x, y, z]: [F; 3]) -> F {
+    a * x + b * y + c * z
+}
+
+pub(crate) fn normalize(v: [F; 3]) -> [F; 3] {
+    kmul(dot(v, v).max(0.).sqrt().max(1e-10).recip(), v)
 }
 
 pub(crate) fn edges(vis: &[usize]) -> impl Iterator<Item = [usize; 2]> + '_ {
