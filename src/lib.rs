@@ -100,16 +100,22 @@ pub(crate) fn sub([a, b, c]: [F; 3], [x, y, z]: [F; 3]) -> [F; 3] {
     [a - x, b - y, c - z]
 }
 
-pub(crate) fn cross([a, b, c]: [F; 3], [x, y, z]: [F; 3]) -> [F; 3] {
-    [b * z - c * y, c * x - a * z, a * y - b * z]
+pub(crate) fn cross([x, y, z]: [F; 3], [a, b, c]: [F; 3]) -> [F; 3] {
+    [y * c - z * b, z * a - x * c, x * b - y * a]
 }
 
 pub(crate) fn dot([a, b, c]: [F; 3], [x, y, z]: [F; 3]) -> F {
     a * x + b * y + c * z
 }
 
-pub(crate) fn normalize(v: [F; 3]) -> [F; 3] {
-    kmul(dot(v, v).max(0.).sqrt().max(1e-10).recip(), v)
+#[inline]
+pub fn normalize<const N: usize>(v: [F; N]) -> [F; N] {
+    let sum: F = v.iter().map(|v| v * v).sum();
+    if sum < 1e-20 {
+        return [0.; N];
+    }
+    let s = sum.sqrt();
+    v.map(|v| v / s)
 }
 
 pub(crate) fn edges(vis: &[usize]) -> impl Iterator<Item = [usize; 2]> + '_ {
