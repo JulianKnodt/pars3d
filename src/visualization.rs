@@ -61,6 +61,7 @@ pub fn opt_raw_edge_visualization(
     vs: &[[F; 3]],
     edge_value: impl Fn([usize; 2]) -> Option<F>,
     default_color: [F; 3],
+    width: F,
 ) -> (Vec<[F; 3]>, Vec<[F; 3]>, Vec<[usize; 4]>) {
     let mut new_vs = vec![];
     let mut new_vc = vec![];
@@ -77,8 +78,8 @@ pub fn opt_raw_edge_visualization(
         let np = non_parallel(e_dir);
         let t = normalize(cross(e_dir, np));
         let b = normalize(cross(e_dir, t));
-        let t = kmul(0.01, t);
-        let b = kmul(0.01, b);
+        let t = kmul(width, t);
+        let b = kmul(width, b);
         let q0 = [
             add(e0, t),
             add(e0, b),
