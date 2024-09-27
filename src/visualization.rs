@@ -134,7 +134,7 @@ fn test_edge_vis() {
 
     let fs = fs
         .into_iter()
-        .map(|tri| super::FaceKind::Tri(tri))
+        .map(super::FaceKind::Tri)
         .collect::<Vec<_>>();
 
     let ply = Ply::new(vs, vc, fs);
@@ -160,7 +160,7 @@ fn test_raw_edge_vis() {
 
     let fs = fs
         .into_iter()
-        .map(|tri| super::FaceKind::Quad(tri))
+        .map(super::FaceKind::Quad)
         .collect::<Vec<_>>();
 
     let ply = Ply::new(vs, vc, fs);
