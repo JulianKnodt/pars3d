@@ -94,7 +94,9 @@ pub fn quadrangulate(
 
         use std::cmp::Reverse;
         merge_heap.push((
-            Reverse(OrdFloat((new_angle0 - HALF_PI).abs() + (new_angle1 - HALF_PI).abs())),
+            Reverse(OrdFloat(
+                (new_angle0 - HALF_PI).abs() + (new_angle1 - HALF_PI).abs(),
+            )),
             // higher is better for this one
             OrdFloat(align),
             new_quad,

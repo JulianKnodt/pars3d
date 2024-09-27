@@ -9,21 +9,27 @@ pub fn edge_value_visualization<'a>(
     vs: &[[F; 3]],
     edge_value: impl Fn([usize; 2]) -> F,
 ) -> (Vec<[F; 3]>, Vec<[F; 3]>, Vec<[usize; 3]>) {
+    optional_edge_value_visualization(fs, nf, vs, |e| Some(edge_value(e)), [0., 1., 0.])
+}
+
+/// Given a mesh with a per-edge scalar value in 0-1, output a new triangle mesh with vertex
+/// coloring that matches the value for each edge. 1 represents max intensity, 0 represents void.
+pub fn optional_edge_value_visualization<'a>(
+    fs: impl Fn(usize) -> &'a [usize],
+    nf: usize,
+    vs: &[[F; 3]],
+    edge_value: impl Fn([usize; 2]) -> Option<F>,
+    default_color: [F; 3],
+) -> (Vec<[F; 3]>, Vec<[F; 3]>, Vec<[usize; 3]>) {
     let mut new_vs = vec![];
     let mut new_vc = vec![];
 
     let mut new_fs = vec![];
-    //let void_color = magma(0.);
 
     for fi in 0..nf {
         let f = fs(fi);
         let centroid = f.iter().map(|&vi| vs[vi]).fold([0.; 3], add);
         let centroid = kmul((f.len() as F).recip(), centroid);
-        /*
-        let ci = new_vs.len();
-        new_vs.push(centroid);
-        new_vc.push(void_color);
-        */
 
         for [e0, e1] in edges(f) {
             let e0i = new_vs.len();
@@ -36,7 +42,7 @@ pub fn edge_value_visualization<'a>(
             let midi = new_vs.len();
             new_vs.push(midpoint);
 
-            let edge_color = magma(edge_value([e0, e1]));
+            let edge_color = edge_value([e0, e1]).map(magma).unwrap_or(default_color);
             new_vc.push(edge_color);
             new_vc.push(edge_color);
             new_vc.push(edge_color);
