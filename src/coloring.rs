@@ -5,7 +5,7 @@ use super::{add, kmul, F};
 pub fn magma(v: F) -> [F; 3] {
     assert!(
         (0.0..=1.0).contains(&v),
-        "Magma values should be in the 0-1 range"
+        "Magma values should be in the 0-1 range, got {v}"
     );
     let idx = 255. * v;
     let below = (idx.floor() as usize).min(254);
