@@ -58,7 +58,7 @@ pub fn optional_edge_value_visualization<'a>(
 
 pub fn opt_raw_edge_visualization(
     edges: impl Iterator<Item = [usize; 2]>,
-    vs: &[[F; 3]],
+    vs: impl Fn(usize) -> [F; 3],
     edge_value: impl Fn([usize; 2]) -> Option<F>,
     default_color: [F; 3],
     width: F,
@@ -69,8 +69,8 @@ pub fn opt_raw_edge_visualization(
 
     for [e0, e1] in edges {
         let color = edge_value([e0, e1]).map(magma).unwrap_or(default_color);
-        let e0 = vs[e0];
-        let e1 = vs[e1];
+        let e0 = vs(e0);
+        let e1 = vs(e1);
         let e_dir = normalize(sub(e1, e0));
         if e_dir.iter().all(|&v| v == 0.) {
             continue;
@@ -147,11 +147,13 @@ fn test_edge_vis() {
 #[ignore]
 #[test]
 fn test_raw_edge_vis() {
+    let vs = [[0.; 3], [1., 0., 0.], [1., 1., 0.], [0., 1., 0.]];
     let (vs, vc, fs) = opt_raw_edge_visualization(
         [[0, 1], [1, 2], [2, 3], [3, 0]].into_iter(),
-        &[[0.; 3], [1., 0., 0.], [1., 1., 0.], [0., 1., 0.]],
+        |vi| vs[vi],
         |[i, _j]| Some((i + 1) as F / 4.),
         [0., 1., 0.],
+        1e-2,
     );
     use super::ply::Ply;
     let vc = vc
