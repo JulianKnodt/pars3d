@@ -1,13 +1,20 @@
 # pars3d
 
-A simple standalone 3D parsing library.
+A standalone 3D parsing library.
 Currently supports the following formats:
 
 - .obj
 - .off
 - .stl
+- .ply
+- .glb/.gltf (with `feature = "gltf"`, and only some support)
 
 # Design:
 
-Unlike Assimp, each file has a different structure. This means that each format will not be
-burdened by the structure of others, but adds additional complexity.
+Each file format has its own `struct` which represents the data supported by that specific file
+type. These structs are then unifiable into a single generic mesh representation.
+
+# Visualization
+
+In addition to parsing 3D file formats, there is minimal support for visualization with vertex
+colors. This can be used to output PLY files with per edge colors.

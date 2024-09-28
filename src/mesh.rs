@@ -6,9 +6,14 @@ use super::FaceKind;
 #[cfg(feature = "gltf")]
 use super::gltf::GLTFMesh;
 
+const MAX_UV: usize = 4;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Mesh {
     pub v: Vec<[F; 3]>,
+    pub uv: [Vec<[F; 2]>; MAX_UV],
+
+    pub n: Vec<[F; 3]>,
     pub f: Vec<FaceKind>,
 
     /// 1-1 relation between vertices and joint/idxs weights.
@@ -31,6 +36,8 @@ impl From<ObjObject> for Mesh {
         Self {
             v: obj.v,
             f,
+            n: vec![],
+            uv: std::array::from_fn(|_| Vec::new()),
 
             joint_idxs: vec![],
             joint_weights: vec![],
@@ -47,12 +54,14 @@ impl From<GLTFMesh> for Mesh {
         let f = gltf_mesh
             .f
             .into_iter()
-            .map(|f| FaceKind::Tri(f))
+            .map(FaceKind::Tri)
             .collect::<Vec<_>>();
 
         Self {
             v: gltf_mesh.v,
             f,
+            n: vec![],
+            uv: std::array::from_fn(|_| Vec::new()),
 
             joint_idxs: gltf_mesh.joint_idxs,
             joint_weights: gltf_mesh.joint_weights,
