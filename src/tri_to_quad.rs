@@ -107,14 +107,24 @@ pub fn quadrangulate(
     let mut new_faces = vec![];
     let mut deleted = vec![false; faces.len()];
 
-    for (_, _, new_quad, [a, b]) in merge_heap.into_iter_sorted() {
-        if deleted[a] || deleted[b] {
-            continue;
-        }
+    let mut snd_heap = BinaryHeap::new();
 
-        deleted[a] = true;
-        deleted[b] = true;
-        new_faces.push(FaceKind::Quad(new_quad));
+    while let Some((ang, align, q, [a,b])) = merge_heap.pop() {
+        snd_heap.push((align, ang, q, [a,b]));
+
+        while let Some((_, ang, q, [a,b])) = snd_heap.pop() {
+            if deleted[a] || deleted[b] {
+                continue;
+            }
+            while let Some(&(na, nal, nq, nab)) = merge_heap.peek() &&
+              ((na.0).0 - (ang.0).0).abs() < 1e-6 {
+              merge_heap.pop();
+              snd_heap.push((nal, na, nq, nab));
+            }
+            deleted[a] = true;
+            deleted[b] = true;
+            new_faces.push(FaceKind::Quad(q));
+        }
     }
 
     new_faces.extend(
