@@ -65,7 +65,11 @@ pub fn quadrangulate(
         let Some(corner_b) = tri_b.into_iter().find(|&v| v != e0 && v != e1) else {
             continue;
         };
-        assert_ne!(corner_a, corner_b);
+
+        // repeat faces
+        if corner_a == corner_b {
+            continue;
+        }
 
         while tri_a[0] != corner_a {
             tri_a.rotate_left(1);
