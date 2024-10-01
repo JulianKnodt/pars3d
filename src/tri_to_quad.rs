@@ -4,21 +4,37 @@ use std::collections::HashMap;
 
 use std::collections::BinaryHeap;
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 struct OrdFloat(F);
 impl Eq for OrdFloat {}
 
+impl PartialOrd for OrdFloat {
+    fn partial_cmp(&self, f: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(f))
+    }
+}
 impl Ord for OrdFloat {
     fn cmp(&self, f: &Self) -> std::cmp::Ordering {
         self.0.total_cmp(&f.0)
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QuadPreference {
+    /// Prefer constructing pi/2 angles.
+    RightAngle,
+    /// Prefer constructing quads with opposing angles being the most similar.
+    Symmetric,
+}
+
+/// Quadrangulate a set of vertices and faces.
+/// Epsilon is given in [0,1] for both.
 pub fn quadrangulate(
     vs: &[[F; 3]],
     faces: &[FaceKind],
     planarity_eps: F,
     angle_eps: F,
+    quad_pref: QuadPreference,
 ) -> Vec<FaceKind> {
     let mut edge_adj: HashMap<[usize; 2], EdgeKind> = HashMap::new();
 
@@ -84,28 +100,35 @@ pub fn quadrangulate(
         let new_angle0 = dot(normalize(sub(v0, v1)), normalize(sub(v2, v1)))
             .clamp(-1., 1.)
             .acos();
-        const HALF_PI: F = std::f64::consts::FRAC_PI_2 as F;
-        if (new_angle0 - HALF_PI).abs() > angle_eps {
-            continue;
-        }
-
         let new_angle1 = dot(normalize(sub(v2, v3)), normalize(sub(v0, v3)))
             .clamp(-1., 1.)
             .acos();
-        if (new_angle1 - HALF_PI).abs() > angle_eps {
-            continue;
-        }
+        let angle_metric = match quad_pref {
+            QuadPreference::RightAngle => {
+                const HALF_PI: F = std::f64::consts::FRAC_PI_2 as F;
+                let delta0 = (new_angle0 - HALF_PI).abs();
+                if delta0 > angle_eps {
+                    continue;
+                }
 
-        use std::cmp::Reverse;
-        merge_heap.push((
-            Reverse(OrdFloat(
-                (new_angle0 - HALF_PI).abs() + (new_angle1 - HALF_PI).abs(),
-            )),
-            // higher is better for this one
-            OrdFloat(align),
-            new_quad,
-            [a, b],
-        ));
+                let delta1 = (new_angle1 - HALF_PI).abs();
+                if delta1 > angle_eps {
+                    continue;
+                }
+                delta0 + delta1
+            }
+            QuadPreference::Symmetric => {
+                let delta = (new_angle0 - new_angle1).abs();
+                if delta > angle_eps {
+                    continue;
+                }
+                delta
+            }
+        };
+
+        // higher is better for this alignment
+        // lower is better for angle metric
+        merge_heap.push((OrdFloat(-angle_metric), OrdFloat(align), new_quad, [a, b]));
     }
 
     let mut new_faces = vec![];
@@ -121,7 +144,7 @@ pub fn quadrangulate(
                 continue;
             }
             while let Some(&(na, nal, nq, nab)) = merge_heap.peek()
-                && ((na.0).0 - (ang.0).0).abs() < 1e-6
+                && (na.0 - ang.0).abs() < 1e-3
             {
                 merge_heap.pop();
                 snd_heap.push((nal, na, nq, nab));
