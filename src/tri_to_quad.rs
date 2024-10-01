@@ -113,17 +113,18 @@ pub fn quadrangulate(
 
     let mut snd_heap = BinaryHeap::new();
 
-    while let Some((ang, align, q, [a,b])) = merge_heap.pop() {
-        snd_heap.push((align, ang, q, [a,b]));
+    while let Some((ang, align, q, [a, b])) = merge_heap.pop() {
+        snd_heap.push((align, ang, q, [a, b]));
 
-        while let Some((_, ang, q, [a,b])) = snd_heap.pop() {
+        while let Some((_, ang, q, [a, b])) = snd_heap.pop() {
             if deleted[a] || deleted[b] {
                 continue;
             }
-            while let Some(&(na, nal, nq, nab)) = merge_heap.peek() &&
-              ((na.0).0 - (ang.0).0).abs() < 1e-6 {
-              merge_heap.pop();
-              snd_heap.push((nal, na, nq, nab));
+            while let Some(&(na, nal, nq, nab)) = merge_heap.peek()
+                && ((na.0).0 - (ang.0).0).abs() < 1e-6
+            {
+                merge_heap.pop();
+                snd_heap.push((nal, na, nq, nab));
             }
             deleted[a] = true;
             deleted[b] = true;

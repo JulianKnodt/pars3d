@@ -133,10 +133,7 @@ fn test_edge_vis() {
         .map(|rgb| rgb.map(|v| (v * 255.) as u8))
         .collect::<Vec<_>>();
 
-    let fs = fs
-        .into_iter()
-        .map(super::FaceKind::Tri)
-        .collect::<Vec<_>>();
+    let fs = fs.into_iter().map(super::FaceKind::Tri).collect::<Vec<_>>();
 
     let ply = Ply::new(vs, vc, fs);
     use std::fs::File;
