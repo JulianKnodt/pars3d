@@ -33,11 +33,12 @@ impl From<ObjObject> for Mesh {
         });
         f.extend(iter);
 
+        // TODO here would need to dedup vertices and UVs so that each index is unique.
         Self {
             v: obj.v,
             f,
-            n: vec![],
-            uv: std::array::from_fn(|_| Vec::new()),
+            n: obj.vn,
+            uv: [obj.vt, vec![], vec![], vec![]],
 
             joint_idxs: vec![],
             joint_weights: vec![],

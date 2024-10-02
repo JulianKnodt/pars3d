@@ -71,7 +71,7 @@ where
                     out.joint_weights
                         .extend(jwr.into_f32().map(|ws| ws.map(|w| w as F)));
                 } else {
-                  assert!(out.joint_idxs.is_empty());
+                    assert!(out.joint_idxs.is_empty());
                 }
 
                 let idxs = reader
