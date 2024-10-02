@@ -3,8 +3,8 @@ use super::F;
 
 use super::FaceKind;
 
-#[cfg(feature = "gltf")]
-use super::gltf::GLTFMesh;
+use std::array::from_fn;
+use std::collections::HashMap;
 
 const MAX_UV: usize = 4;
 
@@ -23,28 +23,59 @@ pub struct Mesh {
 
 impl From<ObjObject> for Mesh {
     fn from(obj: ObjObject) -> Self {
-        let mut f = vec![];
+        let mut fs = vec![];
 
-        let iter = obj.f.into_iter().filter_map(|f| match f.v.as_slice() {
-            [] | [_] | [_, _] => None,
-            &[a, b, c] => Some(FaceKind::Tri([a, b, c])),
-            &[a, b, c, d] => Some(FaceKind::Quad([a, b, c, d])),
-            _ => Some(FaceKind::Poly(f.v)),
-        });
-        f.extend(iter);
+        let mut verts = HashMap::new();
+        let mut v = vec![];
+        let mut uv = vec![];
+        let mut n = vec![];
+
+        for f in obj.f.into_iter() {
+            if f.v.len() < 3 {
+                continue;
+            }
+            macro_rules! key_i {
+                ($i: expr) => {
+                    (f.v[$i], f.vt.get($i).copied(), f.vn.get($i).copied())
+                };
+            }
+            for i in 0..f.v.len() {
+                let key = key_i!(i);
+                if !verts.contains_key(&key) {
+                    v.push(obj.v[f.v[i]]);
+                    if let Some(vt) = key.1 {
+                        uv.push(obj.vt[vt]);
+                    };
+                    if let Some(vn) = key.2 {
+                        n.push(obj.vn[vn]);
+                    };
+                    verts.insert(key, verts.len());
+                }
+            }
+            let f = match f.v.len() {
+                0 | 1 | 2 => unreachable!(),
+                3 => FaceKind::Tri(from_fn(|i| verts[&key_i!(i)])),
+                4 => FaceKind::Quad(from_fn(|i| verts[&key_i!(i)])),
+                n => FaceKind::Poly((0..n).map(|i| verts[&key_i!(i)]).collect::<Vec<_>>()),
+            };
+            fs.push(f);
+        }
 
         // TODO here would need to dedup vertices and UVs so that each index is unique.
         Self {
-            v: obj.v,
-            f,
-            n: obj.vn,
-            uv: [obj.vt, vec![], vec![], vec![]],
+            v,
+            f: fs,
+            n,
+            uv: [uv, vec![], vec![], vec![]],
 
             joint_idxs: vec![],
             joint_weights: vec![],
         }
     }
 }
+
+#[cfg(feature = "gltf")]
+use super::gltf::GLTFMesh;
 
 #[cfg(feature = "gltf")]
 impl From<GLTFMesh> for Mesh {
