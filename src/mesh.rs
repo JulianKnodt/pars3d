@@ -21,6 +21,16 @@ pub struct Mesh {
     pub joint_weights: Vec<[F; 4]>,
 }
 
+impl Mesh {
+    pub fn flip_uv_v(&mut self) {
+        for uv_chan in self.uv.iter_mut() {
+            for uvs in uv_chan.iter_mut() {
+                uvs[1] = 1. - uvs[1];
+            }
+        }
+    }
+}
+
 impl From<ObjObject> for Mesh {
     fn from(obj: ObjObject) -> Self {
         let mut fs = vec![];
