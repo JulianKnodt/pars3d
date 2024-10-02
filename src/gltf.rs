@@ -3,8 +3,12 @@ use super::F;
 #[derive(Default, Clone, PartialEq)]
 pub struct GLTFMesh {
     pub v: Vec<[F; 3]>,
-    pub uvs: Vec<[F; 2]>,
     pub f: Vec<[usize; 3]>,
+
+    pub uvs: Vec<[F; 2]>,
+
+    pub n: Vec<[F; 3]>,
+
     // For each vertex, associate it with 4 bones
     pub joint_idxs: Vec<[u16; 4]>,
     pub joint_weights: Vec<[F; 4]>,
@@ -45,6 +49,14 @@ where
                         .map(|uvs| uvs.map(|uv| uv as F)),
                 );
 
+                out.n.extend(
+                    reader
+                        .read_normals()
+                        .into_iter()
+                        .flatten()
+                        .map(|n| n.map(|n| n as F)),
+                );
+
                 if let Some(jr) = reader.read_joints(0) {
                     let mut num_joint = 0;
                     for p in jr.into_u16() {
@@ -58,11 +70,8 @@ where
                     };
                     out.joint_weights
                         .extend(jwr.into_f32().map(|ws| ws.map(|w| w as F)));
-                } else if !out.joint_idxs.is_empty() {
-                    let num_missing = out.v.len() - out.joint_idxs.len();
-                    out.joint_idxs.extend((0..num_missing).map(|i| [0; 4]));
-                    out.joint_weights.extend((0..num_missing).map(|i| [0.; 4]));
-                    assert_eq!(out.joint_idxs.len(), out.v.len());
+                } else {
+                  assert!(out.joint_idxs.is_empty());
                 }
 
                 let idxs = reader

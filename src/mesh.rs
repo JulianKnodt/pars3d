@@ -61,7 +61,7 @@ impl From<GLTFMesh> for Mesh {
             v: gltf_mesh.v,
             f,
             n: vec![],
-            uv: std::array::from_fn(|_| Vec::new()),
+            uv: [gltf_mesh.uvs, vec![], vec![], vec![]],
 
             joint_idxs: gltf_mesh.joint_idxs,
             joint_weights: gltf_mesh.joint_weights,
