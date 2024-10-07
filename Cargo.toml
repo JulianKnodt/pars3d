@@ -10,5 +10,6 @@ image = "0.24.7"
 gltf = { version = "1.4.1", features = ["utils"], optional = true }
 
 [features]
+default = ["gltf"]
 f64 = []
 gltf = ["dep:gltf"]

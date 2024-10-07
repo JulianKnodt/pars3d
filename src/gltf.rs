@@ -6,8 +6,7 @@ pub struct GLTFScene {
     meshes: Vec<GLTFMesh>,
 
     root_nodes: Vec<usize>,
-
-    materials: Vec<Material>,
+    //materials: Vec<Material>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -15,6 +14,9 @@ pub struct GLTFNode {
     mesh: Option<usize>,
     children: Vec<usize>,
     skin: Vec<usize>,
+
+    name: String,
+    // TODO also needs to include a transform
 }
 
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -43,51 +45,50 @@ where
         buffers: &[gltf::buffer::Data],
         node: &gltf::scene::Node,
         out: &mut GLTFScene,
-    ) {
+    ) -> usize {
+        let mut new_node = GLTFNode::default();
+        new_node.name = node.name().map(String::from).unwrap_or_else(String::new);
+
         if let Some(m) = node.mesh() {
+            let mut new_mesh = GLTFMesh::default();
             for p in m.primitives() {
-                let offset = out.v.len();
+                let offset = new_mesh.v.len();
                 let reader = p.reader(|buffer: gltf::Buffer| {
                     buffers.get(buffer.index()).map(|data| &data[..])
                 });
-                let mut num_pos = 0;
-                for p in reader.read_positions().into_iter().flatten() {
-                    out.v.push(p.map(|v| v as F));
-                    num_pos += 1;
-                }
+                let ps = reader
+                    .read_positions()
+                    .into_iter()
+                    .flatten()
+                    .map(|p| p.map(|v| v as F));
+                new_mesh.v.extend(ps);
 
-                out.uvs.extend(
-                    reader
-                        .read_tex_coords(0)
-                        .map(|v| v.into_f32())
-                        .into_iter()
-                        .flatten()
-                        .map(|uvs| uvs.map(|uv| uv as F)),
-                );
+                let uvs = reader
+                    .read_tex_coords(0)
+                    .map(|v| v.into_f32())
+                    .into_iter()
+                    .flatten()
+                    .map(|uvs| uvs.map(|uv| uv as F));
+                new_mesh.uvs.extend(uvs);
+                assert_eq!(new_mesh.uvs.len(), new_mesh.v.len());
 
-                out.n.extend(
-                    reader
-                        .read_normals()
-                        .into_iter()
-                        .flatten()
-                        .map(|n| n.map(|n| n as F)),
-                );
+                let ns = reader
+                    .read_normals()
+                    .into_iter()
+                    .flatten()
+                    .map(|n| n.map(|n| n as F));
+                new_mesh.n.extend(ns);
+                assert_eq!(new_mesh.n.len(), new_mesh.v.len());
 
                 if let Some(jr) = reader.read_joints(0) {
-                    let mut num_joint = 0;
-                    for p in jr.into_u16() {
-                        out.joint_idxs.push(p);
-                        num_joint += 1;
-                    }
-                    assert_eq!(num_pos, num_joint);
-                    assert_eq!(out.joint_idxs.len(), out.v.len());
-                    let Some(jwr) = reader.read_weights(0) else {
-                        panic!("has joints but no weights?");
-                    };
-                    out.joint_weights
+                    new_mesh.joint_idxs.extend(jr.into_u16());
+                    assert_eq!(new_mesh.joint_idxs.len(), new_mesh.v.len());
+                    let jwr = reader
+                        .read_weights(0)
+                        .expect("GLTF has joints but no weights?");
+                    new_mesh
+                        .joint_weights
                         .extend(jwr.into_f32().map(|ws| ws.map(|w| w as F)));
-                } else {
-                    assert!(out.joint_idxs.is_empty());
                 }
 
                 let idxs = reader
@@ -95,14 +96,20 @@ where
                     .unwrap()
                     .into_u32()
                     .array_chunks::<3>();
-                for vis in idxs {
-                    out.f.push(vis.map(|vi| vi as usize + offset));
-                }
+                new_mesh
+                    .f
+                    .extend(idxs.map(|vis| vis.map(|vi| vi as usize + offset)));
             }
+            new_node.mesh = Some(out.meshes.len());
+            out.meshes.push(new_mesh);
         }
         for child in node.children() {
-            traverse_node(gltf, buffers, &child, out);
+            let child_idx = traverse_node(gltf, buffers, &child, out);
+            new_node.children.push(child_idx);
         }
+        let idx = out.nodes.len();
+        out.nodes.push(new_node);
+        idx
     }
 
     let out = doc
@@ -110,9 +117,10 @@ where
         .map(|scene| {
             let mut out = GLTFScene::default();
             for root_node in scene.nodes() {
-                out.root_nodes.push(out.nodes.len());
-                traverse_node(&doc, &buffers, &root_node, &mut out);
+                let idx = traverse_node(&doc, &buffers, &root_node, &mut out);
+                out.root_nodes.push(idx);
             }
+            out
         })
         .collect::<Vec<_>>();
     Ok(out)
@@ -120,7 +128,13 @@ where
 
 #[test]
 fn test_load_gltf() {
-    let mesh = load("jacket.glb").unwrap();
+    let mut scenes = load("etrian_odyssey_3_monk.glb").unwrap();
+    assert_eq!(scenes.len(), 1);
+    let scene = scenes.pop().unwrap();
+    assert_eq!(scene.root_nodes.len(), 1);
+    assert_eq!(scene.meshes.len(), 24);
+    assert_eq!(scene.nodes.len(), 293);
+    /*
     for [x, y, z] in &mesh.v {
         println!("v {x} {y} {z}");
     }
@@ -128,4 +142,5 @@ fn test_load_gltf() {
         let [i, j, k] = ijk.map(|i| i + 1);
         println!("f {i} {j} {k}");
     }
+    */
 }
