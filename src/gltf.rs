@@ -2,10 +2,10 @@ use super::F;
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct GLTFScene {
-    nodes: Vec<GLTFNode>,
-    meshes: Vec<GLTFMesh>,
+    pub nodes: Vec<GLTFNode>,
+    pub meshes: Vec<GLTFMesh>,
 
-    root_nodes: Vec<usize>,
+    pub root_nodes: Vec<usize>,
     //materials: Vec<Material>,
 }
 

@@ -8,13 +8,14 @@ use std::collections::HashMap;
 
 const MAX_UV: usize = 4;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Default, Debug, Clone, PartialEq)]
 pub struct Mesh {
     pub v: Vec<[F; 3]>,
     pub uv: [Vec<[F; 2]>; MAX_UV],
 
     pub n: Vec<[F; 3]>,
     pub f: Vec<FaceKind>,
+    pub face_mesh_idx: Vec<usize>,
 
     /// 1-1 relation between vertices and joint/idxs weights.
     pub joint_idxs: Vec<[u16; 4]>,
@@ -71,9 +72,9 @@ impl From<ObjObject> for Mesh {
             fs.push(f);
         }
 
-        // TODO here would need to dedup vertices and UVs so that each index is unique.
         Self {
             v,
+            face_mesh_idx: vec![0; fs.len()],
             f: fs,
             n,
             uv: [uv, vec![], vec![], vec![]],
@@ -84,29 +85,35 @@ impl From<ObjObject> for Mesh {
     }
 }
 
+// Convert a GLTF Scene into a flat mesh.
 #[cfg(feature = "gltf")]
-use super::gltf::GLTFMesh;
-
-#[cfg(feature = "gltf")]
-impl From<GLTFMesh> for Mesh {
-    fn from(gltf_mesh: GLTFMesh) -> Self {
-        if !gltf_mesh.joint_idxs.is_empty() {
-            assert_eq!(gltf_mesh.v.len(), gltf_mesh.joint_idxs.len());
+impl From<super::gltf::GLTFScene> for Mesh {
+    fn from(mut gltf_scene: super::gltf::GLTFScene) -> Self {
+        let mut out = Self::default();
+        for (mi, mesh) in gltf_scene.meshes.iter_mut().enumerate() {
+            out.face_mesh_idx.extend((0..mesh.f.len()).map(|_| mi));
+            let fs = mesh
+                .f
+                .iter()
+                .map(|&vis| vis.map(|vi| vi + out.v.len()))
+                .map(FaceKind::Tri);
+            out.f.extend(fs);
+            let curr_num_v = out.v.len();
+            out.v.append(&mut mesh.v);
+            out.n.append(&mut mesh.n);
+            out.uv[0].append(&mut mesh.uvs);
+            if mesh.joint_idxs.is_empty() {
+                assert!(mesh.joint_weights.is_empty());
+                out.joint_idxs
+                    .extend((curr_num_v..out.v.len()).map(|_| [0; 4]));
+                out.joint_weights
+                    .extend((curr_num_v..out.v.len()).map(|_| [0.; 4]));
+            } else {
+                assert!(!mesh.joint_weights.is_empty());
+                out.joint_idxs.append(&mut mesh.joint_idxs);
+                out.joint_weights.append(&mut mesh.joint_weights);
+            }
         }
-        let f = gltf_mesh
-            .f
-            .into_iter()
-            .map(FaceKind::Tri)
-            .collect::<Vec<_>>();
-
-        Self {
-            v: gltf_mesh.v,
-            f,
-            n: vec![],
-            uv: [gltf_mesh.uvs, vec![], vec![], vec![]],
-
-            joint_idxs: gltf_mesh.joint_idxs,
-            joint_weights: gltf_mesh.joint_weights,
-        }
+        out
     }
 }
