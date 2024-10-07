@@ -114,6 +114,10 @@ impl From<super::gltf::GLTFScene> for Mesh {
                 out.joint_weights.append(&mut mesh.joint_weights);
             }
         }
+        // flip all UV
+        for uv in &mut out.uv[0] {
+          uv[1] = 1. - uv[1];
+        }
         out
     }
 }
