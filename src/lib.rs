@@ -39,6 +39,7 @@ pub mod coloring;
 /// Visualize per-element attributes.
 pub mod visualization;
 
+/// Load GLTF meshes.
 #[cfg(feature = "gltf")]
 pub mod gltf;
 

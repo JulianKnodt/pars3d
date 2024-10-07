@@ -1,6 +1,23 @@
 use super::F;
 
-#[derive(Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct GLTFScene {
+    nodes: Vec<GLTFNode>,
+    meshes: Vec<GLTFMesh>,
+
+    root_nodes: Vec<usize>,
+
+    materials: Vec<Material>,
+}
+
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct GLTFNode {
+    mesh: Option<usize>,
+    children: Vec<usize>,
+    skin: Vec<usize>,
+}
+
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct GLTFMesh {
     pub v: Vec<[F; 3]>,
     pub f: Vec<[usize; 3]>,
@@ -14,19 +31,18 @@ pub struct GLTFMesh {
     pub joint_weights: Vec<[F; 4]>,
 }
 
-pub fn load<P>(path: P) -> gltf::Result<GLTFMesh>
+/// Load a GLTF/GLB file into a GLTFScene.
+pub fn load<P>(path: P) -> gltf::Result<Vec<GLTFScene>>
 where
     P: AsRef<std::path::Path>,
 {
     let (doc, buffers, _images) = gltf::import(path)?;
 
-    let mut out = GLTFMesh::default();
-
     fn traverse_node(
         gltf: &gltf::Document,
         buffers: &[gltf::buffer::Data],
         node: &gltf::scene::Node,
-        out: &mut GLTFMesh,
+        out: &mut GLTFScene,
     ) {
         if let Some(m) = node.mesh() {
             for p in m.primitives() {
@@ -89,11 +105,16 @@ where
         }
     }
 
-    for scene in doc.scenes() {
-        for root_node in scene.nodes() {
-            traverse_node(&doc, &buffers, &root_node, &mut out);
-        }
-    }
+    let out = doc
+        .scenes()
+        .map(|scene| {
+            let mut out = GLTFScene::default();
+            for root_node in scene.nodes() {
+                out.root_nodes.push(out.nodes.len());
+                traverse_node(&doc, &buffers, &root_node, &mut out);
+            }
+        })
+        .collect::<Vec<_>>();
     Ok(out)
 }
 
@@ -107,6 +128,4 @@ fn test_load_gltf() {
         let [i, j, k] = ijk.map(|i| i + 1);
         println!("f {i} {j} {k}");
     }
-    /*
-     */
 }
