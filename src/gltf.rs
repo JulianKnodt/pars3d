@@ -127,11 +127,12 @@ where
     Ok(out)
 }
 
-// Seems this is non-trivial for more complicated meshes.
-fn save_binary(&scene: GLTFScene, r: impl std::io::Read, binary: bool) -> io::Result<()> {
-  todo!()
-  //let mut root = gltf_json::Root::default();
-  //let buffer_len = scene.meshes.iter().map(|v|
+// TODO Seems this is non-trivial for more complicated meshes.
+#[allow(unused)]
+fn save_binary(_scene: &GLTFScene, _r: impl std::io::Read, _binary: bool) -> io::Result<()> {
+    todo!()
+    //let mut root = gltf_json::Root::default();
+    //let buffer_len = scene.meshes.iter().map(|v|
 }
 
 #[test]

@@ -10,16 +10,16 @@ const MAX_UV: usize = 4;
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Node {
-    mesh: Option<usize>,
-    children: Vec<usize>,
+    pub mesh: Option<usize>,
+    pub children: Vec<usize>,
     // TODO more fields
 }
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Scene {
-    root_nodes: Vec<usize>,
-    nodes: Vec<Node>,
-    meshes: Vec<Mesh>,
+    pub root_nodes: Vec<usize>,
+    pub nodes: Vec<Node>,
+    pub meshes: Vec<Mesh>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
