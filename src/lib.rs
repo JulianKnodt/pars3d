@@ -95,12 +95,12 @@ impl FaceKind {
     }
 }
 
-pub(crate) fn kmul(k: F, [x, y, z]: [F; 3]) -> [F; 3] {
-    [x * k, y * k, z * k]
+pub(crate) fn kmul<const N: usize>(k: F, v: [F; N]) -> [F; N] {
+    v.map(|v| v * k)
 }
 
-pub(crate) fn add([a, b, c]: [F; 3], [x, y, z]: [F; 3]) -> [F; 3] {
-    [a + x, b + y, c + z]
+pub(crate) fn add<const N: usize>(a: [F; N], b: [F; N]) -> [F; N] {
+    std::array::from_fn(|i| a[i] + b[i])
 }
 
 pub(crate) fn sub([a, b, c]: [F; 3], [x, y, z]: [F; 3]) -> [F; 3] {
@@ -113,6 +113,41 @@ pub(crate) fn cross([x, y, z]: [F; 3], [a, b, c]: [F; 3]) -> [F; 3] {
 
 pub(crate) fn dot([a, b, c]: [F; 3], [x, y, z]: [F; 3]) -> F {
     a * x + b * y + c * z
+}
+
+/// Apply a transformation (col major 4x4) to a point
+pub fn tform_point(tform: [[F; 4]; 4], p: [F; 3]) -> [F; 3] {
+    let out = (0..4)
+        .map(|i| {
+            if i == 3 {
+                tform[i]
+            } else {
+                kmul(p[i], tform[i])
+            }
+        })
+        .fold([0.; 4], add);
+    std::array::from_fn(|i| out[i] / out[3])
+}
+pub fn identity<const N: usize>() -> [[F; N]; N] {
+    let mut out = [[0.; N]; N];
+    for i in 0..N {
+        out[i][i] = 1.;
+    }
+    out
+}
+
+/// Matrix multiplication.
+/// For composing transforms together.
+pub fn matmul<const N: usize>(ta: [[F; N]; N], tb: [[F; N]; N]) -> [[F; N]; N] {
+    let mut out = [[0.; N]; N];
+    for i in 0..N {
+        for j in 0..N {
+            for k in 0..N {
+                out[i][j] += ta[i][k] * tb[k][j];
+            }
+        }
+    }
+    out
 }
 
 #[inline]

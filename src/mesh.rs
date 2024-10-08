@@ -1,7 +1,5 @@
 use super::obj::ObjObject;
-use super::F;
-
-use super::FaceKind;
+use super::{FaceKind, F};
 
 use std::array::from_fn;
 use std::collections::HashMap;
@@ -99,12 +97,18 @@ impl From<ObjObject> for Mesh {
     }
 }
 
-// Convert a GLTF Scene into a flat mesh.
+/// Convert a GLTF Scene into a flat mesh.
+/// Will put the mesh into it's default pose.
 #[cfg(feature = "gltf")]
 impl From<super::gltf::GLTFScene> for Mesh {
-    fn from(mut gltf_scene: super::gltf::GLTFScene) -> Self {
+    fn from(gltf_scene: super::gltf::GLTFScene) -> Self {
         let mut out = Self::default();
-        for (mi, mesh) in gltf_scene.meshes.iter_mut().enumerate() {
+        gltf_scene.traverse(|node, tform| {
+            let Some(mi) = node.mesh else {
+                return;
+            };
+            let mut mesh = gltf_scene.meshes[mi].clone();
+
             out.face_mesh_idx.extend((0..mesh.f.len()).map(|_| mi));
             let fs = mesh
                 .f
@@ -113,7 +117,8 @@ impl From<super::gltf::GLTFScene> for Mesh {
                 .map(FaceKind::Tri);
             out.f.extend(fs);
             let curr_num_v = out.v.len();
-            out.v.append(&mut mesh.v);
+            out.v
+                .extend(mesh.v.into_iter().map(|v| super::tform_point(tform, v)));
             out.n.append(&mut mesh.n);
             out.uv[0].append(&mut mesh.uvs);
             if mesh.joint_idxs.is_empty() {
@@ -127,7 +132,7 @@ impl From<super::gltf::GLTFScene> for Mesh {
                 out.joint_idxs.append(&mut mesh.joint_idxs);
                 out.joint_weights.append(&mut mesh.joint_weights);
             }
-        }
+        });
         // flip all UV
         for uv in &mut out.uv[0] {
             uv[1] = 1. - uv[1];

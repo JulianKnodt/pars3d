@@ -1,4 +1,4 @@
-use super::F;
+use super::{identity, matmul, F};
 use std::io;
 
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -10,14 +10,38 @@ pub struct GLTFScene {
     //materials: Vec<Material>,
 }
 
+impl GLTFScene {
+    pub fn traverse(&self, mut visit: impl FnMut(&GLTFNode, [[F; 4]; 4])) {
+        for &root_node in &self.root_nodes {
+            self.nodes[root_node].traverse(self, identity::<4>(), &mut visit);
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct GLTFNode {
-    mesh: Option<usize>,
+    pub mesh: Option<usize>,
     children: Vec<usize>,
     skin: Vec<usize>,
 
     name: String,
     // TODO also needs to include a transform
+    pub transform: [[F; 4]; 4],
+}
+
+impl GLTFNode {
+    fn traverse(
+        &self,
+        scene: &GLTFScene,
+        curr_tform: [[F; 4]; 4],
+        mut visit: impl FnMut(&Self, [[F; 4]; 4]),
+    ) {
+        let new_tform = matmul(self.transform, curr_tform);
+        visit(self, new_tform);
+        for &c in &self.children {
+            scene.nodes[c].traverse(scene, new_tform, &mut visit);
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -52,6 +76,7 @@ where
 
         if let Some(m) = node.mesh() {
             let mut new_mesh = GLTFMesh::default();
+            new_node.transform = node.transform().matrix().map(|col| col.map(|v| v as F));
             for p in m.primitives() {
                 let offset = new_mesh.v.len();
                 let reader = p.reader(|buffer: gltf::Buffer| {

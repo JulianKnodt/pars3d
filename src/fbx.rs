@@ -1,4 +1,4 @@
-use super::mesh::{Scene, Node};
+use super::mesh::{Node, Scene};
 
 use std::fs::File;
 use std::io::{self, BufReader};
@@ -36,7 +36,7 @@ where
         let nexts = get_object_by_parent!(id).filter(|o| o.class() == "Model");
 
         for n in nexts {
-          println!("{:?}", n.get_typed());
+            println!("{:?}", n.get_typed());
         }
     };
 
