@@ -484,6 +484,7 @@ version = "0.1.0"
 dependencies = [
  "fbxcel-dom",
  "gltf",
+ "gltf-json",
  "image 0.24.9",
 ]
 

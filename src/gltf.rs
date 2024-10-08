@@ -1,4 +1,5 @@
 use super::F;
+use std::io;
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct GLTFScene {
@@ -124,6 +125,13 @@ where
         })
         .collect::<Vec<_>>();
     Ok(out)
+}
+
+// Seems this is non-trivial for more complicated meshes.
+fn save_binary(&scene: GLTFScene, r: impl std::io::Read, binary: bool) -> io::Result<()> {
+  todo!()
+  //let mut root = gltf_json::Root::default();
+  //let buffer_len = scene.meshes.iter().map(|v|
 }
 
 #[test]
