@@ -8,6 +8,20 @@ use std::collections::HashMap;
 
 const MAX_UV: usize = 4;
 
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct Node {
+    mesh: Option<usize>,
+    children: Vec<usize>,
+    // TODO more fields
+}
+
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct Scene {
+    root_nodes: Vec<usize>,
+    nodes: Vec<Node>,
+    meshes: Vec<Mesh>,
+}
+
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct Mesh {
     pub v: Vec<[F; 3]>,
@@ -116,7 +130,7 @@ impl From<super::gltf::GLTFScene> for Mesh {
         }
         // flip all UV
         for uv in &mut out.uv[0] {
-          uv[1] = 1. - uv[1];
+            uv[1] = 1. - uv[1];
         }
         out
     }

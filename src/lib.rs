@@ -49,6 +49,10 @@ pub mod mesh;
 /// Approximately convert a triangle mesh to a mixed tri/quad mesh.
 pub mod tri_to_quad;
 
+/// FBX parsing.
+#[cfg(feature = "fbx")]
+pub mod fbx;
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum FaceKind {
     Tri([usize; 3]),
