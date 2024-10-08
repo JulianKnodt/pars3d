@@ -126,6 +126,7 @@ pub fn tform_point(tform: [[F; 4]; 4], p: [F; 3]) -> [F; 3] {
             }
         })
         .fold([0.; 4], add);
+    assert_ne!(out[3], 0., "{tform:?}*{p:?} = {out:?}");
     std::array::from_fn(|i| out[i] / out[3])
 }
 pub fn identity<const N: usize>() -> [[F; N]; N] {

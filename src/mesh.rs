@@ -103,7 +103,7 @@ impl From<ObjObject> for Mesh {
 impl From<super::gltf::GLTFScene> for Mesh {
     fn from(gltf_scene: super::gltf::GLTFScene) -> Self {
         let mut out = Self::default();
-        gltf_scene.traverse(|node, tform| {
+        gltf_scene.traverse(&mut |node, tform| {
             let Some(mi) = node.mesh else {
                 return;
             };
