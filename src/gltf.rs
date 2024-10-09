@@ -398,6 +398,9 @@ fn test_load_gltf() {
     assert_eq!(scene.root_nodes.len(), 1);
     assert_eq!(scene.meshes.len(), 24);
     assert_eq!(scene.nodes.len(), 293);
+    let out = std::fs::File::create("gltf_test.glb").expect("Failed to create file");
+    save_gltf(scene.into(), io::BufWriter::new(out), false).expect("Failed to write file");
+
     /*
     for [x, y, z] in &mesh.v {
         println!("v {x} {y} {z}");
