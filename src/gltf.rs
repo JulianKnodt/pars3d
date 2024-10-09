@@ -216,11 +216,20 @@ pub fn save_glb(scene: &super::mesh::Scene, dst: impl Write) -> io::Result<()> {
     for mesh in &scene.meshes {
         for i in 0..mesh.v.len() {
             let v = Vertex {
-                v: mesh.v[i],
-                uv: mesh.uv[0].get(i).copied().unwrap_or_default(),
-                n: mesh.n.get(i).copied().unwrap_or_default(),
+                v: mesh.v[i].map(|v| v as f32),
+                uv: mesh.uv[0]
+                    .get(i)
+                    .copied()
+                    .unwrap_or_default()
+                    .map(|v| v as f32),
+                n: mesh.n.get(i).copied().unwrap_or_default().map(|v| v as f32),
                 joint_idxs: mesh.joint_idxs.get(i).copied().unwrap_or_default(),
-                joint_weights: mesh.joint_weights.get(i).copied().unwrap_or_default(),
+                joint_weights: mesh
+                    .joint_weights
+                    .get(i)
+                    .copied()
+                    .unwrap_or_default()
+                    .map(|v| v as f32),
             };
             bytes.extend(v.to_bytes());
             verts.push(v);
