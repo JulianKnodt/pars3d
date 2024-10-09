@@ -27,6 +27,7 @@ pub struct Node {
     pub mesh: Option<usize>,
     pub children: Vec<usize>,
     // TODO more fields
+    pub transform: [[F; 4]; 4],
 }
 
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -138,6 +139,7 @@ impl From<Obj> for Scene {
             out.nodes.push(Node {
                 mesh: Some(i),
                 children: vec![],
+                transform: super::identity::<4>(),
             });
         }
         out
@@ -184,6 +186,65 @@ impl From<super::gltf::GLTFScene> for Mesh {
         for uv in &mut out.uv[0] {
             uv[1] = 1. - uv[1];
         }
+        out
+    }
+}
+
+#[cfg(feature = "gltf")]
+impl From<super::gltf::GLTFMesh> for Mesh {
+    fn from(gltf_mesh: super::gltf::GLTFMesh) -> Self {
+        let super::gltf::GLTFMesh {
+            v,
+            f,
+            uvs,
+            n,
+            joint_idxs,
+            joint_weights,
+        } = gltf_mesh;
+        let uv = [uvs, vec![], vec![], vec![]];
+        let f = f.into_iter().map(FaceKind::Tri).collect::<Vec<_>>();
+        let face_mesh_idx = vec![];
+        Self {
+            v,
+            f,
+            uv,
+            n,
+            joint_idxs,
+            joint_weights,
+            face_mesh_idx,
+        }
+    }
+}
+
+#[cfg(feature = "gltf")]
+impl From<super::gltf::GLTFScene> for Scene {
+    fn from(gltf_scene: super::gltf::GLTFScene) -> Self {
+        let mut out = Self::default();
+        gltf_scene.traverse_with_parent(|| None, &mut |node, parent_idx: Option<usize>| {
+            let mi = if let Some(mesh) = node.mesh {
+                let mesh = gltf_scene.meshes[mesh].clone().into();
+                let mi = out.meshes.len();
+                out.meshes.push(mesh);
+                Some(mi)
+            } else {
+                None
+            };
+
+            let new_node = Node {
+                mesh: mi,
+                children: vec![],
+                transform: node.transform,
+            };
+
+            let own_idx = out.nodes.len();
+            out.nodes.push(new_node);
+            if let Some(parent_idx) = parent_idx {
+                out.nodes[parent_idx].children.push(own_idx);
+            } else {
+                out.root_nodes.push(own_idx);
+            }
+            Some(own_idx)
+        });
         out
     }
 }

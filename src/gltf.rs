@@ -18,6 +18,17 @@ impl GLTFScene {
             self.nodes[root_node].traverse(self, identity::<4>(), visit);
         }
     }
+    pub fn traverse_with_parent<T>(
+        &self,
+        root_init: impl Fn() -> T,
+        visit: &mut impl FnMut(&GLTFNode, T) -> T,
+    ) where
+        T: Copy,
+    {
+        for &root_node in &self.root_nodes {
+            self.nodes[root_node].traverse_with_parent(self, root_init(), visit);
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -32,7 +43,7 @@ pub struct GLTFNode {
 }
 
 impl GLTFNode {
-    fn traverse(
+    pub fn traverse(
         &self,
         scene: &GLTFScene,
         curr_tform: [[F; 4]; 4],
@@ -42,6 +53,19 @@ impl GLTFNode {
         visit(self, new_tform);
         for &c in &self.children {
             scene.nodes[c].traverse(scene, new_tform, visit);
+        }
+    }
+    pub fn traverse_with_parent<T>(
+        &self,
+        scene: &GLTFScene,
+        parent_val: T,
+        visit: &mut impl FnMut(&GLTFNode, T) -> T,
+    ) where
+        T: Copy,
+    {
+        let new_val = visit(self, parent_val);
+        for &c in &self.children {
+            scene.nodes[c].traverse_with_parent(scene, new_val, visit);
         }
     }
 }
@@ -80,7 +104,6 @@ where
         if let Some(m) = node.mesh() {
             let mut new_mesh = GLTFMesh::default();
             new_node.transform = node.transform().matrix().map(|col| col.map(|v| v as F));
-            println!("{:?}", new_node.transform);
             for p in m.primitives() {
                 let offset = new_mesh.v.len();
                 let reader = p.reader(|buffer: gltf::Buffer| {
@@ -100,7 +123,9 @@ where
                     .flatten()
                     .map(|uvs| uvs.map(|uv| uv as F));
                 new_mesh.uvs.extend(uvs);
-                assert_eq!(new_mesh.uvs.len(), new_mesh.v.len());
+                if !new_mesh.uvs.is_empty() {
+                    assert_eq!(new_mesh.uvs.len(), new_mesh.v.len());
+                }
 
                 let ns = reader
                     .read_normals()
@@ -108,7 +133,9 @@ where
                     .flatten()
                     .map(|n| n.map(|n| n as F));
                 new_mesh.n.extend(ns);
-                assert_eq!(new_mesh.n.len(), new_mesh.v.len());
+                if !new_mesh.n.is_empty() {
+                    assert_eq!(new_mesh.n.len(), new_mesh.v.len());
+                }
 
                 if let Some(jr) = reader.read_joints(0) {
                     new_mesh.joint_idxs.extend(jr.into_u16());
@@ -160,7 +187,9 @@ where
 pub fn save_gltf(scene: &super::mesh::Scene, dst: impl Write, ascii: bool) -> io::Result<()> {
     use std::borrow::Cow;
     let mut root = gltf_json::Root::default();
-    //let buffer_len = scene.meshes.iter().map(|v|
+
+    let mut bytes: Vec<u8> = vec![];
+
     #[derive(Clone, Copy, Debug)]
     #[repr(C)]
     struct Vertex {
@@ -171,22 +200,46 @@ pub fn save_gltf(scene: &super::mesh::Scene, dst: impl Write, ascii: bool) -> io
         joint_weights: [f32; 4],
         joint_idxs: [u16; 4],
     }
+    impl Vertex {
+        pub fn to_bytes(&self) -> impl Iterator<Item = u8> + '_ {
+            self.v
+                .into_iter()
+                .flat_map(f32::to_le_bytes)
+                .chain(self.uv.into_iter().flat_map(f32::to_le_bytes))
+                .chain(self.n.into_iter().flat_map(f32::to_le_bytes))
+                .chain(self.joint_weights.into_iter().flat_map(f32::to_le_bytes))
+                .chain(self.joint_idxs.into_iter().flat_map(u16::to_le_bytes))
+        }
+    }
     // TODO make 2 buffers per mesh instead of one giant buffer of everything.
     let mut verts = vec![];
-    let mut idxs = vec![];
     for mesh in &scene.meshes {
         for i in 0..mesh.v.len() {
-            verts.push(Vertex {
+            let v = Vertex {
                 v: mesh.v[i],
-                uv: mesh.uv[0][i],
-                n: mesh.n[i],
-                joint_idxs: mesh.joint_idxs[i],
-                joint_weights: mesh.joint_weights[i],
-            });
+                uv: mesh.uv[0].get(i).copied().unwrap_or_default(),
+                n: mesh.n.get(i).copied().unwrap_or_default(),
+                joint_idxs: mesh.joint_idxs.get(i).copied().unwrap_or_default(),
+                joint_weights: mesh.joint_weights.get(i).copied().unwrap_or_default(),
+            };
+            bytes.extend(v.to_bytes());
+            verts.push(v);
         }
+    }
+    let f_offset = bytes.len();
+    let mut n_tris = 0usize;
+    let mut vertex_offset = 0;
+    for mesh in &scene.meshes {
         for f in &mesh.f {
-          idxs.extend(f.as_triangle_fan().map(|vis| vis.map(|vi| vi as u32)));
+            for tri in f.as_triangle_fan() {
+                bytes.extend(
+                    tri.into_iter()
+                        .flat_map(|vi| (vi as u32 + vertex_offset).to_le_bytes()),
+                );
+                n_tris += 1;
+            }
         }
+        vertex_offset += mesh.v.len() as u32;
     }
     let [lb, ub] = verts
         .iter()
@@ -196,7 +249,8 @@ pub fn save_gltf(scene: &super::mesh::Scene, dst: impl Write, ascii: bool) -> io
                 std::array::from_fn(|i| h[i].max(n.v[i])),
             ]
         });
-    let buf_len = verts.len() * mem::size_of::<Vertex>();
+
+    let buf_len = bytes.len();
     let buffer = root.push(gltf_json::Buffer {
         byte_length: USize64::from(buf_len),
         extensions: Default::default(),
@@ -205,26 +259,25 @@ pub fn save_gltf(scene: &super::mesh::Scene, dst: impl Write, ascii: bool) -> io
         uri: ascii.then(|| String::from("buffer0.bin")),
     });
 
-    /*
-    let idx_buf_len = idxs.len() * mem::size_of::<[u32; 3]>();
-    let idx_buf = root.push(gltf_json::Buffer {
-        byte_length: USize64::from(idx_buf_len),
-        extensions: Default::default(),
-        extras: Default::default(),
-        name: None,
-        uri: ascii.then(|| String::from("buffer1.bin")),
-    })
-    */
-
     let buffer_view = root.push(gltf_json::buffer::View {
         buffer,
-        byte_length: USize64::from(buf_len),
+        byte_length: USize64::from(f_offset),
         byte_offset: None,
         byte_stride: Some(gltf_json::buffer::Stride(mem::size_of::<Vertex>())),
         extensions: Default::default(),
         extras: Default::default(),
         name: None,
         target: Some(Valid(gltf_json::buffer::Target::ArrayBuffer)),
+    });
+    let idx_buffer_view = root.push(gltf_json::buffer::View {
+        buffer,
+        byte_length: USize64::from(buf_len - f_offset),
+        byte_offset: Some(USize64::from(f_offset)),
+        byte_stride: None,
+        extensions: Default::default(),
+        extras: Default::default(),
+        name: None,
+        target: Some(Valid(gltf_json::buffer::Target::ElementArrayBuffer)),
     });
     let positions = root.push(gltf_json::Accessor {
         buffer_view: Some(buffer_view),
@@ -274,7 +327,7 @@ pub fn save_gltf(scene: &super::mesh::Scene, dst: impl Write, ascii: bool) -> io
         normalized: false,
         sparse: None,
     });
-    let joint_idxs = root.push(gltf_json::Accessor {
+    let joint_ws = root.push(gltf_json::Accessor {
         buffer_view: Some(buffer_view),
         byte_offset: Some(USize64::from(8 * mem::size_of::<f32>())),
         count: USize64::from(verts.len()),
@@ -290,7 +343,7 @@ pub fn save_gltf(scene: &super::mesh::Scene, dst: impl Write, ascii: bool) -> io
         normalized: false,
         sparse: None,
     });
-    let joint_ws = root.push(gltf_json::Accessor {
+    let joint_idxs = root.push(gltf_json::Accessor {
         buffer_view: Some(buffer_view),
         byte_offset: Some(USize64::from(12 * mem::size_of::<f32>())),
         count: USize64::from(verts.len()),
@@ -300,6 +353,22 @@ pub fn save_gltf(scene: &super::mesh::Scene, dst: impl Write, ascii: bool) -> io
         extensions: Default::default(),
         extras: Default::default(),
         type_: Valid(gltf_json::accessor::Type::Vec4),
+        min: None,
+        max: None,
+        name: None,
+        normalized: false,
+        sparse: None,
+    });
+    let faces = root.push(gltf_json::Accessor {
+        buffer_view: Some(idx_buffer_view),
+        byte_offset: Some(USize64(0)),
+        count: USize64::from(n_tris * 3),
+        component_type: Valid(gltf_json::accessor::GenericComponentType(
+            gltf_json::accessor::ComponentType::U32,
+        )),
+        extensions: Default::default(),
+        extras: Default::default(),
+        type_: Valid(gltf_json::accessor::Type::Scalar),
         min: None,
         max: None,
         name: None,
@@ -318,7 +387,7 @@ pub fn save_gltf(scene: &super::mesh::Scene, dst: impl Write, ascii: bool) -> io
         },
         extensions: Default::default(),
         extras: Default::default(),
-        indices: None,
+        indices: Some(faces),
         material: None,
         mode: Valid(gltf_json::mesh::Mode::Triangles),
         targets: None,
@@ -366,7 +435,7 @@ pub fn save_gltf(scene: &super::mesh::Scene, dst: impl Write, ascii: bool) -> io
                     .try_into()
                     .expect("file size exceeds binary glTF limit"),
             },
-            bin: Some(Cow::Owned(to_padded_byte_vector(verts))),
+            bin: Some(Cow::Owned(to_padded_byte_vector(bytes))),
             json: Cow::Owned(json_string.into_bytes()),
         };
         glb.to_writer(dst).expect("glTF binary output error");
@@ -389,7 +458,6 @@ fn to_padded_byte_vector<T>(vec: Vec<T>) -> Vec<u8> {
     }
     new_vec
 }
-
 #[test]
 fn test_load_gltf() {
     let mut scenes = load("etrian_odyssey_3_monk.glb").unwrap();
@@ -398,16 +466,18 @@ fn test_load_gltf() {
     assert_eq!(scene.root_nodes.len(), 1);
     assert_eq!(scene.meshes.len(), 24);
     assert_eq!(scene.nodes.len(), 293);
-    let out = std::fs::File::create("gltf_test.glb").expect("Failed to create file");
-    save_gltf(scene.into(), io::BufWriter::new(out), false).expect("Failed to write file");
+}
 
-    /*
-    for [x, y, z] in &mesh.v {
-        println!("v {x} {y} {z}");
-    }
-    for ijk in &mesh.f {
-        let [i, j, k] = ijk.map(|i| i + 1);
-        println!("f {i} {j} {k}");
-    }
-    */
+#[test]
+fn test_gltf_load_save() {
+    let mut scenes = load("etrian_odyssey_3_monk.glb").expect("Failed to open");
+    assert_eq!(scenes.len(), 1);
+    let scene = scenes.pop().unwrap();
+    let out = std::fs::File::create("gltf_test.glb").expect("Failed to create file");
+    save_gltf(
+        &super::mesh::Scene::from(scene),
+        io::BufWriter::new(out),
+        false,
+    )
+    .expect("Failed to write file");
 }
