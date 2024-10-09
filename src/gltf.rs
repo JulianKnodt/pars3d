@@ -184,7 +184,7 @@ where
 }
 
 /// Save a scene as a gltf file (either binary or ascii).
-pub fn save_gltf(scene: &super::mesh::Scene, dst: impl Write, ascii: bool) -> io::Result<()> {
+pub fn save_glb(scene: &super::mesh::Scene, dst: impl Write) -> io::Result<()> {
     use std::borrow::Cow;
     let mut root = gltf_json::Root::default();
 
@@ -256,7 +256,7 @@ pub fn save_gltf(scene: &super::mesh::Scene, dst: impl Write, ascii: bool) -> io
         extensions: Default::default(),
         extras: Default::default(),
         name: None,
-        uri: ascii.then(|| String::from("buffer0.bin")),
+        uri: None, //ascii.then(|| String::from("buffer0.bin")),
     });
 
     let buffer_view = root.push(gltf_json::buffer::View {
@@ -413,33 +413,23 @@ pub fn save_gltf(scene: &super::mesh::Scene, dst: impl Write, ascii: bool) -> io
         nodes: vec![node],
     });
 
-    if ascii {
-        todo!("Implement ascii version");
-        /*
-        gltf_json::serialize::to_writer_pretty(dst, &root).expect("Serialization error");
+    let json_string = gltf_json::serialize::to_string(&root).expect("Serialization error");
+    let mut json_offset = json_string.len();
+    align_to_multiple_of_four(&mut json_offset);
+    let glb = gltf::binary::Glb {
+        header: gltf::binary::Header {
+            magic: *b"glTF",
+            version: 2,
+            // N.B., the size of binary glTF file is limited to range of `u32`.
+            length: (json_offset + buf_len)
+                .try_into()
+                .expect("file size exceeds binary glTF limit"),
+        },
+        bin: Some(Cow::Owned(to_padded_byte_vector(bytes))),
+        json: Cow::Owned(json_string.into_bytes()),
+    };
+    glb.to_writer(dst).expect("glTF binary output error");
 
-        let bin = to_padded_byte_vector(triangle_vertices);
-        let mut writer = fs::File::create("triangle/buffer0.bin").expect("I/O error");
-        writer.write_all(&bin).expect("I/O error");
-        */
-    } else {
-        let json_string = gltf_json::serialize::to_string(&root).expect("Serialization error");
-        let mut json_offset = json_string.len();
-        align_to_multiple_of_four(&mut json_offset);
-        let glb = gltf::binary::Glb {
-            header: gltf::binary::Header {
-                magic: *b"glTF",
-                version: 2,
-                // N.B., the size of binary glTF file is limited to range of `u32`.
-                length: (json_offset + buf_len)
-                    .try_into()
-                    .expect("file size exceeds binary glTF limit"),
-            },
-            bin: Some(Cow::Owned(to_padded_byte_vector(bytes))),
-            json: Cow::Owned(json_string.into_bytes()),
-        };
-        glb.to_writer(dst).expect("glTF binary output error");
-    }
     Ok(())
 }
 
@@ -474,10 +464,6 @@ fn test_gltf_load_save() {
     assert_eq!(scenes.len(), 1);
     let scene = scenes.pop().unwrap();
     let out = std::fs::File::create("gltf_test.glb").expect("Failed to create file");
-    save_gltf(
-        &super::mesh::Scene::from(scene),
-        io::BufWriter::new(out),
-        false,
-    )
-    .expect("Failed to write file");
+    save_glb(&super::mesh::Scene::from(scene), io::BufWriter::new(out))
+        .expect("Failed to write file");
 }
