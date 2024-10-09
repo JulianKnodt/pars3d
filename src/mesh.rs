@@ -43,7 +43,10 @@ pub struct Mesh {
     pub uv: [Vec<[F; 2]>; MAX_UV],
 
     pub n: Vec<[F; 3]>,
+
     pub f: Vec<FaceKind>,
+    /// Which mesh did this face come from?
+    /// Used when flattening a scene into a single mesh.
     pub face_mesh_idx: Vec<usize>,
 
     /// 1-1 relation between vertices and joint/idxs weights.

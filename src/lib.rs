@@ -5,6 +5,7 @@
 #![feature(cmp_minmax)]
 #![feature(binary_heap_into_iter_sorted)]
 #![feature(let_chains)]
+#![feature(array_chunks)]
 
 #[cfg(not(feature = "f64"))]
 pub type F = f32;
@@ -92,6 +93,11 @@ impl FaceKind {
             Quad(_) => false,
             Poly(v) => v.is_empty(),
         }
+    }
+    /// Iterate over triangles in this face rooted at the 0th index.
+    pub fn as_triangle_fan(&self) -> impl Iterator<Item = [usize; 3]> + '_ {
+        let (&v0, rest) = self.as_slice().split_first().unwrap();
+        rest.array_chunks::<2>().map(move |&[v1, v2]| [v0, v1, v2])
     }
 }
 
