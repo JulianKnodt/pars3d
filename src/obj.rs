@@ -268,6 +268,7 @@ pub fn parse(p: impl AsRef<Path>, split_by_object: bool, split_by_group: bool) -
     let mut curr_mtl = None;
     let mut mtl_start_face = 0;
     let mut curr_mtl_name = String::from("");
+    let mut logged_no_mtl = false;
 
     let pf = |v: &str| v.parse::<F>().unwrap();
 
@@ -365,6 +366,12 @@ pub fn parse(p: impl AsRef<Path>, split_by_object: bool, split_by_group: bool) -
                         }
                         Err(_e) => {}
                     }
+                }
+            }
+            "usemtl" if obj.mtls.is_empty() => {
+                if !logged_no_mtl {
+                    logged_no_mtl = true;
+                    eprintln!("[WARN]: OBJ with materials, but no mtls found");
                 }
             }
             "usemtl" => {
