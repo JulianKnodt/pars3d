@@ -1,5 +1,5 @@
 use super::obj::{Obj, ObjObject};
-use super::{FaceKind, F};
+use super::{add, kmul, sub, FaceKind, F};
 
 use std::array::from_fn;
 use std::collections::HashMap;
@@ -61,6 +61,43 @@ impl Mesh {
             for uvs in uv_chan.iter_mut() {
                 uvs[1] = 1. - uvs[1];
             }
+        }
+    }
+    /// Normalize this mesh's geometry to lay within [-1, 1].
+    /// Outputs scale and translation to reposition back to the original dimension.
+    pub fn normalize(&mut self) -> (F, [F; 3]) {
+        // Normalize the geometry of this mesh to lay in the unit box.
+        let [l, h] = self
+            .v
+            .iter()
+            .fold([[F::INFINITY; 3], [F::NEG_INFINITY; 3]], |[l, h], n| {
+                [from_fn(|i| l[i].min(n[i])), from_fn(|i| h[i].max(n[i]))]
+            });
+        let center = kmul(0.5, add(l, h));
+        for v in &mut self.v {
+            *v = sub(*v, center);
+        }
+        let largest_val = self
+            .v
+            .iter()
+            .fold(0., |m, v| v.into_iter().fold(m, |m, c| c.abs().max(m)));
+        let scale = if largest_val == 0. {
+            1.
+        } else {
+            largest_val.recip()
+        };
+        for v in &mut self.v {
+            *v = kmul(scale, *v);
+        }
+        (scale, center)
+    }
+    /// Given a scale and translation output from normalization, reset the geometry to its
+    /// original position.
+    pub fn denormalize(&mut self, scale: F, trans: [F; 3]) {
+        assert_ne!(scale, 0.);
+        let inv_scale = scale.recip();
+        for v in &mut self.v {
+            *v = add(kmul(inv_scale, *v), trans);
         }
     }
 }
