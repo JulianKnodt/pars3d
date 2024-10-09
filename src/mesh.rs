@@ -1,10 +1,26 @@
-use super::obj::ObjObject;
+use super::obj::{Obj, ObjObject};
 use super::{FaceKind, F};
 
 use std::array::from_fn;
 use std::collections::HashMap;
 
 const MAX_UV: usize = 4;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextureKind {
+    Diffuse,
+    Normal,
+    Emissive,
+    Specular,
+    Metallic,
+    Roughness,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct Material {
+    textures: Vec<(TextureKind, image::DynamicImage)>,
+    name: String,
+}
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Node {
@@ -18,6 +34,7 @@ pub struct Scene {
     pub root_nodes: Vec<usize>,
     pub nodes: Vec<Node>,
     pub meshes: Vec<Mesh>,
+    pub materials: Vec<Material>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
@@ -94,6 +111,33 @@ impl From<ObjObject> for Mesh {
             joint_idxs: vec![],
             joint_weights: vec![],
         }
+    }
+}
+
+impl From<Obj> for Scene {
+    fn from(obj: Obj) -> Self {
+        let mut out = Self::default();
+        for (name, mtl) in obj.mtls {
+            let mut new_material = Material::default();
+            new_material.name = name;
+            if let Some(map_kd) = mtl.map_kd {
+                new_material.textures.push((TextureKind::Diffuse, map_kd));
+            }
+            if let Some(map_ke) = mtl.map_ke {
+                new_material.textures.push((TextureKind::Emissive, map_ke));
+            }
+            // TODO here add actual material details to material.
+            out.materials.push(new_material);
+        }
+        for (i, o) in obj.objects.into_iter().enumerate() {
+            out.meshes.push(Mesh::from(o));
+            out.root_nodes.push(i);
+            out.nodes.push(Node {
+                mesh: Some(i),
+                children: vec![],
+            });
+        }
+        out
     }
 }
 
