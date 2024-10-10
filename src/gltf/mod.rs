@@ -1,4 +1,5 @@
 mod gltf;
 pub use gltf::*;
+
+/// Conversions
 mod to_mesh;
-pub use to_mesh::*;

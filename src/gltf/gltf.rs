@@ -410,16 +410,45 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
         weights: None,
     });
 
-    let node = root.push(gltf_json::Node {
-        mesh: Some(mesh),
-        ..Default::default()
-    });
+    let mut nodes = vec![];
+    for (ni, n) in scene.nodes.iter().enumerate() {
+        let matrix = if n.transform == identity::<4>() {
+            None
+        } else {
+            Some(unsafe { std::mem::transmute(n.transform) })
+        };
+        let children = if n.children.is_empty() {
+            None
+        } else {
+            let children = n
+                .children
+                .iter()
+                .map(|&v| gltf_json::Index::new(v as u32))
+                .collect::<Vec<_>>();
+            Some(children)
+        };
+        let node = root.push(gltf_json::Node {
+            // TODO actually write out each mesh as separate.
+            mesh: (ni == 0).then_some(mesh),
+
+            skin: None,
+            children,
+            matrix,
+            ..Default::default()
+        });
+
+        nodes.push(node);
+    }
 
     root.push(gltf_json::Scene {
         extensions: Default::default(),
         extras: Default::default(),
         name: None,
-        nodes: vec![node],
+        nodes: scene
+            .root_nodes
+            .iter()
+            .map(|&v| gltf_json::Index::new(v as u32))
+            .collect::<Vec<_>>(),
     });
 
     let json_string = gltf_json::serialize::to_string(&root).expect("Serialization error");
@@ -473,6 +502,6 @@ fn test_gltf_load_save() {
     assert_eq!(scenes.len(), 1);
     let scene = scenes.pop().unwrap();
     let out = std::fs::File::create("gltf_test.glb").expect("Failed to create file");
-    save_glb(&super::mesh::Scene::from(scene), io::BufWriter::new(out))
+    save_glb(&crate::mesh::Scene::from(scene), io::BufWriter::new(out))
         .expect("Failed to write file");
 }

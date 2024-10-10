@@ -22,12 +22,36 @@ pub struct Material {
     name: String,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct Skin {
+    inv_bind_matrices: Option<[[F; 4]; 4]>,
+    joint_nodes: Vec<usize>,
+    skeleton: Option<usize>,
+}
+
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Node {
     pub mesh: Option<usize>,
     pub children: Vec<usize>,
     // TODO more fields
     pub transform: [[F; 4]; 4],
+    pub skin: Option<usize>,
+}
+
+impl Node {
+    pub fn traverse_with_parent<T>(
+        &self,
+        scene: &Scene,
+        parent_val: T,
+        visit: &mut impl FnMut(&Node, T) -> T,
+    ) where
+        T: Copy,
+    {
+        let new_val = visit(self, parent_val);
+        for &c in &self.children {
+            scene.nodes[c].traverse_with_parent(scene, new_val, visit);
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -36,6 +60,21 @@ pub struct Scene {
     pub nodes: Vec<Node>,
     pub meshes: Vec<Mesh>,
     pub materials: Vec<Material>,
+    pub skins: Vec<Skin>,
+}
+
+impl Scene {
+    pub fn traverse_with_parent<T>(
+        &self,
+        root_init: impl Fn() -> T,
+        visit: &mut impl FnMut(&Node, T) -> T,
+    ) where
+        T: Copy,
+    {
+        for &root_node in &self.root_nodes {
+            self.nodes[root_node].traverse_with_parent(self, root_init(), visit);
+        }
+    }
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
@@ -231,6 +270,7 @@ impl From<Obj> for Scene {
                 mesh: Some(i),
                 children: vec![],
                 transform: super::identity::<4>(),
+                skin: None,
             });
         }
         out

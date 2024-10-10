@@ -88,6 +88,8 @@ impl From<GLTFScene> for Scene {
                 mesh: mi,
                 children: vec![],
                 transform: node.transform,
+                // TODO implement skins here
+                skin: None,
             };
 
             let own_idx = out.nodes.len();
