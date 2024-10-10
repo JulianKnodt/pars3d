@@ -1,4 +1,4 @@
-use super::{identity, matmul, F};
+use crate::{identity, matmul, F};
 use gltf_json::validation::{Checked::Valid, USize64};
 use std::io::{self, Write};
 use std::mem;
@@ -183,8 +183,8 @@ where
     Ok(out)
 }
 
-/// Save a scene as a gltf file (either binary or ascii).
-pub fn save_glb(scene: &super::mesh::Scene, dst: impl Write) -> io::Result<()> {
+/// Save a scene as a glb file (binary GLTF file).
+pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
     use std::borrow::Cow;
     let mut root = gltf_json::Root::default();
 

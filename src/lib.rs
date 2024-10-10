@@ -99,6 +99,11 @@ impl FaceKind {
         let (&v0, rest) = self.as_slice().split_first().unwrap();
         rest.array_chunks::<2>().map(move |&[v1, v2]| [v0, v1, v2])
     }
+    pub fn map(&mut self, mut f: impl FnMut(usize) -> usize) {
+        for v in self.as_mut_slice() {
+            *v = f(*v);
+        }
+    }
 }
 
 pub(crate) fn kmul<const N: usize>(k: F, v: [F; N]) -> [F; N] {
