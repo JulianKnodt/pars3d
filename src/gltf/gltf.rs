@@ -415,7 +415,7 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
         let matrix = if n.transform == identity::<4>() {
             None
         } else {
-            Some(unsafe { std::mem::transmute(n.transform) })
+            Some(unsafe { std::mem::transmute(n.transform.map(|col| col.map(|v| v as f32))) })
         };
         let children = if n.children.is_empty() {
             None
