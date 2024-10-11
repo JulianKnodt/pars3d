@@ -115,6 +115,9 @@ pub struct Mesh {
     /// 1-1 relation between vertices and joint/idxs weights.
     pub joint_idxs: Vec<[u16; 4]>,
     pub joint_weights: Vec<[F; 4]>,
+
+    /// Name of this mesh.
+    pub name: String,
 }
 
 impl Mesh {
@@ -267,6 +270,7 @@ impl From<ObjObject> for Mesh {
 
             joint_idxs: vec![],
             joint_weights: vec![],
+            name: String::new(),
         }
     }
 }

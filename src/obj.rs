@@ -700,3 +700,50 @@ impl ObjObject {
         Ok(())
     }
 }
+
+pub fn save_obj(
+    s: &super::mesh::Scene,
+    mut geom_dst: impl Write,
+    //mtl: impl Write,
+    //img_dsts: impl Fn(TextureKind, &str) -> impl Write,
+) -> io::Result<()> {
+    for (mi, m) in s.meshes.iter().enumerate() {
+        for &[x, y, z] in &m.v {
+            writeln!(geom_dst, "v {x} {y} {z}")?;
+        }
+
+        for &[u, v] in &m.uv[0] {
+            writeln!(geom_dst, "vt {u} {v}")?;
+        }
+
+        for &[x, y, z] in &m.n {
+            writeln!(geom_dst, "vn {x} {y} {z}")?;
+        }
+
+        // TODO maybe figure out whether this is correct or not?
+        geom_dst.write_all(b"s 1\n")?;
+        if m.name.is_empty() {
+            writeln!(geom_dst, "g mesh_{mi}")?;
+        } else {
+            writeln!(geom_dst, "g {}", m.name)?;
+        }
+        let fmt = |v| match (m.n.is_empty(), m.uv[0].is_empty()) {
+            (true, true) => format!("{v}"),
+            (true, false) => format!("{v}/{v}"),
+            (false, true) => format!("{v}//{v}"),
+            (false, false) => format!("{v}/{v}/{v}"),
+        };
+
+        for f in &m.f {
+            geom_dst.write_all(b"f ")?;
+            let Some((lv, fv)) = f.as_slice().split_last() else {
+                continue;
+            };
+            for &v in fv {
+                write!(geom_dst, "{} ", fmt(v + 1))?;
+            }
+            writeln!(geom_dst, "{}", fmt(lv + 1))?;
+        }
+    }
+    Ok(())
+}

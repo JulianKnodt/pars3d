@@ -67,6 +67,7 @@ impl From<GLTFMesh> for Mesh {
             joint_idxs,
             joint_weights,
             face_mesh_idx,
+            name: String::new(),
         }
     }
 }
