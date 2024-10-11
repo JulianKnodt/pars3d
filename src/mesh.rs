@@ -75,6 +75,28 @@ impl Scene {
             self.nodes[root_node].traverse_with_parent(self, root_init(), visit);
         }
     }
+    /// Converts this scene into a flattened mesh which can then be repopulated back into a
+    /// scene later.
+    pub fn into_flattened_mesh(&self) -> Mesh {
+        let mut out = Mesh::default();
+        for (mi, m) in self.meshes.iter().enumerate() {
+            let curr_vertex_offset = out.v.len();
+            out.v.extend(m.v.iter().copied());
+            for chan in 0..MAX_UV {
+                out.uv[chan].extend(m.uv[chan].iter().copied());
+            }
+            out.n.extend(m.n.iter().copied());
+            out.f.extend(m.f.iter().map(|f| {
+                let mut f = f.clone();
+                f.map(|vi| vi + curr_vertex_offset);
+                f
+            }));
+            out.face_mesh_idx.extend(m.f.iter().map(|_| mi));
+            out.joint_idxs.extend(m.joint_idxs.iter().copied());
+            out.joint_weights.extend(m.joint_weights.iter().copied());
+        }
+        out
+    }
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
