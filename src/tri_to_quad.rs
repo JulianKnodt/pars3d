@@ -35,7 +35,7 @@ pub fn quadrangulate(
     planarity_eps: F,
     angle_eps: F,
     quad_pref: QuadPreference,
-) -> Vec<FaceKind> {
+) -> (Vec<FaceKind>, Vec<(usize, Option<usize>)>) {
     let mut edge_adj: HashMap<[usize; 2], EdgeKind> = HashMap::new();
 
     let mut tri_normals = vec![[0.; 3]; faces.len()];
@@ -133,6 +133,7 @@ pub fn quadrangulate(
 
     let mut new_faces = vec![];
     let mut deleted = vec![false; faces.len()];
+    let mut merged = vec![];
 
     let mut snd_heap = BinaryHeap::new();
 
@@ -146,6 +147,7 @@ pub fn quadrangulate(
             deleted[a] = true;
             deleted[b] = true;
             new_faces.push(FaceKind::Quad(q));
+            merged.push((a, Some(b)));
 
             while let Some(&(na, nal, nq, nab)) = merge_heap.peek()
                 && (na.0 - ang.0).abs() < 1e-3
@@ -158,13 +160,21 @@ pub fn quadrangulate(
 
     new_faces.extend(
         deleted
-            .into_iter()
+            .iter()
             .enumerate()
             .filter(|&(_, del)| !del)
             .map(|(i, _)| faces[i].clone()),
     );
 
-    new_faces
+    merged.extend(
+        deleted
+            .iter()
+            .enumerate()
+            .filter(|&(_, del)| !del)
+            .map(|(i, _)| (i, None)),
+    );
+
+    (new_faces, merged)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

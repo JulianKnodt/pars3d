@@ -97,7 +97,7 @@ impl FaceKind {
     /// Iterate over triangles in this face rooted at the 0th index.
     pub fn as_triangle_fan(&self) -> impl Iterator<Item = [usize; 3]> + '_ {
         let (&v0, rest) = self.as_slice().split_first().unwrap();
-        rest.array_chunks::<2>().map(move |&[v1, v2]| [v0, v1, v2])
+        rest.array_windows::<2>().map(move |&[v1, v2]| [v0, v1, v2])
     }
     pub fn map(&mut self, mut f: impl FnMut(usize) -> usize) {
         for v in self.as_mut_slice() {

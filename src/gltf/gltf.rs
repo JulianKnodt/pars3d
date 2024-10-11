@@ -241,10 +241,10 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
     for mesh in &scene.meshes {
         for f in &mesh.f {
             for tri in f.as_triangle_fan() {
-                bytes.extend(
-                    tri.into_iter()
-                        .flat_map(|vi| (vi as u32 + vertex_offset).to_le_bytes()),
-                );
+                let raw = tri
+                    .into_iter()
+                    .flat_map(|vi| (vi as u32 + vertex_offset).to_le_bytes());
+                bytes.extend(raw);
                 n_tris += 1;
             }
         }
