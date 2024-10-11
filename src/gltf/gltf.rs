@@ -37,7 +37,7 @@ pub struct GLTFNode {
     children: Vec<usize>,
     skin: Vec<usize>,
 
-    name: String,
+    pub name: String,
     // TODO also needs to include a transform
     pub transform: [[F; 4]; 4],
 }
@@ -430,6 +430,7 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
         let node = root.push(gltf_json::Node {
             // TODO actually write out each mesh as separate.
             mesh: (ni == 0).then_some(mesh),
+            name: (!n.name.is_empty()).then(|| n.name.clone()),
 
             skin: None,
             children,

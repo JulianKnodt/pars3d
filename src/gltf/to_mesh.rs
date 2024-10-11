@@ -90,6 +90,7 @@ impl From<GLTFScene> for Scene {
                 transform: node.transform,
                 // TODO implement skins here
                 skin: None,
+                name: node.name.clone(),
             };
 
             let own_idx = out.nodes.len();

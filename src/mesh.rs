@@ -36,6 +36,7 @@ pub struct Node {
     // TODO more fields
     pub transform: [[F; 4]; 4],
     pub skin: Option<usize>,
+    pub name: String,
 }
 
 impl Node {
@@ -293,6 +294,7 @@ impl From<Obj> for Scene {
                 children: vec![],
                 transform: super::identity::<4>(),
                 skin: None,
+                name: String::new(),
             });
         }
         out
