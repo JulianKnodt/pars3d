@@ -86,6 +86,16 @@ impl FaceKind {
             Poly(v) => v.len(),
         }
     }
+    pub fn quad_opp_edge(&self, e0: usize, e1: usize) -> Option<[usize; 2]> {
+        match self {
+            &Self::Quad([a, b, c, d] | [d, a, b, c] | [c, d, a, b] | [b, c, d, a])
+                if (a == e0 && b == e1) || (a == e1 && b == e0) =>
+            {
+                Some([c, d])
+            }
+            _ => None,
+        }
+    }
     pub fn is_empty(&self) -> bool {
         use FaceKind::*;
         match self {
