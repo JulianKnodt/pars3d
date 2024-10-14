@@ -104,6 +104,37 @@ impl FaceKind {
             *v = f(*v);
         }
     }
+    /// Canonicalize this face, deleting duplicates and retaining order such that the lowest
+    /// index vertex is first.
+    /// Returns true if this face is now degenerate.
+    pub fn canonicalize(&mut self) -> bool {
+        use FaceKind::*;
+        match self {
+            Tri([a, b, c]) if a == b || b == c || a == c => return true,
+            Tri(_) => {}
+            &mut Quad([a, b, c, d] | [d, a, b, c] | [c, d, a, b] | [b, c, d, a]) if a == b => {
+                *self = Self::Tri([a, c, d]);
+                return self.canonicalize();
+            }
+            Quad(_) => {}
+            Poly(ref mut v) => {
+                v.dedup();
+                if v.len() < 3 {
+                    return true;
+                }
+            }
+        }
+        assert!(self.as_slice().len() > 2);
+        let min_idx = self
+            .as_slice()
+            .iter()
+            .enumerate()
+            .min_by_key(|&(_, &v)| v)
+            .unwrap()
+            .0;
+        self.as_mut_slice().rotate_left(min_idx);
+        false
+    }
 }
 
 pub(crate) fn kmul<const N: usize>(k: F, v: [F; N]) -> [F; N] {

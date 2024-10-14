@@ -98,7 +98,7 @@ where
         out: &mut GLTFScene,
     ) -> usize {
         let mut new_node = GLTFNode::default();
-        new_node.name = node.name().map(String::from).unwrap_or_else(String::new);
+        new_node.name = node.name().map(String::from).unwrap_or_default();
         new_node.transform = identity::<4>();
 
         if let Some(m) = node.mesh() {
