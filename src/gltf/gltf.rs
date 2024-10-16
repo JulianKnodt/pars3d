@@ -9,7 +9,18 @@ pub struct GLTFScene {
     pub meshes: Vec<GLTFMesh>,
 
     pub root_nodes: Vec<usize>,
-    //materials: Vec<Material>,
+    pub skins: Vec<GLTFSkin>, //materials: Vec<Material>,
+}
+
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct GLTFSkin {
+    pub name: String,
+
+    pub inv_bind_matrices: Vec<[[F; 4]; 4]>,
+
+    pub joints: Vec<usize>,
+
+    pub skeleton: Option<usize>,
 }
 
 impl GLTFScene {
@@ -34,8 +45,10 @@ impl GLTFScene {
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct GLTFNode {
     pub mesh: Option<usize>,
-    children: Vec<usize>,
-    skin: Vec<usize>,
+    pub children: Vec<usize>,
+    pub skin: Option<usize>,
+    /// index from source do not change
+    pub(crate) index: usize,
 
     pub name: String,
     // TODO also needs to include a transform
@@ -98,8 +111,24 @@ where
         out: &mut GLTFScene,
     ) -> usize {
         let mut new_node = GLTFNode::default();
-        new_node.name = node.name().map(String::from).unwrap_or_default();
+        new_node.index = node.index();
+        new_node.name = node.name().unwrap_or("").into();
         new_node.transform = identity::<4>();
+
+        if let Some(s) = node.skin() {
+            new_node.skin = Some(out.skins.len());
+            let mut new_skin = GLTFSkin::default();
+            let bind_mats = s
+                .reader(|buffer: gltf::Buffer| buffers.get(buffer.index()).map(|data| &data[..]))
+                .read_inverse_bind_matrices()
+                .into_iter()
+                .flatten()
+                .map(|p| p.map(|col| col.map(|v| v as F)));
+            new_skin.inv_bind_matrices.extend(bind_mats);
+            new_skin.name = s.name().unwrap_or("").into();
+            new_skin.joints.extend(s.joints().map(|j| j.index()));
+            out.skins.push(new_skin);
+        }
 
         if let Some(m) = node.mesh() {
             let mut new_mesh = GLTFMesh::default();
@@ -176,6 +205,17 @@ where
             for root_node in scene.nodes() {
                 let idx = traverse_node(&doc, &buffers, &root_node, &mut out);
                 out.root_nodes.push(idx);
+            }
+            // correct original index to new index.
+            // TODO may want to check names are the same as well? But it's less reliable.
+            for s in out.skins.iter_mut() {
+                for j in s.joints.iter_mut() {
+                    *j = out
+                        .nodes
+                        .iter()
+                        .position(|n| n.index == *j)
+                        .expect("Could not find matching node");
+                }
             }
             out
         })
@@ -495,6 +535,7 @@ fn test_load_gltf() {
     assert_eq!(scene.root_nodes.len(), 1);
     assert_eq!(scene.meshes.len(), 24);
     assert_eq!(scene.nodes.len(), 293);
+    assert_eq!(scene.skins.len(), 18);
 }
 
 #[test]

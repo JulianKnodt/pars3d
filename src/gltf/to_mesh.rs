@@ -1,5 +1,5 @@
-use super::gltf::{GLTFMesh, GLTFScene};
-use crate::mesh::{Mesh, Node, Scene};
+use super::gltf::{GLTFMesh, GLTFNode, GLTFScene, GLTFSkin};
+use crate::mesh::{Mesh, Node, Scene, Skin};
 
 use crate::{tform_point, FaceKind};
 
@@ -75,34 +75,39 @@ impl From<GLTFMesh> for Mesh {
 impl From<GLTFScene> for Scene {
     fn from(gltf_scene: GLTFScene) -> Self {
         let mut out = Self::default();
-        gltf_scene.traverse_with_parent(|| None, &mut |node, parent_idx: Option<usize>| {
-            let mi = if let Some(mesh) = node.mesh {
-                let mesh = gltf_scene.meshes[mesh].clone().into();
-                let mi = out.meshes.len();
-                out.meshes.push(mesh);
-                Some(mi)
-            } else {
-                None
-            };
-
-            let new_node = Node {
-                mesh: mi,
-                children: vec![],
-                transform: node.transform,
-                // TODO implement skins here
-                skin: None,
-                name: node.name.clone(),
-            };
-
-            let own_idx = out.nodes.len();
-            out.nodes.push(new_node);
-            if let Some(parent_idx) = parent_idx {
-                out.nodes[parent_idx].children.push(own_idx);
-            } else {
-                out.root_nodes.push(own_idx);
+        out.skins.extend(gltf_scene.skins.into_iter().map(|skin| {
+            let GLTFSkin {
+                inv_bind_matrices,
+                name,
+                joints,
+                skeleton,
+            } = skin;
+            Skin {
+                inv_bind_matrices,
+                name,
+                joints,
+                skeleton,
             }
-            Some(own_idx)
-        });
+        }));
+        out.meshes
+            .extend(gltf_scene.meshes.into_iter().map(|mesh| mesh.into()));
+        out.nodes.extend(gltf_scene.nodes.into_iter().map(|node| {
+            let GLTFNode {
+                mesh,
+                children,
+                skin,
+                name,
+                transform,
+                ..
+            } = node;
+            Node {
+                mesh,
+                children,
+                transform,
+                skin,
+                name,
+            }
+        }));
         out
     }
 }

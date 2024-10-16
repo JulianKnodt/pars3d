@@ -24,16 +24,16 @@ pub struct Material {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Skin {
-    inv_bind_matrices: Option<[[F; 4]; 4]>,
-    joint_nodes: Vec<usize>,
-    skeleton: Option<usize>,
+    pub inv_bind_matrices: Vec<[[F; 4]; 4]>,
+    pub joints: Vec<usize>,
+    pub skeleton: Option<usize>,
+    pub name: String,
 }
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Node {
     pub mesh: Option<usize>,
     pub children: Vec<usize>,
-    // TODO more fields
     pub transform: [[F; 4]; 4],
     pub skin: Option<usize>,
     pub name: String,
