@@ -236,17 +236,22 @@ impl From<ObjObject> for Mesh {
             }
             macro_rules! key_i {
                 ($i: expr) => {
-                    (f.v[$i], f.vt.get($i).copied(), f.vn.get($i).copied())
+                    (
+                        f.v[$i],
+                        f.vt.get($i).copied(),
+                        // NOTE: Do not use normals to split edges, seems it's a bit buggy
+                        //f.vn.get($i).copied().map(|vn| obj.vn[vn].map(F::to_bits)),
+                    )
                 };
             }
             for i in 0..f.v.len() {
                 let key = key_i!(i);
                 if !verts.contains_key(&key) {
                     v.push(obj.v[f.v[i]]);
-                    if let Some(vt) = key.1 {
-                        uv.push(obj.vt[vt]);
+                    if let Some(_vt) = key.1 {
+                        uv.push(obj.vt[*f.vt.get(i).unwrap()]);
                     };
-                    if let Some(vn) = key.2 {
+                    if let Some(&vn) = f.vn.get(i) {
                         n.push(obj.vn[vn]);
                     };
                     verts.insert(key, verts.len());
