@@ -458,7 +458,7 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
             None
         } else {
             Some(unsafe {
-                std::mem::transmute::<[[F; 4]; 4], [F; 16]>(
+                std::mem::transmute::<[[f32; 4]; 4], [f32; 16]>(
                     n.transform.map(|col| col.map(|v| v as f32)),
                 )
             })
