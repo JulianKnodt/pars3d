@@ -104,6 +104,8 @@ where
 {
     let (doc, buffers, _images) = gltf::import(path)?;
 
+    // TODO remove this, just visit the nodes in orer.
+    // will help me keep my sanity
     fn traverse_node(
         gltf: &gltf::Document,
         buffers: &[gltf::buffer::Data],
@@ -455,7 +457,11 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
         let matrix = if n.transform == identity::<4>() {
             None
         } else {
-            Some(unsafe { std::mem::transmute(n.transform.map(|col| col.map(|v| v as f32))) })
+            Some(unsafe {
+                std::mem::transmute::<[[F; 4]; 4], [F; 16]>(
+                    n.transform.map(|col| col.map(|v| v as f32)),
+                )
+            })
         };
         let children = if n.children.is_empty() {
             None

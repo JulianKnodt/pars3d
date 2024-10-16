@@ -188,9 +188,9 @@ enum EdgeKind {
 impl EdgeKind {
     fn insert(&mut self, v: usize) {
         use EdgeKind::*;
-        *self = match self {
-            &mut Boundary(a) if a != v => EdgeKind::Manifold([a, v]),
-            &mut Manifold([a, b]) if a != v && b != v => EdgeKind::NonManifold,
+        *self = match *self {
+            Boundary(a) if a != v => EdgeKind::Manifold([a, v]),
+            Manifold([a, b]) if a != v && b != v => EdgeKind::NonManifold,
             _ => return,
         }
     }

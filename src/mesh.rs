@@ -145,7 +145,7 @@ impl Mesh {
         let largest_val = self
             .v
             .iter()
-            .fold(0., |m, v| v.into_iter().fold(m, |m, c| c.abs().max(m)));
+            .fold(0., |m, v| v.iter().fold(m, |m, c| c.abs().max(m)));
         let scale = if largest_val == 0. {
             1.
         } else {
