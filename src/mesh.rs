@@ -128,6 +128,9 @@ impl Mesh {
             }
         }
     }
+    pub fn num_tris(&self) -> usize {
+        self.f.iter().map(|f| f.num_tris()).sum::<usize>()
+    }
     /// Normalize this mesh's geometry to lay within [-1, 1].
     /// Outputs scale and translation to reposition back to the original dimension.
     pub fn normalize(&mut self) -> (F, [F; 3]) {

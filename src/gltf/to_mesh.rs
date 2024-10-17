@@ -108,6 +108,7 @@ impl From<GLTFScene> for Scene {
                 name,
             }
         }));
+        out.root_nodes = gltf_scene.root_nodes.clone();
         out
     }
 }

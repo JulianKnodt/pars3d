@@ -70,6 +70,9 @@ impl FaceKind {
             Poly(v) => v.as_slice(),
         }
     }
+    pub fn num_tris(&self) -> usize {
+        self.as_slice().len() - 2
+    }
     pub fn as_mut_slice(&mut self) -> &mut [usize] {
         use FaceKind::*;
         match self {

@@ -107,7 +107,7 @@ where
     let mut out = GLTFScene::default();
     for scene in doc.scenes() {
         for root_node in scene.nodes() {
-          out.root_nodes.push(root_node.index());
+            out.root_nodes.push(root_node.index());
         }
     }
     for (i, node) in doc.nodes().enumerate() {
@@ -115,15 +115,14 @@ where
         let mut new_node = GLTFNode::default();
         new_node.index = node.index();
         new_node.name = node.name().unwrap_or("").into();
-        new_node.transform = identity::<4>();
+        new_node.transform = node.transform().matrix().map(|col| col.map(|v| v as F));
+        new_node.children = node.children().map(|v| v.index()).collect();
 
         if let Some(s) = node.skin() {
             new_node.skin = Some(out.skins.len());
             let mut new_skin = GLTFSkin::default();
             let bind_mats = s
-                .reader(|buffer: gltf::Buffer| {
-                    buffers.get(buffer.index()).map(|data| &data[..])
-                })
+                .reader(|buffer: gltf::Buffer| buffers.get(buffer.index()).map(|data| &data[..]))
                 .read_inverse_bind_matrices()
                 .into_iter()
                 .flatten()
@@ -131,6 +130,7 @@ where
             new_skin.inv_bind_matrices.extend(bind_mats);
             new_skin.name = s.name().unwrap_or("").into();
             new_skin.joints.extend(s.joints().map(|j| j.index()));
+            new_skin.skeleton = s.skeleton().map(|j| j.index());
             out.skins.push(new_skin);
         }
 
@@ -250,21 +250,35 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
             verts.push(v);
         }
     }
+
+    let mut inv_bind_mat_offsets = vec![];
+    for skin in &scene.skins {
+        inv_bind_mat_offsets.push(bytes.len());
+        for &ibm in &skin.inv_bind_matrices {
+            let raw_bytes = ibm.iter().flat_map(|col| {
+                col.into_iter()
+                    .flat_map(|&v| (v as f32).to_le_bytes().into_iter())
+            });
+            bytes.extend(raw_bytes);
+        }
+    }
+
     let f_offset = bytes.len();
-    let mut n_tris = 0usize;
     let mut vertex_offset = 0;
+    let mut f_offsets = vec![];
     for mesh in &scene.meshes {
+        f_offsets.push(bytes.len() - f_offset);
         for f in &mesh.f {
             for tri in f.as_triangle_fan() {
                 let raw = tri
                     .into_iter()
                     .flat_map(|vi| (vi as u32 + vertex_offset).to_le_bytes());
                 bytes.extend(raw);
-                n_tris += 1;
             }
         }
         vertex_offset += mesh.v.len() as u32;
     }
+
     let [lb, ub] = verts
         .iter()
         .fold([[f32::INFINITY; 3], [f32::NEG_INFINITY; 3]], |[l, h], n| {
@@ -285,7 +299,7 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
 
     let buffer_view = root.push(gltf_json::buffer::View {
         buffer,
-        byte_length: USize64::from(f_offset),
+        byte_length: USize64::from(inv_bind_mat_offsets.first().copied().unwrap_or(f_offset)),
         byte_offset: None,
         byte_stride: Some(gltf_json::buffer::Stride(mem::size_of::<Vertex>())),
         extensions: Default::default(),
@@ -293,6 +307,20 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
         name: None,
         target: Some(Valid(gltf_json::buffer::Target::ArrayBuffer)),
     });
+    let ibm_buffer_view = if inv_bind_mat_offsets.is_empty() {
+        gltf_json::Index::new(0)
+    } else {
+        root.push(gltf_json::buffer::View {
+            buffer,
+            byte_length: USize64::from(f_offset - inv_bind_mat_offsets[0]),
+            byte_stride: None,
+            byte_offset: Some(USize64::from(inv_bind_mat_offsets[0])),
+            extensions: Default::default(),
+            extras: Default::default(),
+            name: None,
+            target: None,
+        })
+    };
     let idx_buffer_view = root.push(gltf_json::buffer::View {
         buffer,
         byte_length: USize64::from(buf_len - f_offset),
@@ -303,6 +331,7 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
         name: None,
         target: Some(Valid(gltf_json::buffer::Target::ElementArrayBuffer)),
     });
+
     let positions = root.push(gltf_json::Accessor {
         buffer_view: Some(buffer_view),
         byte_offset: Some(USize64(0)),
@@ -383,47 +412,99 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
         normalized: false,
         sparse: None,
     });
-    let faces = root.push(gltf_json::Accessor {
-        buffer_view: Some(idx_buffer_view),
-        byte_offset: Some(USize64(0)),
-        count: USize64::from(n_tris * 3),
-        component_type: Valid(gltf_json::accessor::GenericComponentType(
-            gltf_json::accessor::ComponentType::U32,
-        )),
-        extensions: Default::default(),
-        extras: Default::default(),
-        type_: Valid(gltf_json::accessor::Type::Scalar),
-        min: None,
-        max: None,
-        name: None,
-        normalized: false,
-        sparse: None,
-    });
-    let primitive = gltf_json::mesh::Primitive {
-        attributes: {
-            let mut map = std::collections::BTreeMap::new();
-            map.insert(Valid(gltf_json::mesh::Semantic::Positions), positions);
-            map.insert(Valid(gltf_json::mesh::Semantic::TexCoords(0)), uvs);
-            map.insert(Valid(gltf_json::mesh::Semantic::Normals), normals);
-            map.insert(Valid(gltf_json::mesh::Semantic::Joints(0)), joint_idxs);
-            map.insert(Valid(gltf_json::mesh::Semantic::Weights(0)), joint_ws);
-            map
-        },
-        extensions: Default::default(),
-        extras: Default::default(),
-        indices: Some(faces),
-        material: None,
-        mode: Valid(gltf_json::mesh::Mode::Triangles),
-        targets: None,
-    };
+    let inv_bind_matrices = inv_bind_mat_offsets
+        .iter()
+        .enumerate()
+        .map(|(i, &offset)| {
+            root.push(gltf_json::Accessor {
+                buffer_view: Some(ibm_buffer_view),
+                byte_offset: Some(USize64::from(offset - inv_bind_mat_offsets[0])),
+                count: USize64::from(scene.skins[i].inv_bind_matrices.len()),
+                component_type: Valid(gltf_json::accessor::GenericComponentType(
+                    gltf_json::accessor::ComponentType::F32,
+                )),
+                extensions: Default::default(),
+                extras: Default::default(),
+                type_: Valid(gltf_json::accessor::Type::Mat4),
+                min: None,
+                max: None,
+                name: None,
+                normalized: false,
+                sparse: None,
+            })
+        })
+        .collect::<Vec<_>>();
+    let mut meshes = vec![];
+    for (mi, mesh) in scene.meshes.iter().enumerate() {
+        let faces = root.push(gltf_json::Accessor {
+            buffer_view: Some(idx_buffer_view),
+            byte_offset: Some(USize64::from(f_offsets[mi])),
+            count: USize64::from(mesh.num_tris() * 3),
+            component_type: Valid(gltf_json::accessor::GenericComponentType(
+                gltf_json::accessor::ComponentType::U32,
+            )),
+            extensions: Default::default(),
+            extras: Default::default(),
+            type_: Valid(gltf_json::accessor::Type::Scalar),
+            min: None,
+            max: None,
+            name: None,
+            normalized: false,
+            sparse: None,
+        });
+        let primitive = gltf_json::mesh::Primitive {
+            attributes: {
+                let mut map = std::collections::BTreeMap::new();
+                map.insert(Valid(gltf_json::mesh::Semantic::Positions), positions);
+                map.insert(Valid(gltf_json::mesh::Semantic::TexCoords(0)), uvs);
+                map.insert(Valid(gltf_json::mesh::Semantic::Normals), normals);
+                map.insert(Valid(gltf_json::mesh::Semantic::Joints(0)), joint_idxs);
+                map.insert(Valid(gltf_json::mesh::Semantic::Weights(0)), joint_ws);
+                map
+            },
+            extensions: Default::default(),
+            extras: Default::default(),
+            indices: Some(faces),
+            material: None,
+            mode: Valid(gltf_json::mesh::Mode::Triangles),
+            targets: None,
+        };
+        let mesh = root.push(gltf_json::Mesh {
+            extensions: Default::default(),
+            extras: Default::default(),
+            name: None,
+            primitives: vec![primitive],
+            weights: None,
+        });
+        meshes.push(mesh);
+    }
 
-    let mesh = root.push(gltf_json::Mesh {
-        extensions: Default::default(),
-        extras: Default::default(),
-        name: None,
-        primitives: vec![primitive],
-        weights: None,
-    });
+    let mut inv_bind_idx = 0;
+    let skins = scene
+        .skins
+        .iter()
+        .map(|skin| {
+            assert_eq!(skin.inv_bind_matrices.len(), skin.joints.len());
+            root.push(gltf_json::Skin {
+                inverse_bind_matrices: if skin.inv_bind_matrices.is_empty() {
+                    None
+                } else {
+                    let i = inv_bind_matrices[inv_bind_idx];
+                    inv_bind_idx += 1;
+                    Some(i)
+                },
+                joints: skin
+                    .joints
+                    .iter()
+                    .map(|&v| gltf_json::Index::new(v as u32))
+                    .collect(),
+                skeleton: skin.skeleton.map(|s| gltf_json::Index::new(s as u32)),
+                name: (!skin.name.is_empty()).then(|| skin.name.clone()),
+                extensions: Default::default(),
+                extras: Default::default(),
+            })
+        })
+        .collect::<Vec<_>>();
 
     let mut nodes = vec![];
     for (ni, n) in scene.nodes.iter().enumerate() {
@@ -447,15 +528,15 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
             Some(children)
         };
         let node = root.push(gltf_json::Node {
-            // TODO actually write out each mesh as separate.
-            mesh: (ni == 0).then_some(mesh),
+            mesh: n.mesh.map(|mi| meshes[mi]),
             name: (!n.name.is_empty()).then(|| n.name.clone()),
 
-            skin: None,
+            skin: n.skin.map(|s| skins[s]),
             children,
             matrix,
             ..Default::default()
         });
+        assert_eq!(node.value(), ni);
 
         nodes.push(node);
     }
@@ -521,4 +602,16 @@ fn test_gltf_load_save() {
     let out = std::fs::File::create("gltf_test.glb").expect("Failed to create file");
     save_glb(&crate::mesh::Scene::from(scene), io::BufWriter::new(out))
         .expect("Failed to write file");
+    todo!();
+}
+
+#[test]
+fn test_simple_skin_load_save() {
+    let scene = load("simple_skin.gltf").expect("Failed to open");
+    assert_eq!(scene.nodes.len(), 3);
+    assert_eq!(scene.skins.len(), 1);
+    let out = std::fs::File::create("simple_skin_io.glb").expect("Failed to create file");
+    save_glb(&crate::mesh::Scene::from(scene), io::BufWriter::new(out))
+        .expect("Failed to write file");
+    todo!();
 }
