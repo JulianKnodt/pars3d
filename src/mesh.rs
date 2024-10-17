@@ -171,8 +171,9 @@ impl Mesh {
     /// After flattening a scene into a mesh, repopulate the original scene with a modified
     /// flattened mesh.
     pub fn repopulate_scene(&self, scene: &mut Scene) {
-        assert!(
-            !self.face_mesh_idx.is_empty(),
+        assert_eq!(
+            self.face_mesh_idx.len(),
+            self.f.len(),
             "Must specify which mesh belongs to which face"
         );
 
