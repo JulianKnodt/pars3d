@@ -98,20 +98,20 @@ pub struct GLTFMesh {
 }
 
 /// Load a GLTF/GLB file into a GLTFScene.
-pub fn load<P>(path: P) -> gltf::Result<Vec<GLTFScene>>
+pub fn load<P>(path: P) -> gltf::Result<GLTFScene>
 where
     P: AsRef<std::path::Path>,
 {
     let (doc, buffers, _images) = gltf::import(path)?;
 
-    // TODO remove this, just visit the nodes in orer.
-    // will help me keep my sanity
-    fn traverse_node(
-        gltf: &gltf::Document,
-        buffers: &[gltf::buffer::Data],
-        node: &gltf::scene::Node,
-        out: &mut GLTFScene,
-    ) -> usize {
+    let mut out = GLTFScene::default();
+    for scene in doc.scenes() {
+        for root_node in scene.nodes() {
+          out.root_nodes.push(root_node.index());
+        }
+    }
+    for (i, node) in doc.nodes().enumerate() {
+        assert_eq!(node.index(), i);
         let mut new_node = GLTFNode::default();
         new_node.index = node.index();
         new_node.name = node.name().unwrap_or("").into();
@@ -121,7 +121,9 @@ where
             new_node.skin = Some(out.skins.len());
             let mut new_skin = GLTFSkin::default();
             let bind_mats = s
-                .reader(|buffer: gltf::Buffer| buffers.get(buffer.index()).map(|data| &data[..]))
+                .reader(|buffer: gltf::Buffer| {
+                    buffers.get(buffer.index()).map(|data| &data[..])
+                })
                 .read_inverse_bind_matrices()
                 .into_iter()
                 .flatten()
@@ -191,37 +193,8 @@ where
             new_node.mesh = Some(out.meshes.len());
             out.meshes.push(new_mesh);
         }
-        for child in node.children() {
-            let child_idx = traverse_node(gltf, buffers, &child, out);
-            new_node.children.push(child_idx);
-        }
-        let idx = out.nodes.len();
         out.nodes.push(new_node);
-        idx
     }
-
-    let out = doc
-        .scenes()
-        .map(|scene| {
-            let mut out = GLTFScene::default();
-            for root_node in scene.nodes() {
-                let idx = traverse_node(&doc, &buffers, &root_node, &mut out);
-                out.root_nodes.push(idx);
-            }
-            // correct original index to new index.
-            // TODO may want to check names are the same as well? But it's less reliable.
-            for s in out.skins.iter_mut() {
-                for j in s.joints.iter_mut() {
-                    *j = out
-                        .nodes
-                        .iter()
-                        .position(|n| n.index == *j)
-                        .expect("Could not find matching node");
-                }
-            }
-            out
-        })
-        .collect::<Vec<_>>();
     Ok(out)
 }
 
@@ -535,9 +508,7 @@ fn to_padded_byte_vector<T>(vec: Vec<T>) -> Vec<u8> {
 }
 #[test]
 fn test_load_gltf() {
-    let mut scenes = load("etrian_odyssey_3_monk.glb").unwrap();
-    assert_eq!(scenes.len(), 1);
-    let scene = scenes.pop().unwrap();
+    let scene = load("etrian_odyssey_3_monk.glb").unwrap();
     assert_eq!(scene.root_nodes.len(), 1);
     assert_eq!(scene.meshes.len(), 24);
     assert_eq!(scene.nodes.len(), 293);
@@ -546,9 +517,7 @@ fn test_load_gltf() {
 
 #[test]
 fn test_gltf_load_save() {
-    let mut scenes = load("etrian_odyssey_3_monk.glb").expect("Failed to open");
-    assert_eq!(scenes.len(), 1);
-    let scene = scenes.pop().unwrap();
+    let scene = load("etrian_odyssey_3_monk.glb").expect("Failed to open");
     let out = std::fs::File::create("gltf_test.glb").expect("Failed to create file");
     save_glb(&crate::mesh::Scene::from(scene), io::BufWriter::new(out))
         .expect("Failed to write file");
