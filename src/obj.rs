@@ -357,17 +357,19 @@ pub fn parse(p: impl AsRef<Path>, split_by_object: bool, split_by_group: bool) -
                 let Some(mtl_file) = iter.remainder() else {
                     panic!("Missing mtl file in {l}")
                 };
-                obj.mtllibs.push(String::from(mtl_file));
                 // Try a bunch of different attempts
                 match parse_mtl(mtl_file) {
                     Ok(mtls) => {
+                        obj.mtllibs.push(String::from(mtl_file));
                         obj.mtls.extend(mtls);
                         continue;
                     }
                     Err(_e) => {}
                 };
-                match parse_mtl(p.with_file_name(mtl_file)) {
+                let appended = p.with_file_name(mtl_file);
+                match parse_mtl(&appended) {
                     Ok(mtls) => {
+                        obj.mtllibs.push(String::from(appended.to_str().unwrap()));
                         obj.mtls.extend(mtls);
                         continue;
                     }
@@ -376,6 +378,7 @@ pub fn parse(p: impl AsRef<Path>, split_by_object: bool, split_by_group: bool) -
                 if let Some(file) = PathBuf::from(mtl_file).file_name() {
                     match parse_mtl(file) {
                         Ok(mtls) => {
+                            obj.mtllibs.push(String::from(file.to_str().unwrap()));
                             obj.mtls.extend(mtls);
                             continue;
                         }
@@ -731,6 +734,7 @@ pub enum OutputKind {
     /// Reuse the original file if it exists.
     /// If it cannot be found, will rewrite with a new material file.
     Reuse,
+    // TODO split reuse into absolute or relative
     New(String),
     /// Do not write out any MTL
     None,
@@ -763,7 +767,7 @@ fn write_mtls(
 
             return Ok(Some(String::from(out_path.to_str().unwrap())));
         }
-        OutputKind::Reuse => String::from("new.mtl"),
+        OutputKind::Reuse => panic!("Unable to reuse input MTL file: {}", s.mtllibs[0]),
         OutputKind::New(v) => v,
     };
     assert_ne!(mtl_path, "", "Must not pass empty MTL");
