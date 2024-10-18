@@ -1,5 +1,29 @@
 use super::{add, kmul, F};
 
+/// Converts a hue in [0,1] to RGB.
+pub fn hue_to_rgb(v: F) -> [F; 3] {
+    assert!(
+        (0.0..=1.0).contains(&v),
+        "Hue values should be in the 0-1 range, got {v}"
+    );
+    let v = v * std::f64::consts::TAU as F;
+    let h = v / (std::f64::consts::TAU as F / 6.);
+    let x = 1. - (h.rem_euclid(2.) - 1.).abs();
+    let c = 1.;
+
+    let rgb = match h {
+      (..1.0) => [c, x, 0.],
+      (1.0..2.0) => [x, c, 0.],
+      (2.0..3.0) => [0., c, x],
+      (3.0..4.0) => [0., x, c],
+      (4.0..5.0) => [x, 0., c],
+      (5.0..) => [c, 0., x],
+      _ => unreachable!(),
+    };
+    let m = v - c;
+    rgb.map(|val| val + m)
+}
+
 /// Use the magma color scheme to visualize a scalar value.
 #[inline]
 pub fn magma(v: F) -> [F; 3] {
