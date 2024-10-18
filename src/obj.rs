@@ -38,6 +38,8 @@ pub struct Obj {
     pub mtls: Vec<(String, MTL)>,
 
     pub mtllibs: Vec<String>,
+
+    pub(crate) input_file: String,
 }
 
 // TODO need to implement a way to fuse a bunch of MTL files into a single super Material.
@@ -272,9 +274,11 @@ fn parse_poly_face(fs: &[&str], num_v: usize, num_vt: usize, num_vn: usize) -> P
 /// Parses a file specified by path `p`.
 /// If split_by_object, will return different objects for each group.
 pub fn parse(p: impl AsRef<Path>, split_by_object: bool, split_by_group: bool) -> io::Result<Obj> {
-    let f = File::open(p.as_ref())?;
+    let p = p.as_ref();
+    let f = File::open(p)?;
     let buf_read = BufReader::new(f);
     let mut obj = Obj::default();
+    obj.input_file = p.to_str().unwrap().into();
     let mut curr_obj = ObjObject::default();
     let mut curr_mtl = None;
     let mut mtl_start_face = 0;
@@ -362,7 +366,7 @@ pub fn parse(p: impl AsRef<Path>, split_by_object: bool, split_by_group: bool) -
                     }
                     Err(_e) => {}
                 };
-                match parse_mtl(p.as_ref().with_file_name(mtl_file)) {
+                match parse_mtl(p.with_file_name(mtl_file)) {
                     Ok(mtls) => {
                         obj.mtls.extend(mtls);
                         continue;
@@ -751,7 +755,13 @@ fn write_mtls(
     let mtl_path = match mtl_output_kind {
         OutputKind::None => return Ok(None),
         OutputKind::Reuse if s.mtllibs.len() == 1 && exists(&s.mtllibs[0]).unwrap_or(false) => {
-            return Ok(Some(String::from(&s.mtllibs[0])));
+            let dst_path: &Path = s.mtllibs[0].as_ref();
+            if dst_path.is_absolute() {
+                return Ok(Some(String::from(&s.mtllibs[0])));
+            }
+            let out_path = std::path::absolute(&dst_path)?;
+
+            return Ok(Some(String::from(out_path.to_str().unwrap())));
         }
         OutputKind::Reuse => String::from("new.mtl"),
         OutputKind::New(v) => v,
@@ -781,7 +791,10 @@ fn write_mtls(
                     let (save, path) = match img_dsts(tex.kind, &tex.original_path) {
                         OutputKind::None => continue,
                         OutputKind::Reuse if exists(&tex.original_path).unwrap_or(false) => {
-                            (false, String::from(&tex.original_path))
+                            let dst_path: &Path = tex.original_path.as_ref();
+                            let out_path = std::path::absolute(&dst_path)?;
+
+                            (false, String::from(out_path.to_str().unwrap()))
                         }
                         OutputKind::Reuse => (true, format!("{:?}.png", tex.kind)),
                         OutputKind::New(f) => (true, f),

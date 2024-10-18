@@ -74,6 +74,10 @@ pub struct Scene {
 
     /// For an OBJ input, where are the MTL files
     pub(crate) mtllibs: Vec<String>,
+
+    /// Path to the input file
+    /// Needed for saving output later
+    pub(crate) input_file: String,
 }
 
 impl Scene {
@@ -316,6 +320,7 @@ impl From<Obj> for Scene {
             });
         }
         out.mtllibs = obj.mtllibs;
+        out.input_file = obj.input_file;
         out
     }
 }
