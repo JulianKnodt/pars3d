@@ -170,6 +170,10 @@ pub(crate) fn dot([a, b, c]: [F; 3], [x, y, z]: [F; 3]) -> F {
     a * x + b * y + c * z
 }
 
+pub(crate) fn append_one([a, b, c]: [F; 3]) -> [F; 4] {
+    [a, b, c, 1.]
+}
+
 /// Apply a transformation (col major 4x4) to a point
 pub fn tform_point(tform: [[F; 4]; 4], p: [F; 3]) -> [F; 3] {
     let out = (0..4)

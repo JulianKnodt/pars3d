@@ -115,14 +115,19 @@ pub struct MTL {
 
     /// diffuse map
     pub map_kd: Option<DynamicImage>,
+    pub map_kd_path: String,
     /// specular map
     pub map_ks: Option<DynamicImage>,
+    pub map_ks_path: String,
     /// ambient map
     pub map_ka: Option<DynamicImage>,
+    pub map_ka_path: String,
     /// emissive map
     pub map_ke: Option<DynamicImage>,
+    pub map_ke_path: String,
     /// Normal Map
     pub bump_normal: Option<DynamicImage>,
+    pub bump_normal_path: String,
 
     /// Bump/Height Map
     pub disp: Option<DynamicImage>,
@@ -153,6 +158,12 @@ impl Default for MTL {
             bump_normal: None,
             disp: None,
             map_ao: None,
+
+            bump_normal_path: String::new(),
+            map_ka_path: String::new(),
+            map_ke_path: String::new(),
+            map_kd_path: String::new(),
+            map_ks_path: String::new(),
 
             ns: 0.,
             ni: 0.,
@@ -488,27 +499,36 @@ pub fn parse_mtl(p: impl AsRef<Path>) -> io::Result<Vec<(String, MTL)>> {
                     windows_file.clone().with_extension("jpg"),
                     windows_file.clone().with_extension("jpeg"),
                 ];
-                let c = choices.into_iter().find_map(|c| image::open(c).ok());
-                let Some(img) = c else {
+                let img_c = choices
+                    .into_iter()
+                    .find_map(|c| Some((image::open(&c).ok()?, c)));
+                let Some((img, c)) = img_c else {
                     // TODO retry with appending mtl path with texture.
                     eprintln!("Failed to load image {f:?}");
                     continue;
                 };
 
-                *match kind.as_str() {
-                    "map_kd" => &mut curr_mtl.map_kd,
-                    "map_ks" => &mut curr_mtl.map_ks,
-                    "map_ka" => &mut curr_mtl.map_ka,
-                    "map_ke" => &mut curr_mtl.map_ke,
-                    "disp" => &mut curr_mtl.disp,
-                    "map_ao" => &mut curr_mtl.map_ao,
-                    "bump" | "map_bump" | "map_normal" | "bump_normal" => &mut curr_mtl.bump_normal,
+                let (img_dst, path_dst) = match kind.as_str() {
+                    "map_kd" => (&mut curr_mtl.map_kd, Some(&mut curr_mtl.map_kd_path)),
+                    "map_ks" => (&mut curr_mtl.map_ks, Some(&mut curr_mtl.map_ks_path)),
+                    "map_ka" => (&mut curr_mtl.map_ka, Some(&mut curr_mtl.map_ka_path)),
+                    "map_ke" => (&mut curr_mtl.map_ke, Some(&mut curr_mtl.map_ke_path)),
+                    "disp" => (&mut curr_mtl.disp, None),
+                    "map_ao" => (&mut curr_mtl.map_ao, None),
+                    "bump" | "map_bump" | "map_normal" | "bump_normal" => (
+                        &mut curr_mtl.bump_normal,
+                        Some(&mut curr_mtl.bump_normal_path),
+                    ),
                     // TODO need to implement these
                     "map_ns" => continue,
                     "map_d" => continue,
                     "refl" => continue,
                     _ => unreachable!(),
-                } = Some(img);
+                };
+                *img_dst = Some(img);
+                if let Some(path_dst) = path_dst {
+                    *path_dst = c.to_str().unwrap().into();
+                }
             }
             "newmtl" => {
                 let old = std::mem::take(&mut curr_mtl);
@@ -701,12 +721,108 @@ impl ObjObject {
     }
 }
 
+/// Writes all materials to a single MTL file (with corresponding images)
+/// Returns Ok(Some(path to mtl)) on success AND if there is an mtl file.
+fn write_mtls(
+    s: &super::mesh::Scene,
+    // Path to MTL file if any. Original MTL file is also passed.
+    mtl_file: impl Fn(&str) -> Option<String>,
+    // given texture kind & original path, output new path to write to
+    img_dsts: impl Fn(super::mesh::TextureKind, &str) -> String,
+) -> io::Result<Option<String>> {
+    let mtl_path = if s.mtllibs.is_empty() {
+        mtl_file("")
+    } else {
+        mtl_file(&s.mtllibs[0])
+    };
+    // TODO need to check this is an absolute path?
+    let Some(mtl_path) = mtl_path else {
+        return Ok(None);
+    };
+    assert_ne!(mtl_path, "", "Must not pass empty MTL");
+    if s.mtllibs.len() == 1
+        && mtl_path == s.mtllibs[0]
+        && std::fs::exists(&mtl_path).unwrap_or(false)
+    {
+        // Don't need to write anything, the original path was fine.
+        return Ok(Some(mtl_path));
+    }
+
+    let mtl_file = File::create(&mtl_path)?;
+    let mut mtl_file = BufWriter::new(mtl_file);
+
+    for (mi, mat) in s.materials.iter().enumerate() {
+        let mat_name = if mat.name.is_empty() {
+            mat.name.clone()
+        } else {
+            format!("mat_{mi}")
+        };
+        writeln!(mtl_file, "newmtl {mat_name}")?;
+        for tex in &mat.textures {
+            use crate::mesh::TextureKind;
+            macro_rules! write_tex {
+                ($tex: expr, $mul_name: expr, $img_name: expr) => {{
+                    let tex = $tex;
+                    let [r, g, b, _a] = tex.mul;
+                    writeln!(mtl_file, "{} {r} {g} {b}", $mul_name)?;
+                    let Some(img) = &tex.image else {
+                        continue;
+                    };
+                    let path = img_dsts(tex.kind, &tex.original_path);
+                    if path != tex.original_path || !std::fs::exists(&path).unwrap_or(false) {
+                        match img.save(&path) {
+                            Ok(()) => {}
+                            Err(image::ImageError::IoError(err)) => return Err(err),
+                            Err(e) => panic!("Failed to save image in OBJ: {e:?}"),
+                        }
+                    }
+                    writeln!(mtl_file, "{} {path}", $img_name)?;
+                }};
+            }
+            match tex.kind {
+                TextureKind::Diffuse => write_tex!(tex, "Kd", "map_Kd"),
+                TextureKind::Specular => write_tex!(tex, "Ks", "map_Ks"),
+                TextureKind::Emissive => write_tex!(tex, "Ke", "map_Ke"),
+                TextureKind::Normal => {
+                    let Some(img) = &tex.image else {
+                        continue;
+                    };
+                    let path = img_dsts(tex.kind, &tex.original_path);
+                    if path != tex.original_path {
+                        img.save(&path).unwrap();
+                    }
+                    writeln!(mtl_file, "bump {path}")?;
+                }
+                // OBJ cannot handle other kinds of textures
+                _ => continue,
+            }
+        }
+    }
+
+    Ok(Some(mtl_path))
+}
+
 pub fn save_obj(
     s: &super::mesh::Scene,
     mut geom_dst: impl Write,
-    //mtl: impl Write,
-    //img_dsts: impl Fn(TextureKind, &str) -> impl Write,
+    // Path to MTL file if any. Original MTL file is also passed.
+    mtl_file: impl Fn(&str) -> Option<String>,
+    // given texture kind & original path, output new path to write to
+    img_dsts: impl Fn(super::mesh::TextureKind, &str) -> String,
 ) -> io::Result<()> {
+    let has_materials =
+        !s.materials.is_empty() && s.materials.iter().any(|m| !m.textures.is_empty());
+    let mtl_path = if has_materials {
+        write_mtls(s, mtl_file, img_dsts)?
+    } else {
+        None
+    };
+    //let mtls = s.mtllibs.into_iter().map()
+    writeln!(geom_dst, "# Generated by pars3d")?;
+    if let Some(mtl_path) = mtl_path {
+        writeln!(geom_dst, "usemtl {mtl_path}")?;
+    }
+
     for (mi, m) in s.meshes.iter().enumerate() {
         for &[x, y, z] in &m.v {
             writeln!(geom_dst, "v {x} {y} {z}")?;
@@ -746,4 +862,19 @@ pub fn save_obj(
         }
     }
     Ok(())
+}
+
+#[test]
+fn test_load_save_obj() {
+    let scene: super::mesh::Scene = parse("garlic.obj", false, false)
+        .expect("Failed to parse obj")
+        .into();
+    let obj_out = File::create("garlic_tmp.obj").unwrap();
+    save_obj(
+        &scene,
+        BufWriter::new(obj_out),
+        |_mtl_path| Some(String::from("garlic_tmp.mtl")),
+        |_tex_kind, og_path| String::from(og_path),
+    )
+    .expect("Failed to save");
 }

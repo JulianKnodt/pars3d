@@ -1,5 +1,5 @@
-use super::obj::{Obj, ObjObject};
-use super::{add, kmul, sub, FaceKind, F};
+use super::obj::{Obj, ObjObject, MTL};
+use super::{add, append_one, kmul, sub, FaceKind, F};
 
 use std::array::from_fn;
 use std::collections::HashMap;
@@ -16,10 +16,19 @@ pub enum TextureKind {
     Roughness,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct Texture {
+    pub kind: TextureKind,
+    pub mul: [F; 4],
+    pub image: Option<image::DynamicImage>,
+    pub original_path: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Material {
-    textures: Vec<(TextureKind, image::DynamicImage)>,
-    name: String,
+    pub textures: Vec<Texture>,
+    pub name: String,
+    pub path: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -62,6 +71,9 @@ pub struct Scene {
     pub meshes: Vec<Mesh>,
     pub materials: Vec<Material>,
     pub skins: Vec<Skin>,
+
+    /// For an OBJ input, where are the MTL files
+    pub(crate) mtllibs: Vec<String>,
 }
 
 impl Scene {
@@ -288,16 +300,9 @@ impl From<Obj> for Scene {
     fn from(obj: Obj) -> Self {
         let mut out = Self::default();
         for (name, mtl) in obj.mtls {
-            let mut new_material = Material::default();
-            new_material.name = name;
-            if let Some(map_kd) = mtl.map_kd {
-                new_material.textures.push((TextureKind::Diffuse, map_kd));
-            }
-            if let Some(map_ke) = mtl.map_ke {
-                new_material.textures.push((TextureKind::Emissive, map_ke));
-            }
-            // TODO here add actual material details to material.
-            out.materials.push(new_material);
+            let mut mat = Material::from(mtl);
+            mat.name = name;
+            out.materials.push(mat);
         }
         for (i, o) in obj.objects.into_iter().enumerate() {
             out.meshes.push(Mesh::from(o));
@@ -310,6 +315,38 @@ impl From<Obj> for Scene {
                 name: String::new(),
             });
         }
+        out.mtllibs = obj.mtllibs;
         out
+    }
+}
+
+impl From<MTL> for Material {
+    fn from(mtl: MTL) -> Self {
+        let mut mat = Material::default();
+        mat.textures.push(Texture {
+            kind: TextureKind::Diffuse,
+            mul: append_one(mtl.kd),
+            image: mtl.map_kd,
+            original_path: mtl.map_kd_path,
+        });
+        mat.textures.push(Texture {
+            kind: TextureKind::Specular,
+            mul: append_one(mtl.ks),
+            image: mtl.map_ks,
+            original_path: mtl.map_ks_path,
+        });
+        mat.textures.push(Texture {
+            kind: TextureKind::Emissive,
+            mul: append_one(mtl.ke),
+            image: mtl.map_ke,
+            original_path: mtl.map_ke_path,
+        });
+        mat.textures.push(Texture {
+            kind: TextureKind::Normal,
+            mul: [1.; 4],
+            image: mtl.bump_normal,
+            original_path: mtl.bump_normal_path,
+        });
+        mat
     }
 }
