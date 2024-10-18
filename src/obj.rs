@@ -731,12 +731,15 @@ impl ObjObject {
 /// How to output an MTL
 #[derive(Debug, Clone, PartialEq)]
 pub enum OutputKind {
-    /// Reuse the original file if it exists.
-    /// If it cannot be found, will rewrite with a new material file.
-    Reuse,
-    // TODO split reuse into absolute or relative
+    /// Reuse the original file if it exists, with an absolute file path
+    ReuseAbsolute,
+    /// Reuse the original file if it exists, with relative file path to the one provided.
+    ReuseRelative(String),
+
+    /// Generate a new mtl at this location. Cannot be empty.
     New(String),
-    /// Do not write out any MTL
+
+    /// Do not write out any MTL file.
     None,
 }
 
@@ -758,7 +761,9 @@ fn write_mtls(
     use std::fs::exists;
     let mtl_path = match mtl_output_kind {
         OutputKind::None => return Ok(None),
-        OutputKind::Reuse if s.mtllibs.len() == 1 && exists(&s.mtllibs[0]).unwrap_or(false) => {
+        OutputKind::ReuseAbsolute
+            if s.mtllibs.len() == 1 && exists(&s.mtllibs[0]).unwrap_or(false) =>
+        {
             let dst_path: &Path = s.mtllibs[0].as_ref();
             if dst_path.is_absolute() {
                 return Ok(Some(String::from(&s.mtllibs[0])));
@@ -767,7 +772,46 @@ fn write_mtls(
 
             return Ok(Some(String::from(out_path.to_str().unwrap())));
         }
-        OutputKind::Reuse => panic!("Unable to reuse input MTL file: {}", s.mtllibs[0]),
+        OutputKind::ReuseRelative(out_file)
+            if s.mtllibs.len() == 1 && exists(&s.mtllibs[0]).unwrap_or(false) =>
+        {
+            let dst_path: &Path = s.mtllibs[0].as_ref();
+            // if original path was absolute don't switch to relative.
+            if dst_path.is_absolute() {
+                return Ok(Some(String::from(&s.mtllibs[0])));
+            }
+
+            let out_path: &Path = out_file.as_ref();
+            assert!(out_path.is_file());
+            let out_path = std::path::absolute(out_path)?;
+
+            let dst_path = std::path::absolute(dst_path)?;
+
+            // Path from out file *to* original obj file *to* original mtl file
+            let out_to_mtl = {
+                let mut curr = out_path.parent();
+                let mut num_parents = 0;
+                while let Some(c) = curr
+                    && !dst_path.starts_with(c)
+                {
+                    num_parents += 1;
+                    curr = c.parent();
+                }
+                let prefix = match curr {
+                    None => todo!(),
+                    Some(c) => dst_path.strip_prefix(c).unwrap(),
+                };
+                let mut backs = PathBuf::new();
+                backs.extend((0..num_parents).map(|_| "../"));
+                backs.push(prefix);
+                backs
+            };
+
+            return Ok(Some(String::from(out_to_mtl.to_str().unwrap())));
+        }
+        OutputKind::ReuseAbsolute | OutputKind::ReuseRelative(_) => {
+            panic!("Unable to reuse input MTL file: {}", s.mtllibs[0])
+        }
         OutputKind::New(v) => v,
     };
     assert_ne!(mtl_path, "", "Must not pass empty MTL");
@@ -783,24 +827,19 @@ fn write_mtls(
         };
         writeln!(mtl_file, "newmtl {mat_name}")?;
         for tex in &mat.textures {
-            use crate::mesh::TextureKind;
-            macro_rules! write_tex {
-                ($tex: expr, $mul_name: expr, $img_name: expr) => {{
-                    let tex = $tex;
-                    let [r, g, b, _a] = tex.mul;
-                    writeln!(mtl_file, "{} {r} {g} {b}", $mul_name)?;
-                    let Some(img) = &tex.image else {
-                        continue;
-                    };
+            macro_rules! save_img {
+                ($img: expr) => {{
+                    let img = $img;
                     let (save, path) = match img_dsts(tex.kind, &tex.original_path) {
                         OutputKind::None => continue,
-                        OutputKind::Reuse if exists(&tex.original_path).unwrap_or(false) => {
-                            let dst_path: &Path = tex.original_path.as_ref();
-                            let out_path = std::path::absolute(&dst_path)?;
-
-                            (false, String::from(out_path.to_str().unwrap()))
+                        OutputKind::ReuseAbsolute | OutputKind::ReuseRelative(_)
+                            if exists(&tex.original_path).unwrap_or(false) =>
+                        {
+                            (false, String::from(&tex.original_path))
                         }
-                        OutputKind::Reuse => (true, format!("{:?}.png", tex.kind)),
+                        OutputKind::ReuseAbsolute | OutputKind::ReuseRelative(_) => {
+                            (true, format!("{:?}.png", tex.kind))
+                        }
                         OutputKind::New(f) => (true, f),
                     };
                     if save {
@@ -810,6 +849,19 @@ fn write_mtls(
                             Err(e) => panic!("Failed to save image in OBJ: {e:?}"),
                         }
                     }
+                    path
+                }};
+            }
+            use crate::mesh::TextureKind;
+            macro_rules! write_tex {
+                ($tex: expr, $mul_name: expr, $img_name: expr) => {{
+                    let tex = $tex;
+                    let [r, g, b, _a] = tex.mul;
+                    writeln!(mtl_file, "{} {r} {g} {b}", $mul_name)?;
+                    let Some(img) = &tex.image else {
+                        continue;
+                    };
+                    let path = save_img!(img);
                     writeln!(mtl_file, "{} {path}", $img_name)?;
                 }};
             }
@@ -821,21 +873,7 @@ fn write_mtls(
                     let Some(img) = &tex.image else {
                         continue;
                     };
-                    let (save, path) = match img_dsts(tex.kind, &tex.original_path) {
-                        OutputKind::None => continue,
-                        OutputKind::Reuse if exists(&tex.original_path).unwrap_or(false) => {
-                            (false, String::from(&tex.original_path))
-                        }
-                        OutputKind::Reuse => (true, format!("{:?}.png", tex.kind)),
-                        OutputKind::New(f) => (true, f),
-                    };
-                    if save {
-                        match img.save(&path) {
-                            Ok(()) => {}
-                            Err(image::ImageError::IoError(err)) => return Err(err),
-                            Err(e) => panic!("Failed to save image in OBJ: {e:?}"),
-                        }
-                    }
+                    let path = save_img!(img);
                     writeln!(mtl_file, "bump {path}")?;
                 }
                 // OBJ cannot handle other kinds of textures
@@ -865,7 +903,7 @@ pub fn save_obj(
     //let mtls = s.mtllibs.into_iter().map()
     writeln!(geom_dst, "# Generated by pars3d")?;
     if let Some(mtl_path) = mtl_path {
-        writeln!(geom_dst, "usemtl {mtl_path}")?;
+        writeln!(geom_dst, "mtllib {mtl_path}")?;
     }
 
     for (mi, m) in s.meshes.iter().enumerate() {
@@ -895,6 +933,7 @@ pub fn save_obj(
             (false, false) => format!("{v}/{v}/{v}"),
         };
 
+        // TODO need to write materials here
         for f in &m.f {
             geom_dst.write_all(b"f ")?;
             let Some((lv, fv)) = f.as_slice().split_last() else {
