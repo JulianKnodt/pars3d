@@ -721,32 +721,42 @@ impl ObjObject {
     }
 }
 
+/// How to output an MTL
+#[derive(Debug, Clone, PartialEq)]
+pub enum OutputKind {
+    /// Reuse the original file if it exists.
+    /// If it cannot be found, will rewrite with a new material file.
+    Reuse,
+    New(String),
+    /// Do not write out any MTL
+    None,
+}
+
 /// Writes all materials to a single MTL file (with corresponding images)
 /// Returns Ok(Some(path to mtl)) on success AND if there is an mtl file.
 fn write_mtls(
     s: &super::mesh::Scene,
     // Path to MTL file if any. Original MTL file is also passed.
-    mtl_file: impl Fn(&str) -> Option<String>,
+    mtl_file: impl Fn(&str) -> OutputKind,
     // given texture kind & original path, output new path to write to
-    img_dsts: impl Fn(super::mesh::TextureKind, &str) -> String,
+    img_dsts: impl Fn(super::mesh::TextureKind, &str) -> OutputKind,
 ) -> io::Result<Option<String>> {
-    let mtl_path = if s.mtllibs.is_empty() {
+    let mtl_output_kind = if s.mtllibs.is_empty() {
         mtl_file("")
     } else {
         mtl_file(&s.mtllibs[0])
     };
-    // TODO need to check this is an absolute path?
-    let Some(mtl_path) = mtl_path else {
-        return Ok(None);
+
+    use std::fs::exists;
+    let mtl_path = match mtl_output_kind {
+        OutputKind::None => return Ok(None),
+        OutputKind::Reuse if s.mtllibs.len() == 1 && exists(&s.mtllibs[0]).unwrap_or(false) => {
+            return Ok(Some(String::from(&s.mtllibs[0])));
+        }
+        OutputKind::Reuse => String::from("new.mtl"),
+        OutputKind::New(v) => v,
     };
     assert_ne!(mtl_path, "", "Must not pass empty MTL");
-    if s.mtllibs.len() == 1
-        && mtl_path == s.mtllibs[0]
-        && std::fs::exists(&mtl_path).unwrap_or(false)
-    {
-        // Don't need to write anything, the original path was fine.
-        return Ok(Some(mtl_path));
-    }
 
     let mtl_file = File::create(&mtl_path)?;
     let mut mtl_file = BufWriter::new(mtl_file);
@@ -768,8 +778,15 @@ fn write_mtls(
                     let Some(img) = &tex.image else {
                         continue;
                     };
-                    let path = img_dsts(tex.kind, &tex.original_path);
-                    if path != tex.original_path || !std::fs::exists(&path).unwrap_or(false) {
+                    let (save, path) = match img_dsts(tex.kind, &tex.original_path) {
+                        OutputKind::None => continue,
+                        OutputKind::Reuse if exists(&tex.original_path).unwrap_or(false) => {
+                            (false, String::from(&tex.original_path))
+                        }
+                        OutputKind::Reuse => (true, format!("{:?}.png", tex.kind)),
+                        OutputKind::New(f) => (true, f),
+                    };
+                    if save {
                         match img.save(&path) {
                             Ok(()) => {}
                             Err(image::ImageError::IoError(err)) => return Err(err),
@@ -787,9 +804,20 @@ fn write_mtls(
                     let Some(img) = &tex.image else {
                         continue;
                     };
-                    let path = img_dsts(tex.kind, &tex.original_path);
-                    if path != tex.original_path {
-                        img.save(&path).unwrap();
+                    let (save, path) = match img_dsts(tex.kind, &tex.original_path) {
+                        OutputKind::None => continue,
+                        OutputKind::Reuse if exists(&tex.original_path).unwrap_or(false) => {
+                            (false, String::from(&tex.original_path))
+                        }
+                        OutputKind::Reuse => (true, format!("{:?}.png", tex.kind)),
+                        OutputKind::New(f) => (true, f),
+                    };
+                    if save {
+                        match img.save(&path) {
+                            Ok(()) => {}
+                            Err(image::ImageError::IoError(err)) => return Err(err),
+                            Err(e) => panic!("Failed to save image in OBJ: {e:?}"),
+                        }
                     }
                     writeln!(mtl_file, "bump {path}")?;
                 }
@@ -806,9 +834,9 @@ pub fn save_obj(
     s: &super::mesh::Scene,
     mut geom_dst: impl Write,
     // Path to MTL file if any. Original MTL file is also passed.
-    mtl_file: impl Fn(&str) -> Option<String>,
+    mtl_file: impl Fn(&str) -> OutputKind,
     // given texture kind & original path, output new path to write to
-    img_dsts: impl Fn(super::mesh::TextureKind, &str) -> String,
+    img_dsts: impl Fn(super::mesh::TextureKind, &str) -> OutputKind,
 ) -> io::Result<()> {
     let has_materials =
         !s.materials.is_empty() && s.materials.iter().any(|m| !m.textures.is_empty());
