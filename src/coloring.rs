@@ -7,7 +7,7 @@ pub fn hue_to_rgb(v: F) -> [F; 3] {
         "Hue values should be in the 0-1 range, got {v}"
     );
     let v = v * std::f64::consts::TAU as F;
-    let h = v / (std::f64::consts::TAU as F / 6.);
+    let h = v.to_degrees() / 60.;
     let x = 1. - (h.rem_euclid(2.) - 1.).abs();
     let c = 1.;
 
@@ -21,7 +21,17 @@ pub fn hue_to_rgb(v: F) -> [F; 3] {
         _ => unreachable!(),
     };
     let m = v - c;
-    rgb.map(|val| val + m)
+    let rgb = rgb.map(|val| val + m);
+    let sum = rgb.into_iter().sum::<F>().max(1e-5);
+    kmul(sum.recip(), rgb)
+}
+
+#[test]
+fn test_hue_to_rgb() {
+    for i in [0.3, 0.6, 0.9] {
+        println!("{:?}", hue_to_rgb(i));
+    }
+    todo!();
 }
 
 /// Use the magma color scheme to visualize a scalar value.

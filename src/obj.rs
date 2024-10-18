@@ -957,8 +957,8 @@ fn test_load_save_obj() {
     save_obj(
         &scene,
         BufWriter::new(obj_out),
-        |_mtl_path| Some(String::from("garlic_tmp.mtl")),
-        |_tex_kind, og_path| String::from(og_path),
+        |_mtl_path| OutputKind::New(String::from("garlic_tmp.mtl")),
+        |_tex_kind, _og_path| OutputKind::ReuseAbsolute,
     )
     .expect("Failed to save");
 }

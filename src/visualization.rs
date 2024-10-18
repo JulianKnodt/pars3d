@@ -1,6 +1,24 @@
-use super::coloring::magma;
+use super::coloring::{hue_to_rgb, magma};
 use super::{add, cross, edges, kmul, normalize, sub, F};
 use core::ops::Neg;
+
+/// Returns a coherent vertex coloring for a mesh with joint influences.
+pub fn joint_influence_coloring(
+    joint_influence: impl Fn(usize) -> ([F; 4], [u16; 4]),
+    num_vs: usize,
+    total_joints: u16,
+) -> impl Iterator<Item = [F; 3]> {
+    let joint_colors = (0..total_joints)
+        .map(|ji| magma(ji as F / (total_joints - 1) as F))
+        .collect::<Vec<_>>();
+
+    (0..num_vs).map(move |vi| {
+        let (jw, ji) = joint_influence(vi);
+        (0..4)
+            .map(|i| kmul(jw[i], joint_colors[ji[i] as usize]))
+            .fold([0.; 3], add)
+    })
+}
 
 /// Given a mesh with a per-edge scalar value in 0-1, output a new triangle mesh with vertex
 /// coloring that matches the value for each edge. 1 represents max intensity, 0 represents void.
