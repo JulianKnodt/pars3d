@@ -128,6 +128,9 @@ pub struct Mesh {
     /// Used when flattening a scene into a single mesh.
     pub face_mesh_idx: Vec<usize>,
 
+    /// Map of ranges for each face that correspond to a specific material
+    pub face_mat_idx: Vec<(std::ops::Range<usize>, usize)>,
+
     /// 1-1 relation between vertices and joint/idxs weights.
     pub joint_idxs: Vec<[u16; 4]>,
     pub joint_weights: Vec<[F; 4]>,
@@ -296,6 +299,7 @@ impl From<ObjObject> for Mesh {
             joint_idxs: vec![],
             joint_weights: vec![],
             name: String::new(),
+            face_mat_idx: obj.mat,
         }
     }
 }

@@ -53,6 +53,7 @@ impl From<GLTFMesh> for Mesh {
             f,
             uvs,
             n,
+            face_mat_idx,
             joint_idxs,
             joint_weights,
         } = gltf_mesh;
@@ -67,6 +68,7 @@ impl From<GLTFMesh> for Mesh {
             joint_idxs,
             joint_weights,
             face_mesh_idx,
+            face_mat_idx,
             name: String::new(),
         }
     }

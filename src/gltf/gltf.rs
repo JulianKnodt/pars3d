@@ -8,8 +8,15 @@ pub struct GLTFScene {
     pub nodes: Vec<GLTFNode>,
     pub meshes: Vec<GLTFMesh>,
 
+    pub materials: Vec<GLTFMaterial>,
+
     pub root_nodes: Vec<usize>,
     pub skins: Vec<GLTFSkin>, //materials: Vec<Material>,
+}
+
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct GLTFMaterial {
+    emissive_texture: (),
 }
 
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -92,6 +99,8 @@ pub struct GLTFMesh {
 
     pub n: Vec<[F; 3]>,
 
+    pub face_mat_idx: Vec<(std::ops::Range<usize>, usize)>,
+
     // For each vertex, associate it with 4 bones
     pub joint_idxs: Vec<[u16; 4]>,
     pub joint_weights: Vec<[F; 4]>,
@@ -109,6 +118,11 @@ where
         for root_node in scene.nodes() {
             out.root_nodes.push(root_node.index());
         }
+    }
+    for _mat in doc.materials() {
+        let new_mat = GLTFMaterial::default();
+        // TODO actually store materials here
+        out.materials.push(new_mat);
     }
     for (i, node) in doc.nodes().enumerate() {
         assert_eq!(node.index(), i);
@@ -189,6 +203,18 @@ where
                 new_mesh
                     .f
                     .extend(idxs.map(|vis| vis.map(|vi| vi as usize + offset)));
+
+                // add in material index
+                let mat = p.material();
+                if let Some(idx) = mat.index() {
+                    let curr_f = new_mesh.f.len();
+                    match new_mesh.face_mat_idx.last().cloned() {
+                        Some(p) if p.1 == idx && p.0.end == curr_f => {
+                            new_mesh.face_mat_idx.last_mut().unwrap().0.end += 1;
+                        }
+                        None | Some(_) => new_mesh.face_mat_idx.push((curr_f..curr_f + 1, idx)),
+                    }
+                }
             }
             new_node.mesh = Some(out.meshes.len());
             out.meshes.push(new_mesh);

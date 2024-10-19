@@ -1,4 +1,4 @@
-use super::coloring::{hue_to_rgb, magma};
+use super::coloring::magma;
 use super::{add, cross, edges, kmul, normalize, sub, F};
 use core::ops::Neg;
 
