@@ -1,4 +1,4 @@
-use std::path::{absolute, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 use std::io;
 
@@ -6,8 +6,8 @@ use std::io;
 pub fn rel_path_btwn(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result<PathBuf> {
     let src: &Path = src.as_ref();
     let dst: &Path = dst.as_ref();
-    let abs_src = absolute(src)?;
-    let abs_dst = absolute(dst)?;
+    let abs_src = src.canonicalize()?;
+    let abs_dst = dst.canonicalize()?;
 
     let mut curr = if abs_src.is_file() {
         abs_src.parent()
@@ -38,11 +38,11 @@ pub fn rel_path_btwn(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result
 
 #[test]
 fn test_basic() {
-  let v = rel_path_btwn("test/a/b", "b").unwrap();
-  let exp: &Path = ("../../../b").as_ref();
-  assert_eq!(v, exp);
+    let v = rel_path_btwn("test/a/b", "b").unwrap();
+    let exp: &Path = ("../../../b").as_ref();
+    assert_eq!(v, exp);
 
-  let v = rel_path_btwn("b", "test/a/b").unwrap();
-  let exp: &Path = ("../test/a/b").as_ref();
-  assert_eq!(v, exp);
+    let v = rel_path_btwn("b", "test/a/b").unwrap();
+    let exp: &Path = ("../test/a/b").as_ref();
+    assert_eq!(v, exp);
 }
