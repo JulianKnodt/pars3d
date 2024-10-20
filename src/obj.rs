@@ -887,12 +887,15 @@ fn write_mtls(
 
 pub fn save_obj(
     s: &super::mesh::Scene,
-    mut geom_dst: impl Write,
+    geom_path: impl AsRef<Path>,
     // Path to MTL file if any. Original MTL file is also passed.
     mtl_file: impl Fn(&str) -> OutputKind,
     // given texture kind & original path, output new path to write to
     img_dsts: impl Fn(super::mesh::TextureKind, &str) -> OutputKind,
 ) -> io::Result<()> {
+    let geom_dst = File::create(geom_path)?;
+    let mut geom_dst = BufWriter::new(geom_dst);
+
     let has_materials =
         !s.materials.is_empty() && s.materials.iter().any(|m| !m.textures.is_empty());
     let mtl_path = if has_materials {
@@ -953,10 +956,9 @@ fn test_load_save_obj() {
     let scene: super::mesh::Scene = parse("garlic.obj", false, false)
         .expect("Failed to parse obj")
         .into();
-    let obj_out = File::create("garlic_tmp.obj").unwrap();
     save_obj(
         &scene,
-        BufWriter::new(obj_out),
+        "garlic_tmp.obj",
         |_mtl_path| OutputKind::New(String::from("garlic_tmp.mtl")),
         |_tex_kind, _og_path| OutputKind::ReuseAbsolute,
     )

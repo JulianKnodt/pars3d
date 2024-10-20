@@ -54,6 +54,8 @@ pub mod tri_to_quad;
 #[cfg(feature = "fbx")]
 pub mod fbx;
 
+mod util;
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum FaceKind {
     Tri([usize; 3]),
