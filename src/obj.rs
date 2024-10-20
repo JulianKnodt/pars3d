@@ -801,7 +801,7 @@ fn write_mtls(
     let mut mtl_file = BufWriter::new(mtl_file);
 
     for (mi, mat) in s.materials.iter().enumerate() {
-        let mat_name = if mat.name.is_empty() {
+        let mat_name = if !mat.name.is_empty() {
             mat.name.clone()
         } else {
             format!("mat_{mi}")
@@ -926,7 +926,39 @@ pub fn save_obj(
         };
 
         // TODO need to write materials here
-        for f in &m.f {
+        let mut curr_mat_idx = None;
+        for (fi, f) in m.f.iter().enumerate() {
+            match curr_mat_idx {
+                None => {
+                    if let Some((mat_range, mi)) = m.face_mat_idx.first()
+                        && mat_range.contains(&fi)
+                    {
+                        let name = &s.materials[*mi].name;
+                        if name.is_empty() {
+                            writeln!(geom_dst, "usemtl mat_{mi}")?;
+                        } else {
+                            writeln!(geom_dst, "usemtl {name}")?;
+                        }
+                        curr_mat_idx = Some(0);
+                    }
+                }
+                Some(v) => {
+                    let (r, _) = &m.face_mat_idx[v];
+                    if !r.contains(&fi) {
+                        let next = m.face_mat_idx.iter().position(|v| v.0.contains(&fi));
+                        if let Some(ni) = next {
+                            curr_mat_idx = Some(ni);
+                            let mi = m.face_mat_idx[ni].1;
+                            let name = &s.materials[mi].name;
+                            if name.is_empty() {
+                                writeln!(geom_dst, "usemtl mat_{mi}")?;
+                            } else {
+                                writeln!(geom_dst, "usemtl {name}")?;
+                            }
+                        }
+                    }
+                }
+            }
             geom_dst.write_all(b"f ")?;
             let Some((lv, fv)) = f.as_slice().split_last() else {
                 continue;
