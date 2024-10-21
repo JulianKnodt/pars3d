@@ -3,6 +3,7 @@ use super::{add, append_one, kmul, sub, FaceKind, F};
 
 use std::array::from_fn;
 use std::collections::HashMap;
+use std::ops::Range;
 
 const MAX_UV: usize = 4;
 
@@ -103,12 +104,18 @@ impl Scene {
                 out.uv[chan].extend(m.uv[chan].iter().copied());
             }
             out.n.extend(m.n.iter().copied());
+            let curr_f = out.f.len();
             out.f.extend(m.f.iter().map(|f| {
                 let mut f = f.clone();
                 f.map(|vi| vi + curr_vertex_offset);
                 f
             }));
             out.face_mesh_idx.extend(m.f.iter().map(|_| mi));
+            out.face_mat_idx.extend(
+                m.face_mat_idx
+                    .iter()
+                    .map(|(f, m)| ((f.start + curr_f)..(f.end + curr_f), *m)),
+            );
             out.joint_idxs.extend(m.joint_idxs.iter().copied());
             out.joint_weights.extend(m.joint_weights.iter().copied());
         }
@@ -129,7 +136,7 @@ pub struct Mesh {
     pub face_mesh_idx: Vec<usize>,
 
     /// Map of ranges for each face that correspond to a specific material
-    pub face_mat_idx: Vec<(std::ops::Range<usize>, usize)>,
+    pub face_mat_idx: Vec<(Range<usize>, usize)>,
 
     /// 1-1 relation between vertices and joint/idxs weights.
     pub joint_idxs: Vec<[u16; 4]>,
@@ -146,6 +153,12 @@ impl Mesh {
                 uvs[1] = 1. - uvs[1];
             }
         }
+    }
+    /// Returns the material for a given face if any.
+    pub fn mat_for_face(&self, fi: usize) -> Option<usize> {
+        self.face_mat_idx
+            .iter()
+            .find_map(|(fr, mi)| fr.contains(&fi).then_some(*mi))
     }
     pub fn num_tris(&self) -> usize {
         self.f.iter().map(|f| f.num_tris()).sum::<usize>()
@@ -202,10 +215,13 @@ impl Mesh {
         // mesh -> original_vertex_idx -> new_vertex_idx
         let mut vertex_map = vec![HashMap::new(); scene.meshes.len()];
         scene.meshes.fill_with(Default::default);
+        // material for each mesh for each face
+        let mut mat_map = vec![vec![]; scene.meshes.len()];
 
         for (fi, f) in self.f.iter().enumerate() {
             let mi = self.face_mesh_idx[fi];
             let mesh = &mut scene.meshes[mi];
+            mat_map[mi].push(self.mat_for_face(fi));
 
             let mut f = f.clone();
             f.map(|flat_vi| {
@@ -241,7 +257,33 @@ impl Mesh {
 
             mesh.f.push(f);
         }
+
+        for (mi, mesh) in scene.meshes.iter_mut().enumerate() {
+            mesh.face_mat_idx = convert_opt_usize(&mat_map[mi]);
+        }
     }
+}
+
+// For converting optional material per face index to a range of faces.
+pub fn convert_opt_usize(s: &[Option<usize>]) -> Vec<(Range<usize>, usize)> {
+    let mut out = vec![];
+    for (i, mati) in s.iter().enumerate() {
+        let &Some(mati) = mati else {
+            continue;
+        };
+        match out.last_mut() {
+            None => out.push((i..(i + 1), mati)),
+            Some((v, p_mati)) => {
+                if v.end == i && mati == *p_mati {
+                    v.end += 1;
+                } else {
+                    out.push((i..(i + 1), mati));
+                }
+            }
+        }
+    }
+
+    out
 }
 
 impl From<ObjObject> for Mesh {
