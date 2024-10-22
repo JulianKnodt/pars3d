@@ -1,3 +1,4 @@
+use crate::anim::{Animation, Channel, InterpolationKind, OutputProperty, Sampler};
 use crate::{identity, matmul, F};
 use gltf_json::validation::{Checked::Valid, USize64};
 use std::io::{self, Write};
@@ -12,6 +13,8 @@ pub struct GLTFScene {
 
     pub root_nodes: Vec<usize>,
     pub skins: Vec<GLTFSkin>, //materials: Vec<Material>,
+
+    pub animations: Vec<Animation>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -118,6 +121,68 @@ where
         for root_node in scene.nodes() {
             out.root_nodes.push(root_node.index());
         }
+    }
+    for anim in doc.animations() {
+        let mut samplers = vec![Sampler::default(); anim.samplers().count()];
+        let channels = anim
+            .channels()
+            .map(|c| {
+                let target_node_idx = c.target().node().index();
+                use crate::anim::Property;
+                use gltf::animation::Property as GLTFProperty;
+                let target_property = match c.target().property() {
+                    GLTFProperty::Translation => Property::Translation,
+                    GLTFProperty::Rotation => Property::Rotation,
+                    GLTFProperty::Scale => Property::Scale,
+                    GLTFProperty::MorphTargetWeights => Property::MorphTargetWeights,
+                };
+                let sampler = c.sampler().index();
+                let reader = c.reader(|buffer: gltf::Buffer| {
+                    buffers.get(buffer.index()).map(|data| &data[..])
+                });
+                let inputs = match reader.read_inputs() {
+                    None => vec![],
+                    Some(i) => i.map(|f| f as F).collect::<Vec<_>>(),
+                };
+                use gltf::animation::util::ReadOutputs;
+                let outputs = match reader.read_outputs() {
+                    None => OutputProperty::None,
+                    Some(ReadOutputs::Translations(xyz)) => OutputProperty::Translation(
+                        xyz.map(|vs| vs.map(|v| v as F)).collect::<Vec<_>>(),
+                    ),
+                    Some(ReadOutputs::Scales(xyz)) => {
+                        OutputProperty::Scale(xyz.map(|vs| vs.map(|v| v as F)).collect::<Vec<_>>())
+                    }
+                    Some(ReadOutputs::Rotations(xyz)) => OutputProperty::Rotation(
+                        xyz.into_f32()
+                            .map(|vs| vs.map(|v| v as F))
+                            .collect::<Vec<_>>(),
+                    ),
+                    Some(ReadOutputs::MorphTargetWeights(w)) => OutputProperty::MorphTargetWeight(
+                        w.into_f32().map(|v| v as F).collect::<Vec<_>>(),
+                    ),
+                };
+                samplers[sampler].input = inputs;
+                samplers[sampler].output = outputs;
+                use gltf::animation::Interpolation as GLTFInterpolation;
+                samplers[sampler].interpolation_kind = match c.sampler().interpolation() {
+                    GLTFInterpolation::Linear => InterpolationKind::Linear,
+                    GLTFInterpolation::CubicSpline => InterpolationKind::CubicSpline,
+                    GLTFInterpolation::Step => InterpolationKind::Step,
+                };
+                Channel {
+                    target_node_idx,
+                    target_property,
+                    sampler,
+                }
+            })
+            .collect::<Vec<_>>();
+
+        out.animations.push(Animation {
+            name: anim.name().unwrap_or("").to_string(),
+            samplers,
+            channels,
+        });
     }
     for _mat in doc.materials() {
         let new_mat = GLTFMaterial::default();

@@ -44,6 +44,9 @@ pub mod visualization;
 #[cfg(feature = "gltf")]
 pub mod gltf;
 
+/// Animation related structs
+pub mod anim;
+
 /// Unified mesh representation.
 pub mod mesh;
 
