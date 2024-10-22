@@ -370,6 +370,47 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
         vertex_offset += mesh.v.len() as u32;
     }
 
+    let a_offset = bytes.len();
+    let mut a_in_offsets = vec![];
+    let mut a_out_offsets = vec![];
+    for anim in &scene.animations {
+        for sampler in &anim.samplers {
+            a_in_offsets.push(vec![]);
+            a_in_offsets
+                .last_mut()
+                .unwrap()
+                .push(bytes.len() - a_offset);
+            let input_bytes = sampler.input.iter().flat_map(|&v| (v as f32).to_le_bytes());
+            bytes.extend(input_bytes);
+
+            a_out_offsets.push(vec![]);
+            a_out_offsets
+                .last_mut()
+                .unwrap()
+                .push(bytes.len() - a_offset);
+            use crate::anim::OutputProperty;
+            match &sampler.output {
+                OutputProperty::None => {}
+                OutputProperty::Translation(t) | OutputProperty::Scale(t) => {
+                    let raw = t
+                        .iter()
+                        .flat_map(|p| p.into_iter().flat_map(|&v| (v as f32).to_le_bytes()));
+                    bytes.extend(raw)
+                }
+                OutputProperty::Rotation(t) => {
+                    let raw = t
+                        .iter()
+                        .flat_map(|p| p.into_iter().flat_map(|&v| (v as f32).to_le_bytes()));
+                    bytes.extend(raw)
+                }
+                OutputProperty::MorphTargetWeight(t) => {
+                    let raw = t.iter().flat_map(|&v| (v as f32).to_le_bytes());
+                    bytes.extend(raw)
+                }
+            }
+        }
+    }
+
     let [lb, ub] = verts
         .iter()
         .fold([[f32::INFINITY; 3], [f32::NEG_INFINITY; 3]], |[l, h], n| {
@@ -414,7 +455,7 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
     };
     let idx_buffer_view = root.push(gltf_json::buffer::View {
         buffer,
-        byte_length: USize64::from(buf_len - f_offset),
+        byte_length: USize64::from(a_offset - f_offset),
         byte_offset: Some(USize64::from(f_offset)),
         byte_stride: None,
         extensions: Default::default(),
@@ -422,6 +463,21 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
         name: None,
         target: Some(Valid(gltf_json::buffer::Target::ElementArrayBuffer)),
     });
+
+    let anim_buffer_view = if scene.animations.is_empty() {
+        gltf_json::Index::new(0)
+    } else {
+        root.push(gltf_json::buffer::View {
+            buffer,
+            byte_length: USize64::from(buf_len - a_offset),
+            byte_offset: Some(USize64::from(a_offset)),
+            byte_stride: None,
+            extensions: Default::default(),
+            extras: Default::default(),
+            name: None,
+            target: None,
+        })
+    };
 
     let positions = root.push(gltf_json::Accessor {
         buffer_view: Some(buffer_view),
@@ -525,6 +581,7 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
             })
         })
         .collect::<Vec<_>>();
+
     let mut meshes = vec![];
     for (mi, mesh) in scene.meshes.iter().enumerate() {
         let faces = root.push(gltf_json::Accessor {
@@ -596,6 +653,95 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
             })
         })
         .collect::<Vec<_>>();
+
+    for (ai, anim) in scene.animations.iter().enumerate() {
+        use crate::anim::Property::*;
+        use gltf_json::animation::Property as GLTFProp;
+        let channels = anim
+            .channels
+            .iter()
+            .map(|c| gltf_json::animation::Channel {
+                sampler: gltf_json::Index::new(c.sampler as u32),
+                target: gltf_json::animation::Target {
+                    node: gltf_json::Index::new(c.target_node_idx as u32),
+                    path: Valid(match c.target_property {
+                        Translation => GLTFProp::Translation,
+                        Rotation => GLTFProp::Rotation,
+                        Scale => GLTFProp::Scale,
+                        MorphTargetWeights => GLTFProp::MorphTargetWeights,
+                    }),
+                    extras: Default::default(),
+                    extensions: Default::default(),
+                },
+                extras: Default::default(),
+                extensions: Default::default(),
+            })
+            .collect::<Vec<_>>();
+        use crate::anim::InterpolationKind::*;
+        use gltf_json::animation::Interpolation as GLTFInterp;
+        let samplers = anim
+            .samplers
+            .iter()
+            .enumerate()
+            .map(|(si, s)| gltf_json::animation::Sampler {
+                input: root.push(gltf_json::Accessor {
+                    buffer_view: Some(anim_buffer_view),
+                    byte_offset: Some(USize64::from(a_in_offsets[ai][si])),
+                    count: USize64::from(s.input.len()),
+                    component_type: Valid(gltf_json::accessor::GenericComponentType(
+                        gltf_json::accessor::ComponentType::F32,
+                    )),
+                    extensions: Default::default(),
+                    extras: Default::default(),
+                    type_: Valid(gltf_json::accessor::Type::Scalar),
+                    min: None,
+                    max: None,
+                    name: None,
+                    normalized: false,
+                    sparse: None,
+                }),
+                output: root.push(gltf_json::Accessor {
+                    buffer_view: Some(anim_buffer_view),
+                    byte_offset: Some(USize64::from(a_out_offsets[ai][si])),
+                    count: USize64::from(s.output.len()),
+                    component_type: Valid(gltf_json::accessor::GenericComponentType(
+                        gltf_json::accessor::ComponentType::F32,
+                    )),
+                    extensions: Default::default(),
+                    extras: Default::default(),
+                    type_: Valid(match s.output {
+                        OutputProperty::None | OutputProperty::MorphTargetWeight(_) => {
+                            gltf_json::accessor::Type::Scalar
+                        }
+                        OutputProperty::Rotation(_) => gltf_json::accessor::Type::Vec4,
+                        OutputProperty::Translation(_) | OutputProperty::Scale(_) => {
+                            gltf_json::accessor::Type::Vec3
+                        }
+                    }),
+                    min: None,
+                    max: None,
+                    name: None,
+                    normalized: false,
+                    sparse: None,
+                }),
+                interpolation: Valid(match s.interpolation_kind {
+                    Linear => GLTFInterp::Linear,
+                    CubicSpline => GLTFInterp::CubicSpline,
+                    Step => GLTFInterp::Step,
+                }),
+                extras: Default::default(),
+                extensions: Default::default(),
+            })
+            .collect::<Vec<_>>();
+        let a = gltf_json::Animation {
+            channels,
+            samplers,
+            extensions: Default::default(),
+            extras: Default::default(),
+            name: (!anim.name.is_empty()).then(|| anim.name.clone()),
+        };
+        root.push(a);
+    }
 
     let mut nodes = vec![];
     for (ni, n) in scene.nodes.iter().enumerate() {

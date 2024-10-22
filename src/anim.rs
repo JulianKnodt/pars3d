@@ -26,6 +26,18 @@ pub enum OutputProperty {
     MorphTargetWeight(Vec<F>),
 }
 
+impl OutputProperty {
+    pub fn len(&self) -> usize {
+        match self {
+            OutputProperty::None => 0,
+            OutputProperty::Translation(t) => t.len(),
+            OutputProperty::Rotation(t) => t.len(),
+            OutputProperty::Scale(t) => t.len(),
+            OutputProperty::MorphTargetWeight(t) => t.len(),
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Channel {
     pub target_node_idx: usize,

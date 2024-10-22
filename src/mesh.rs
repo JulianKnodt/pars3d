@@ -1,3 +1,4 @@
+use super::anim::Animation;
 use super::obj::{Obj, ObjObject, MTL};
 use super::{add, append_one, kmul, sub, FaceKind, F};
 
@@ -72,6 +73,7 @@ pub struct Scene {
     pub meshes: Vec<Mesh>,
     pub materials: Vec<Material>,
     pub skins: Vec<Skin>,
+    pub animations: Vec<Animation>,
 
     /// For an OBJ input, where are the MTL files
     pub(crate) mtllibs: Vec<String>,

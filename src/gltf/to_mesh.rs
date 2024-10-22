@@ -1,7 +1,7 @@
 use super::gltf::{GLTFMesh, GLTFNode, GLTFScene, GLTFSkin};
 use crate::mesh::{Mesh, Node, Scene, Skin};
 
-use crate::{tform_point, FaceKind};
+use crate::FaceKind;
 
 impl From<GLTFMesh> for Mesh {
     fn from(gltf_mesh: GLTFMesh) -> Self {
@@ -48,6 +48,7 @@ impl From<GLTFScene> for Scene {
                 skeleton,
             }
         }));
+        out.animations = gltf_scene.animations;
         out.meshes
             .extend(gltf_scene.meshes.into_iter().map(|mesh| mesh.into()));
         // for each mesh, also ensure that if any has joint then all will have joints
