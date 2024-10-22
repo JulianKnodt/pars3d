@@ -898,6 +898,7 @@ pub fn save_obj(
         writeln!(geom_dst, "mtllib {}", mtl_path.display())?;
     }
 
+    let mut prev_v = 0;
     for (mi, m) in s.meshes.iter().enumerate() {
         for &[x, y, z] in &m.v {
             writeln!(geom_dst, "v {x} {y} {z}")?;
@@ -964,10 +965,11 @@ pub fn save_obj(
                 continue;
             };
             for &v in fv {
-                write!(geom_dst, "{} ", fmt(v + 1))?;
+                write!(geom_dst, "{} ", fmt(v + 1 + prev_v))?;
             }
-            writeln!(geom_dst, "{}", fmt(lv + 1))?;
+            writeln!(geom_dst, "{}", fmt(lv + 1 + prev_v))?;
         }
+        prev_v += m.v.len();
     }
     Ok(())
 }
