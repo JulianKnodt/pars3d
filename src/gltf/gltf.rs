@@ -374,8 +374,9 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
     let mut a_in_offsets = vec![];
     let mut a_out_offsets = vec![];
     for anim in &scene.animations {
+        a_in_offsets.push(vec![]);
+        a_out_offsets.push(vec![]);
         for sampler in &anim.samplers {
-            a_in_offsets.push(vec![]);
             a_in_offsets
                 .last_mut()
                 .unwrap()
@@ -383,7 +384,6 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
             let input_bytes = sampler.input.iter().flat_map(|&v| (v as f32).to_le_bytes());
             bytes.extend(input_bytes);
 
-            a_out_offsets.push(vec![]);
             a_out_offsets
                 .last_mut()
                 .unwrap()
