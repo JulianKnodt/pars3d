@@ -933,7 +933,7 @@ pub fn save_obj(
                     if let Some((mat_range, mi)) = m.face_mat_idx.first()
                         && mat_range.contains(&fi)
                     {
-                        let name = &s.materials[*mi].name;
+                        let name = s.materials.get(*mi).map(|n| n.name.as_str()).unwrap_or("");
                         if name.is_empty() {
                             writeln!(geom_dst, "usemtl mat_{mi}")?;
                         } else {
