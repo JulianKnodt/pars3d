@@ -156,6 +156,17 @@ impl Mesh {
             }
         }
     }
+    /// Returns an iterator over (edge, face) pairs in this mesh.
+    /// Each edge will be visited multiple times, equaling the number of its adjacent faces.
+    pub fn edges(&self) -> impl Iterator<Item = ([usize; 2], usize)> + '_ {
+        self.f.iter().enumerate().flat_map(|(fi, f)| {
+            let f_sl = f.as_slice();
+            f_sl.array_windows::<2>()
+                .copied()
+                .chain(std::iter::once([*f_sl.last().unwrap(), f_sl[0]]))
+                .map(move |e| (e, fi))
+        })
+    }
     /// Returns the material for a given face if any.
     pub fn mat_for_face(&self, fi: usize) -> Option<usize> {
         self.face_mat_idx
