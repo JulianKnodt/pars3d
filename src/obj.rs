@@ -950,7 +950,7 @@ pub fn save_obj(
                         if let Some(ni) = next {
                             curr_mat_idx = Some(ni);
                             let mi = m.face_mat_idx[ni].1;
-                            let name = &s.materials[mi].name;
+                            let name = s.materials.get(mi).map(|m| m.name.as_str()).unwrap_or("");
                             if name.is_empty() {
                                 writeln!(geom_dst, "usemtl mat_{mi}")?;
                             } else {
