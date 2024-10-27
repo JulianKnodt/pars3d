@@ -6,6 +6,8 @@
 #![feature(binary_heap_into_iter_sorted)]
 #![feature(let_chains)]
 #![feature(array_chunks)]
+#![feature(ascii_char)]
+#![feature(ascii_char_variants)]
 
 #[cfg(not(feature = "f64"))]
 pub type F = f32;
@@ -54,7 +56,6 @@ pub mod mesh;
 pub mod tri_to_quad;
 
 /// FBX parsing.
-#[cfg(feature = "fbx")]
 pub mod fbx;
 
 mod util;
