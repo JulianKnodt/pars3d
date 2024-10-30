@@ -58,6 +58,7 @@ pub mod material;
 /// Approximately convert a triangle mesh to a mixed tri/quad mesh.
 pub mod tri_to_quad;
 
+#[cfg(feature = "fbx")]
 /// FBX parsing.
 pub mod fbx;
 

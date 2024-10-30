@@ -1,4 +1,4 @@
-use gltf::GLTFMaterial;
+use crate::gltf::GLTFMaterial;
 
 /// Source material from loaded mesh.
 #[derive(Debug, Clone, PartialEq)]

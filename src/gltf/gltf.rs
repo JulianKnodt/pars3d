@@ -17,9 +17,48 @@ pub struct GLTFScene {
     pub animations: Vec<Animation>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImageData {
+    pixels: Vec<u8>,
+    width: u32,
+    height: u32,
+    format: gltf::image::Format,
+}
+
+impl From<gltf::image::Data> for ImageData {
+    fn from(d: gltf::image::Data) -> ImageData {
+        let gltf::image::Data {
+            pixels,
+            width,
+            height,
+            format,
+        } = d;
+        ImageData {
+            pixels,
+            width,
+            height,
+            format,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TexInfo {
+    uv_channel: u32,
+    // TODO this can either be a URI w/ optional mime OR raw buffer w/ uri
+    texture: ImageData,
+    mime_type: Option<String>,
+}
+
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct PbrMetallicRoughness {
+    base_color_factor: [F; 4],
+    base_color_texture: Option<TexInfo>,
+}
+
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct GLTFMaterial {
-    pbr_metallic_roughness: gltf::PbrMetallicRoughness,
+    pbr_metallic_roughness: PbrMetallicRoughness,
     name: String,
     double_sided: bool,
 }
@@ -116,7 +155,7 @@ pub fn load<P>(path: P) -> gltf::Result<GLTFScene>
 where
     P: AsRef<std::path::Path>,
 {
-    let (doc, buffers, _images) = gltf::import(path)?;
+    let (doc, buffers, images) = gltf::import(path)?;
 
     let mut out = GLTFScene::default();
     for scene in doc.scenes() {
@@ -124,6 +163,25 @@ where
             out.root_nodes.push(root_node.index());
         }
     }
+
+    for mat in doc.materials() {
+        let mut new_mat = GLTFMaterial::default();
+        new_mat.name = mat.name().map(String::from).unwrap_or_else(String::new);
+        let prev_pbr_mr = mat.pbr_metallic_roughness();
+        new_mat.pbr_metallic_roughness = PbrMetallicRoughness {
+            base_color_factor: prev_pbr_mr.base_color_factor(),
+            base_color_texture: prev_pbr_mr.base_color_texture().map(|i| TexInfo {
+                uv_channel: i.tex_coord(),
+                texture: images[i.texture().source().index()].clone().into(),
+                mime_type: match i.texture().source().source() {
+                    gltf::image::Source::View { mime_type, .. } => Some(String::from(mime_type)),
+                    gltf::image::Source::Uri { mime_type, .. } => mime_type.map(String::from),
+                },
+            }),
+        };
+        out.materials.push(new_mat);
+    }
+
     for anim in doc.animations() {
         let mut samplers = vec![Sampler::default(); anim.samplers().count()];
         let channels = anim
@@ -185,11 +243,6 @@ where
             samplers,
             channels,
         });
-    }
-    for _mat in doc.materials() {
-        let new_mat = GLTFMaterial::default();
-        // TODO actually store materials here
-        out.materials.push(new_mat);
     }
     for (i, node) in doc.nodes().enumerate() {
         assert_eq!(node.index(), i);
@@ -421,6 +474,8 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
                 std::array::from_fn(|i| h[i].max(n.v[i])),
             ]
         });
+
+    // TODO write images here
 
     let buf_len = bytes.len();
     let buffer = root.push(gltf_json::Buffer {
