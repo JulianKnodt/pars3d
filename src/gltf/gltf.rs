@@ -19,7 +19,9 @@ pub struct GLTFScene {
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct GLTFMaterial {
-    emissive_texture: (),
+    pbr_metallic_roughness: gltf::PbrMetallicRoughness,
+    name: String,
+    double_sided: bool,
 }
 
 #[derive(Debug, Default, Clone, PartialEq)]

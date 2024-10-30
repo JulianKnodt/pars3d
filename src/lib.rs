@@ -52,6 +52,9 @@ pub mod anim;
 /// Unified mesh representation.
 pub mod mesh;
 
+/// Material representation. An enum over possible input file format's material kinds.
+pub mod material;
+
 /// Approximately convert a triangle mesh to a mixed tri/quad mesh.
 pub mod tri_to_quad;
 

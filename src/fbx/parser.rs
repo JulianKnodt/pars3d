@@ -61,9 +61,6 @@ impl KVs {
         let mut i = self.kvs.len();
         self.kvs.push(Default::default());
         self.kvs[i].parent = parent;
-        if parent.is_none() {
-            self.roots.push(i);
-        }
         while let Some(n) = tokens.next() {
             match n {
                 Token::Key(k) => {
@@ -116,16 +113,17 @@ impl KVs {
         let mut fbx_scene = FBXScene::default();
 
         for &i in rev_map.keys() {
-          println!("{:?}", self.kvs[i]);
+            println!("{:?}", self.kvs[i]);
         }
         //let mut connections = vec![];
-        let conn_kv = self.roots
+        let conn_kv = self
+            .roots
             .iter()
             .find(|&&v| self.kvs[v].key == "Connections")
             .expect("No connections?");
 
         for &child in &rev_map[conn_kv] {
-          println!("{:?}", self.kvs[child]);
+            println!("{:?}", self.kvs[child]);
         }
 
         //let mut objects = vec![];
