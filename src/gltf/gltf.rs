@@ -169,7 +169,7 @@ where
         new_mat.name = mat.name().map(String::from).unwrap_or_else(String::new);
         let prev_pbr_mr = mat.pbr_metallic_roughness();
         new_mat.pbr_metallic_roughness = PbrMetallicRoughness {
-            base_color_factor: prev_pbr_mr.base_color_factor(),
+            base_color_factor: prev_pbr_mr.base_color_factor().map(|v| v as F),
             base_color_texture: prev_pbr_mr.base_color_texture().map(|i| TexInfo {
                 uv_channel: i.tex_coord(),
                 texture: images[i.texture().source().index()].clone().into(),
