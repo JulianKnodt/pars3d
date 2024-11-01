@@ -98,6 +98,9 @@ impl Scene {
     /// Converts this scene into a flattened mesh which can then be repopulated back into a
     /// scene later.
     pub fn into_flattened_mesh(&self) -> Mesh {
+        let has_joints = self.meshes.iter().any(|m| {
+            !m.joint_weights.is_empty() && m.joint_weights.iter().any(|&jw| jw != [0.; 4])
+        });
         let mut out = Mesh::default();
         for (mi, m) in self.meshes.iter().enumerate() {
             let curr_vertex_offset = out.v.len();
@@ -118,8 +121,23 @@ impl Scene {
                     .iter()
                     .map(|(f, m)| ((f.start + curr_f)..(f.end + curr_f), *m)),
             );
-            out.joint_idxs.extend(m.joint_idxs.iter().copied());
-            out.joint_weights.extend(m.joint_weights.iter().copied());
+
+            // always pad to equivalent number of joints and vertices OR 0 joints.
+            if has_joints {
+                if m.joint_idxs.is_empty() {
+                    out.joint_idxs.extend((0..m.v.len()).map(|_| [0; 4]));
+                    out.joint_weights.extend((0..m.v.len()).map(|_| [0.; 4]));
+                } else {
+                    assert_eq!(m.v.len(), m.joint_idxs.len());
+                    out.joint_idxs.extend(m.joint_idxs.iter().copied());
+                    assert_eq!(m.v.len(), m.joint_weights.len());
+                    out.joint_weights.extend(m.joint_weights.iter().copied());
+                }
+            }
+        }
+        if !out.joint_idxs.is_empty() {
+            assert_eq!(out.joint_idxs.len(), out.joint_weights.len());
+            assert_eq!(out.joint_idxs.len(), out.v.len());
         }
         out
     }
