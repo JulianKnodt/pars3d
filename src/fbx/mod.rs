@@ -17,4 +17,9 @@ pub struct FBXMesh {
     v: Vec<[F; 3]>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct FBXObject {
+    id: i64,
+}
+
 pub mod parser;

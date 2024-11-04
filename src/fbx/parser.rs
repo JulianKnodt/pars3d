@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use super::FBXScene;
 use std::ascii::Char;
 use std::collections::HashMap;
@@ -33,6 +35,22 @@ pub enum Data {
     BoolArr(Vec<bool>),
 }
 
+impl Data {
+    fn as_str(&self) -> Option<&str> {
+        if let Data::String(s) = self {
+            Some(s.as_str())
+        } else {
+            None
+        }
+    }
+    fn as_int(&self) -> Option<i64> {
+        match self {
+            &Data::I64(v) => Some(v),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum Token {
     Key(String),
@@ -61,6 +79,9 @@ impl KVs {
         let mut i = self.kvs.len();
         self.kvs.push(Default::default());
         self.kvs[i].parent = parent;
+        if parent == None {
+            self.roots.push(i);
+        }
         while let Some(n) = tokens.next() {
             match n {
                 Token::Key(k) => {
@@ -71,6 +92,9 @@ impl KVs {
                         self.kvs.push(Default::default());
                         self.kvs[i].parent = parent;
                         self.kvs[i].key = k;
+                        if parent == None {
+                            self.roots.push(i);
+                        }
                     }
                 }
                 Token::ScopeStart => self.parse_scope(tokens, Some(i)),
@@ -83,18 +107,19 @@ impl KVs {
     // TODO reconvert KVs to tokens
 
     /// Constructs a graphviz representation of this FBX file, for viewing externally
-    fn to_graphviz(&self, mut dst: impl Write) -> io::Result<()> {
-        let mut rev_map: HashMap<usize, Vec<usize>> = HashMap::new();
+    #[allow(unused)]
+    pub fn to_graphviz(&self, mut dst: impl Write) -> io::Result<()> {
+        let mut children: HashMap<usize, Vec<usize>> = HashMap::new();
         for (i, kv) in self.kvs.iter().enumerate() {
             let Some(p) = kv.parent else { continue };
-            rev_map.entry(p).or_default().push(i);
+            children.entry(p).or_default().push(i);
         }
 
         writeln!(dst, "graph FBX {{")?;
         for (i, kv) in self.kvs.iter().enumerate() {
             writeln!(dst, "\t{i} [label=\"{}\"]", kv.key)?;
         }
-        for (k, vs) in rev_map.into_iter() {
+        for (k, vs) in children.into_iter() {
             for v in vs.into_iter() {
                 writeln!(dst, "\t{k} -- {v}")?;
             }
@@ -104,30 +129,82 @@ impl KVs {
     }
 
     fn to_scene(&self) -> FBXScene {
-        let mut rev_map: HashMap<usize, Vec<usize>> = HashMap::new();
+        // parent -> all children
+        let mut children: HashMap<usize, Vec<usize>> = HashMap::new();
 
         for (i, kv) in self.kvs.iter().enumerate() {
             let Some(p) = kv.parent else { continue };
-            rev_map.entry(p).or_default().push(i);
+            children.entry(p).or_default().push(i);
         }
         let mut fbx_scene = FBXScene::default();
 
-        for &i in rev_map.keys() {
-            println!("{:?}", self.kvs[i]);
-        }
-        //let mut connections = vec![];
-        let conn_kv = self
+        // parent->child pairs
+        let mut connections = vec![];
+        let conn_idx = self
             .roots
             .iter()
-            .find(|&&v| self.kvs[v].key == "Connections")
-            .expect("No connections?");
-
-        for &child in &rev_map[conn_kv] {
-            println!("{:?}", self.kvs[child]);
+            .find(|&&v| self.kvs[v].key == "Connections");
+        if let Some(conn_idx) = conn_idx {
+            for &child in &children[conn_idx] {
+                let kv = &self.kvs[child];
+                assert_eq!(kv.key, "C");
+                assert_eq!(kv.values.len(), 3);
+                let [marker, src, dst] = &kv.values[..] else {
+                    todo!("{:?}", kv.values);
+                };
+                assert_eq!(marker.as_str().unwrap(), "OO", "Temporary check {marker:?}");
+                connections.push((src.as_int().unwrap(), dst.as_int().unwrap()));
+            }
         }
 
-        //let mut objects = vec![];
-        todo!();
+        let mut objects = self.roots.iter().find(|&&v| self.kvs[v].key == "Objects");
+        println!("objects");
+        if let Some(objects) = objects {
+            for &o in &children[objects] {
+                let kv = &self.kvs[o];
+                let [id, name_objtype, classtag] = &kv.values[..] else {
+                    todo!("{:?}", kv.values);
+                };
+                let id = id.as_int().unwrap();
+                assert_eq!(kv.values.len(), 3);
+                let n_o = name_objtype.as_str().unwrap().split_once("\\x00\\x01");
+                let Some((name, obj_type)) = n_o else {
+                    todo!("{name_objtype:?}");
+                };
+
+                let Some(classtag) = classtag.as_str() else {
+                    todo!("{classtag:?}");
+                };
+
+                let out_object = match obj_type {
+                    "NodeAttribute" => match classtag {
+                        "Light" => continue,
+                        "Camera" => continue,
+                        _ => todo!("NodeAttribute::{classtag} not handled"),
+                    },
+                    "Geometry" => match classtag {
+                        "Mesh" => {
+                            println!("{id:?} {:?}", children.keys().collect::<Vec<_>>());
+                            println!("{:?}", children[&(id as usize)]);
+                        }
+                        _ => todo!("Geometry::{classtag} not handled"),
+                    },
+                    // Do not handle lights or cameras for now
+                    /*
+                    "Model" => match classtag {
+                      "Geometry"
+                    },
+                    */
+                    // Don't handle materials yet
+                    "Material" => continue,
+                    _ => todo!("{obj_type:?}"),
+                };
+            }
+        }
+
+        todo!("Where we at");
+
+        fbx_scene
     }
 }
 
@@ -280,8 +357,6 @@ fn read_scope(
     let prop_len = read_word!();
     let scope_name = read_string!(false, false);
 
-    println!("{prop_count} {prop_len} {scope_name} {block_len}");
-
     output_tokens.push(Token::Key(scope_name));
 
     let curr_read = read;
@@ -354,7 +429,7 @@ fn test_parse_fbx() {
         .expect("Failed to write graphviz");
     */
 
-    let scene = kvs.to_scene();
+    let _scene = kvs.to_scene();
 
     todo!();
 }
