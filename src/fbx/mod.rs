@@ -1,4 +1,4 @@
-use crate::F;
+use crate::{FaceKind, F};
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FBXScene {
@@ -12,9 +12,10 @@ pub struct FBXNode {
     children: Vec<usize>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct FBXMesh {
     v: Vec<[F; 3]>,
+    f: Vec<FaceKind>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -158,6 +158,26 @@ impl FaceKind {
         self.as_mut_slice().rotate_left(min_idx);
         false
     }
+    #[allow(unused)]
+    pub(crate) fn insert(&mut self, v: usize) {
+        use FaceKind::*;
+        *self = match self {
+            &mut Tri([a, b, c]) => Quad([a, b, c, v]),
+            &mut Quad([a, b, c, d]) => Poly(vec![a, b, c, d, v]),
+            Poly(ref mut vis) => match vis.len() {
+                2 => Tri([vis[0], vis[1], v]),
+                3 | 4 => unreachable!(),
+                0 | 1 | _ => {
+                    vis.push(v);
+                    return;
+                }
+            },
+        }
+    }
+    #[allow(unused)]
+    pub(crate) fn empty() -> Self {
+        FaceKind::Poly(vec![])
+    }
 }
 
 pub(crate) fn kmul<const N: usize>(k: F, v: [F; N]) -> [F; N] {

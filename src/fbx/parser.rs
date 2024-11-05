@@ -1,6 +1,8 @@
 #![allow(unused)]
 
-use super::FBXScene;
+use super::{FBXMesh, FBXScene};
+use crate::{FaceKind, F};
+
 use std::ascii::Char;
 use std::collections::HashMap;
 use std::io::{self, BufRead, Write};
@@ -8,6 +10,7 @@ use std::mem::size_of;
 
 /// Magic binary length.
 const MAGIC_LEN: usize = 23;
+
 /// Magic binary.
 pub(crate) const MAGIC: &[u8; MAGIC_LEN] = b"Kaydara FBX Binary  \x00\x1a\x00";
 
@@ -33,16 +36,29 @@ pub enum Data {
     F32Arr(Vec<f32>),
     F64Arr(Vec<f64>),
     BoolArr(Vec<bool>),
+
+    /// Marker to indicate that data was moved from this
+    Used,
+}
+
+macro_rules! cast {
+    ($fn_name: ident, $out_ty: ty, $variant: tt) => {
+        fn $fn_name(&self) -> Option<$out_ty> {
+            match self {
+                Data::$variant(v) => Some(v),
+                _ => None,
+            }
+        }
+    };
 }
 
 impl Data {
-    fn as_str(&self) -> Option<&str> {
-        if let Data::String(s) = self {
-            Some(s.as_str())
-        } else {
-            None
-        }
-    }
+    cast!(as_str, &str, String);
+    cast!(as_f64_arr, &[f64], F64Arr);
+    cast!(as_i64_arr, &[i64], I64Arr);
+    cast!(as_i32_arr, &[i32], I32Arr);
+    cast!(as_i64, &i64, I64);
+
     fn as_int(&self) -> Option<i64> {
         match self {
             &Data::I64(v) => Some(v),
@@ -66,10 +82,17 @@ struct KV {
     parent: Option<usize>,
 }
 
+impl KV {
+    pub fn id(&self) -> Option<i64> {
+        self.values.get(0).and_then(Data::as_int)
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 struct KVs {
     kvs: Vec<KV>,
     roots: Vec<usize>,
+    children: HashMap<usize, Vec<usize>>,
 }
 
 impl KVs {
@@ -79,8 +102,9 @@ impl KVs {
         let mut i = self.kvs.len();
         self.kvs.push(Default::default());
         self.kvs[i].parent = parent;
-        if parent == None {
-            self.roots.push(i);
+        match parent {
+            None => self.roots.push(i),
+            Some(p) => self.children.entry(p).or_default().push(i),
         }
         while let Some(n) = tokens.next() {
             match n {
@@ -92,8 +116,9 @@ impl KVs {
                         self.kvs.push(Default::default());
                         self.kvs[i].parent = parent;
                         self.kvs[i].key = k;
-                        if parent == None {
-                            self.roots.push(i);
+                        match parent {
+                            None => self.roots.push(i),
+                            Some(p) => self.children.entry(p).or_default().push(i),
                         }
                     }
                 }
@@ -106,35 +131,107 @@ impl KVs {
 
     // TODO reconvert KVs to tokens
 
+    /*
     /// Constructs a graphviz representation of this FBX file, for viewing externally
     #[allow(unused)]
     pub fn to_graphviz(&self, mut dst: impl Write) -> io::Result<()> {
-        let mut children: HashMap<usize, Vec<usize>> = HashMap::new();
-        for (i, kv) in self.kvs.iter().enumerate() {
-            let Some(p) = kv.parent else { continue };
-            children.entry(p).or_default().push(i);
-        }
-
         writeln!(dst, "graph FBX {{")?;
         for (i, kv) in self.kvs.iter().enumerate() {
             writeln!(dst, "\t{i} [label=\"{}\"]", kv.key)?;
         }
-        for (k, vs) in children.into_iter() {
-            for v in vs.into_iter() {
+        for &(k, vs) in self.children.iter() {
+            for &v in vs.iter() {
                 writeln!(dst, "\t{k} -- {v}")?;
             }
         }
         writeln!(dst, "}}")?;
         Ok(())
     }
+    */
+    fn parse_mesh(&self, mesh_id: i64, kvi: usize) -> FBXMesh {
+        let mut out = FBXMesh::default();
+        for &c in &self.children[&kvi] {
+            let child = &self.kvs[c];
+            match child.key.as_str() {
+                "Vertices" => {
+                    // TODO or this can be f32?
+                    let v_arr: &[f64] = child.values[0].as_f64_arr().unwrap();
+                    let v = v_arr
+                        .iter()
+                        .array_chunks::<3>()
+                        .map(|[a, b, c]| [*a as F, *b as F, *c as F]);
+                    out.v.extend(v);
+                }
+                "Properties70" => {
+                    assert!(child.values.is_empty());
+                }
+                "GeometryVersion" => {}
+                "PolygonVertexIndex" => {
+                    let mut curr_face = FaceKind::empty();
+                    let idxs = child.values[0].as_i32_arr().unwrap();
+                    for &vi in idxs {
+                        if vi >= 0 {
+                            curr_face.insert(vi as usize);
+                        } else {
+                            curr_face.insert(-(vi + 1) as usize);
+                            let f = std::mem::replace(&mut curr_face, FaceKind::empty());
+                            out.f.push(f);
+                        }
+                    }
+                }
+                "Edges" => { /* No idea what to do here */ }
+                "LayerElementNormal" => {
+                    for &cc in &self.children[&c] {
+                        let gc = &self.kvs[cc];
+                        match gc.key.as_str() {
+                            "Version" => {}
+                            "Name" => {}
+                            "MappingInformationType" => {}
+                            "ReferenceInformationType" => {}
+                            "Normals" => todo!(),
+                        }
+                    }
+                }
+                "LayerElementUV" => {
+                    for &cc in &self.children[&c] {
+                        let gc = &self.kvs[cc];
+                        match gc.key.as_str() {
+                            "Version" => {}
+                            "Name" => {}
+                            "MappingInformationType" => {}
+                            "ReferenceInformationType" => {}
+                            "UV" => todo!(),
+                            "UVIndex" => todo!(),
+                        }
+                    }
+                }
+                "LayerElementMaterial" => {
+                    for &cc in &self.children[&c] {
+                        let gc = &self.kvs[cc];
+                        match gc.key.as_str() {
+                            "Version" => {}
+                            "Name" => {}
+                            "MappingInformationType" => {}
+                            "ReferenceInformationType" => {}
+                            "UV" => todo!(),
+                            "UVIndex" => todo!(),
+                        }
+                    }
+                }
+                x => todo!("{x:?} {:?}", child.values),
+            }
+        }
+        out
+    }
 
-    fn to_scene(&self) -> FBXScene {
-        // parent -> all children
-        let mut children: HashMap<usize, Vec<usize>> = HashMap::new();
+    pub fn to_scene(&self) -> FBXScene {
+        let mut id_to_kv = HashMap::new();
 
         for (i, kv) in self.kvs.iter().enumerate() {
             let Some(p) = kv.parent else { continue };
-            children.entry(p).or_default().push(i);
+            if let Some(id) = kv.id() {
+                id_to_kv.insert(id, i);
+            }
         }
         let mut fbx_scene = FBXScene::default();
 
@@ -145,7 +242,7 @@ impl KVs {
             .iter()
             .find(|&&v| self.kvs[v].key == "Connections");
         if let Some(conn_idx) = conn_idx {
-            for &child in &children[conn_idx] {
+            for &child in &self.children[conn_idx] {
                 let kv = &self.kvs[child];
                 assert_eq!(kv.key, "C");
                 assert_eq!(kv.values.len(), 3);
@@ -158,48 +255,46 @@ impl KVs {
         }
 
         let mut objects = self.roots.iter().find(|&&v| self.kvs[v].key == "Objects");
-        println!("objects");
-        if let Some(objects) = objects {
-            for &o in &children[objects] {
-                let kv = &self.kvs[o];
-                let [id, name_objtype, classtag] = &kv.values[..] else {
-                    todo!("{:?}", kv.values);
-                };
-                let id = id.as_int().unwrap();
-                assert_eq!(kv.values.len(), 3);
-                let n_o = name_objtype.as_str().unwrap().split_once("\\x00\\x01");
-                let Some((name, obj_type)) = n_o else {
-                    todo!("{name_objtype:?}");
-                };
+        let objects = objects.into_iter().flat_map(|o| &self.children[o]);
+        for &o in objects {
+            let kv = &self.kvs[o];
+            let [id, name_objtype, classtag] = &kv.values[..] else {
+                todo!("{:?}", kv.values);
+            };
+            let id = id.as_int().unwrap();
+            assert_eq!(kv.values.len(), 3);
+            let n_o = name_objtype.as_str().unwrap().split_once("\\x00\\x01");
+            let Some((name, obj_type)) = n_o else {
+                todo!("{name_objtype:?}");
+            };
 
-                let Some(classtag) = classtag.as_str() else {
-                    todo!("{classtag:?}");
-                };
+            let Some(classtag) = classtag.as_str() else {
+                todo!("{classtag:?}");
+            };
 
-                let out_object = match obj_type {
-                    "NodeAttribute" => match classtag {
-                        "Light" => continue,
-                        "Camera" => continue,
-                        _ => todo!("NodeAttribute::{classtag} not handled"),
-                    },
-                    "Geometry" => match classtag {
-                        "Mesh" => {
-                            println!("{id:?} {:?}", children.keys().collect::<Vec<_>>());
-                            println!("{:?}", children[&(id as usize)]);
-                        }
-                        _ => todo!("Geometry::{classtag} not handled"),
-                    },
-                    // Do not handle lights or cameras for now
-                    /*
-                    "Model" => match classtag {
-                      "Geometry"
-                    },
-                    */
-                    // Don't handle materials yet
-                    "Material" => continue,
-                    _ => todo!("{obj_type:?}"),
-                };
-            }
+            let out_object = match obj_type {
+                "NodeAttribute" => match classtag {
+                    "Light" => continue,
+                    "Camera" => continue,
+                    _ => todo!("NodeAttribute::{classtag} not handled"),
+                },
+                "Geometry" => match classtag {
+                    "Mesh" => {
+                        let fbx_mesh = self.parse_mesh(id, id_to_kv[&id]);
+                        fbx_scene.meshes.push(fbx_mesh);
+                    }
+                    _ => todo!("Geometry::{classtag} not handled"),
+                },
+                // Do not handle lights or cameras for now
+                /*
+                "Model" => match classtag {
+                  "Geometry"
+                },
+                */
+                // Don't handle materials yet
+                "Material" => continue,
+                _ => todo!("{obj_type:?}"),
+            };
         }
 
         todo!("Where we at");
