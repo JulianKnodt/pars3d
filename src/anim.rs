@@ -8,6 +8,16 @@ pub enum InterpolationKind {
     Step,
 }
 
+impl InterpolationKind {
+  pub fn apply(self, t: F) -> [F; 2] {
+    match self {
+      InterpolationKind::Step => [1., 0.],
+      InterpolationKind::Linear => [1. - t, t],
+      InterpolationKind::CubicSpline => todo!(),
+    }
+  }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Property {
     Translation,

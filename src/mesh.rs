@@ -64,6 +64,23 @@ impl Node {
             scene.nodes[c].traverse_with_parent(scene, new_val, visit);
         }
     }
+
+    pub fn traverse_mut_with_parent<T>(
+        &mut self,
+        scene: &mut Scene,
+        parent_val: T,
+        visit: &mut impl FnMut(&mut Node, T) -> T,
+    ) where
+        T: Copy,
+    {
+        let new_val = visit(self, parent_val);
+        for c in 0..self.children.len() {
+            let ci = self.children[c];
+            let mut curr_node = std::mem::take(&mut scene.nodes[ci]);
+            curr_node.traverse_mut_with_parent(scene, new_val, visit);
+            scene.nodes[ci] = curr_node;
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -91,8 +108,22 @@ impl Scene {
     ) where
         T: Copy,
     {
-        for &root_node in &self.root_nodes {
-            self.nodes[root_node].traverse_with_parent(self, root_init(), visit);
+        for &ri in &self.root_nodes {
+            self.nodes[ri].traverse_with_parent(self, root_init(), visit);
+        }
+    }
+    pub fn traverse_mut_with_parent<T>(
+        &mut self,
+        root_init: impl Fn() -> T,
+        visit: &mut impl FnMut(&mut Node, T) -> T,
+    ) where
+        T: Copy,
+    {
+        for i in 0..self.root_nodes.len() {
+            let ri = self.root_nodes[i];
+            let mut node = std::mem::take(&mut self.nodes[ri]);
+            node.traverse_mut_with_parent(self, root_init(), visit);
+            self.nodes[ri] = node;
         }
     }
     /// Converts this scene into a flattened mesh which can then be repopulated back into a
