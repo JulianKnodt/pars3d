@@ -514,7 +514,7 @@ fn read_scope(
 fn test_parse_fbx() {
     use std::fs::File;
     use std::io::BufReader;
-    let f = File::open("cube.fbx").unwrap();
+    let f = File::open("src/fbx/test_data/cube.fbx").unwrap();
     let tokens = tokenize_binary(BufReader::new(f)).expect("Failed to tokenize FBX");
     let kvs = parse_tokens(tokens.into_iter());
 
