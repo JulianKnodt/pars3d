@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use super::{FBXMesh, FBXScene};
+use super::{FBXMesh, FBXNode, FBXScene};
 use crate::{FaceKind, F};
 
 use std::ascii::Char;
@@ -14,7 +14,7 @@ const MAGIC_LEN: usize = 23;
 /// Magic binary.
 pub(crate) const MAGIC: &[u8; MAGIC_LEN] = b"Kaydara FBX Binary  \x00\x1a\x00";
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Data {
     I8(i8),
     I16(i16),
@@ -64,6 +64,10 @@ impl Data {
             &Data::I64(v) => Some(v),
             _ => None,
         }
+    }
+
+    fn str(s: &str) -> Self {
+        Data::String(String::from(s))
     }
 }
 
@@ -148,8 +152,21 @@ impl KVs {
         Ok(())
     }
     */
+    fn parse_node(&self, node_id: i64, kvi: usize) -> FBXNode {
+        let mut out = FBXNode::default();
+        assert!(node_id >= 0);
+        out.id = node_id as usize;
+        for &c in &self.children[&kvi] {
+            let child = &self.kvs[c];
+            println!("{child:?}");
+            // TODO do something with children
+        }
+        out
+    }
     fn parse_mesh(&self, mesh_id: i64, kvi: usize) -> FBXMesh {
         let mut out = FBXMesh::default();
+        assert!(mesh_id >= 0);
+        out.id = mesh_id as usize;
         for &c in &self.children[&kvi] {
             let child = &self.kvs[c];
             match child.key.as_str() {
@@ -186,9 +203,31 @@ impl KVs {
                         match gc.key.as_str() {
                             "Version" => {}
                             "Name" => {}
-                            "MappingInformationType" => {}
+                            "MappingInformationType" => {
+                                assert_eq!(&gc.values, &[Data::str("ByPolygonVertex")]);
+                            }
                             "ReferenceInformationType" => {}
-                            "Normals" => todo!(),
+                            "Normals" => {
+                                assert_eq!(gc.values.len(), 1);
+                                let Data::F64Arr(ref arr) = &gc.values[0] else {
+                                    todo!("Expected F64 Arr got {:?}", gc.values);
+                                };
+                                out.n
+                                    .extend(arr.array_chunks::<3>().map(|n| n.map(|v| v as F)));
+                            }
+                            "NormalsIndex" => {
+                                assert_eq!(gc.values.len(), 1);
+                                let Data::I32Arr(ref arr) = &gc.values[0] else {
+                                    todo!("Did not get I32Arr, got {:?}", gc.values);
+                                };
+                                let idxs = arr
+                                    .iter()
+                                    .copied()
+                                    .inspect(|&idx| assert!(idx >= 0))
+                                    .map(|v| v as usize);
+                                out.vert_norm_idx.extend(idxs);
+                            }
+                            x => todo!("{x:?}"),
                         }
                     }
                 }
@@ -198,10 +237,32 @@ impl KVs {
                         match gc.key.as_str() {
                             "Version" => {}
                             "Name" => {}
-                            "MappingInformationType" => {}
-                            "ReferenceInformationType" => {}
-                            "UV" => todo!(),
-                            "UVIndex" => todo!(),
+                            "MappingInformationType" => {
+                                assert_eq!(&gc.values, &[Data::str("ByPolygonVertex")]);
+                            }
+                            "ReferenceInformationType" => {
+                                assert_eq!(&gc.values, &[Data::str("IndexToDirect")]);
+                            }
+                            "UV" => {
+                                let Data::F64Arr(ref arr) = &gc.values[0] else {
+                                    todo!("exp F64Arr, got {:?}", gc.values);
+                                };
+                                out.uv
+                                    .extend(arr.array_chunks::<2>().map(|uv| uv.map(|v| v as F)));
+                            }
+                            "UVIndex" => {
+                                assert_eq!(gc.values.len(), 1);
+                                let Data::I32Arr(ref arr) = &gc.values[0] else {
+                                    todo!("Did not get I32Arr, got {:?}", gc.values);
+                                };
+                                let idxs = arr
+                                    .iter()
+                                    .copied()
+                                    .inspect(|&idx| assert!(idx >= 0))
+                                    .map(|v| v as usize);
+                                out.uv_idx.extend(idxs);
+                            }
+                            x => todo!("{x:?}"),
                         }
                     }
                 }
@@ -211,13 +272,48 @@ impl KVs {
                         match gc.key.as_str() {
                             "Version" => {}
                             "Name" => {}
-                            "MappingInformationType" => {}
+                            "MappingInformationType" => {
+                                assert_eq!(gc.values, &[Data::str("AllSame")]);
+                            }
                             "ReferenceInformationType" => {}
-                            "UV" => todo!(),
-                            "UVIndex" => todo!(),
+                            "Materials" => {
+                                assert_eq!(gc.values.len(), 1);
+                                match &gc.values[0] {
+                                    &Data::I32(i) => {
+                                        assert!(i >= 0);
+                                        out.global_mat = Some(i as usize);
+                                    }
+                                    Data::I32Arr(ref arr) => {
+                                        assert!(!arr.is_empty());
+                                        assert!(arr.iter().all(|&v| v >= 0));
+                                        if arr.len() == 1 {
+                                            out.global_mat = Some(arr[0] as usize);
+                                        } else {
+                                            // here per face
+                                            todo!();
+                                        }
+                                    }
+                                    x => todo!("{x:?}"),
+                                }
+                            }
+                            x => todo!("{x:?}"),
                         }
                     }
                 }
+                "Layer" => {
+                    for &cc in &self.children[&c] {
+                        let gc = &self.kvs[cc];
+                        match gc.key.as_str() {
+                            "Version" => {}
+                            "Name" => {}
+                            "MappingInformationType" => {}
+                            "ReferenceInformationType" => {}
+                            "LayerElement" => {}
+                            x => todo!("{x:?}"),
+                        }
+                    }
+                }
+
                 x => todo!("{x:?} {:?}", child.values),
             }
         }
@@ -241,17 +337,17 @@ impl KVs {
             .roots
             .iter()
             .find(|&&v| self.kvs[v].key == "Connections");
-        if let Some(conn_idx) = conn_idx {
-            for &child in &self.children[conn_idx] {
-                let kv = &self.kvs[child];
-                assert_eq!(kv.key, "C");
-                assert_eq!(kv.values.len(), 3);
-                let [marker, src, dst] = &kv.values[..] else {
-                    todo!("{:?}", kv.values);
-                };
-                assert_eq!(marker.as_str().unwrap(), "OO", "Temporary check {marker:?}");
-                connections.push((src.as_int().unwrap(), dst.as_int().unwrap()));
-            }
+
+        let conns = conn_idx.into_iter().flat_map(|ci| &self.children[ci]);
+        for &child in conns {
+            let kv = &self.kvs[child];
+            assert_eq!(kv.key, "C");
+            assert_eq!(kv.values.len(), 3);
+            let [marker, dst, src] = &kv.values[..] else {
+                todo!("{:?}", kv.values);
+            };
+            assert_eq!(marker.as_str().unwrap(), "OO", "Temporary check {marker:?}");
+            connections.push((src.as_int().unwrap(), dst.as_int().unwrap()));
         }
 
         let mut objects = self.roots.iter().find(|&&v| self.kvs[v].key == "Objects");
@@ -286,18 +382,37 @@ impl KVs {
                     _ => todo!("Geometry::{classtag} not handled"),
                 },
                 // Do not handle lights or cameras for now
-                /*
                 "Model" => match classtag {
-                  "Geometry"
+                    "Mesh" => {
+                        let kv = &self.kvs[id_to_kv[&id]];
+                        let Data::String(ref name) = kv.values[1] else {
+                            todo!();
+                        };
+                        let node = self.parse_node(id, id_to_kv[&id]);
+                        let parents = connections.iter().filter(|&&(_src, dst)| dst == id);
+                        let mut num_parents = 0;
+                        for p in parents {
+                          if p.0 == 0 {
+                            fbx_scene.root_nodes.push(fbx_scene.nodes.len());
+                          } else {
+                            todo!();
+                          }
+                          num_parents += 1;
+                        }
+                        assert!(num_parents == 1);
+
+                        fbx_scene.nodes.push(node);
+                        let children = connections.iter().filter(|&&(src, _dst)| src == id);
+                    }
+                    x => todo!("{x:?}"),
                 },
-                */
+
                 // Don't handle materials yet
                 "Material" => continue,
+
                 _ => todo!("{obj_type:?}"),
             };
         }
-
-        todo!("Where we at");
 
         fbx_scene
     }

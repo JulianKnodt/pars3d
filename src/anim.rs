@@ -9,13 +9,13 @@ pub enum InterpolationKind {
 }
 
 impl InterpolationKind {
-  pub fn apply(self, t: F) -> [F; 2] {
-    match self {
-      InterpolationKind::Step => [1., 0.],
-      InterpolationKind::Linear => [1. - t, t],
-      InterpolationKind::CubicSpline => todo!(),
+    pub fn apply(self, t: F) -> [F; 2] {
+        match self {
+            InterpolationKind::Step => [1., 0.],
+            InterpolationKind::Linear => [1. - t, t],
+            InterpolationKind::CubicSpline => todo!(),
+        }
     }
-  }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
