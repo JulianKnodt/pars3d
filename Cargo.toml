@@ -12,7 +12,7 @@ gltf-json = { version = "1.4.1", optional = true, features = ["names"] }
 zune-inflate = { version = "0.2", default-features = false, features = ["zlib"] }
 
 [features]
-default = ["gltf"]
+default = ["gltf", "fbx"]
 f64 = []
 gltf = ["dep:gltf", "dep:gltf-json"]
 fbx = []

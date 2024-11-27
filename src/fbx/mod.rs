@@ -1,5 +1,9 @@
 use crate::{FaceKind, F};
 
+pub mod parser;
+
+pub mod to_mesh;
+
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FBXScene {
     meshes: Vec<FBXMesh>,
@@ -13,11 +17,13 @@ pub struct FBXNode {
     id: usize,
     mesh: Option<usize>,
     children: Vec<usize>,
+    name: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FBXMesh {
     id: usize,
+    name: String,
 
     v: Vec<[F; 3]>,
     f: Vec<FaceKind>,
@@ -26,11 +32,10 @@ pub struct FBXMesh {
     // for each vertex, what is its normal
     vert_norm_idx: Vec<usize>,
 
+    // TODO need to add multiple channels here
     uv: Vec<[F; 2]>,
     uv_idx: Vec<usize>,
 
     global_mat: Option<usize>,
     per_face_mat: Vec<usize>,
 }
-
-pub mod parser;

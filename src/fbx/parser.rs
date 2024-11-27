@@ -388,21 +388,38 @@ impl KVs {
                         let Data::String(ref name) = kv.values[1] else {
                             todo!();
                         };
-                        let node = self.parse_node(id, id_to_kv[&id]);
+                        let mut node = self.parse_node(id, id_to_kv[&id]);
                         let parents = connections.iter().filter(|&&(_src, dst)| dst == id);
                         let mut num_parents = 0;
                         for p in parents {
-                          if p.0 == 0 {
-                            fbx_scene.root_nodes.push(fbx_scene.nodes.len());
-                          } else {
-                            todo!();
-                          }
-                          num_parents += 1;
+                            if p.0 == 0 {
+                                fbx_scene.root_nodes.push(fbx_scene.nodes.len());
+                            } else {
+                                todo!();
+                            }
+                            num_parents += 1;
                         }
                         assert!(num_parents == 1);
 
-                        fbx_scene.nodes.push(node);
                         let children = connections.iter().filter(|&&(src, _dst)| src == id);
+                        for (_, c) in children {
+                            let c_kv = &self.kvs[id_to_kv[&c]];
+                            match c_kv.key.as_str() {
+                                "Geometry" => {
+                                    let Some(p) =
+                                        fbx_scene.meshes.iter().position(|p| p.id == *c as usize)
+                                    else {
+                                        todo!("Load mesh lazily?");
+                                    };
+                                    node.mesh = Some(p);
+                                }
+                                // Don't handle materials yet
+                                "Material" => continue,
+                                x => todo!("{x:?}"),
+                            }
+                        }
+
+                        fbx_scene.nodes.push(node);
                     }
                     x => todo!("{x:?}"),
                 },
