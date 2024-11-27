@@ -36,6 +36,30 @@ pub fn rel_path_btwn(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result
     Ok(backs)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FileFormat {
+    GLB,
+    FBX,
+    OBJ,
+    Unknown,
+}
+
+pub fn extension_to_format(s: impl AsRef<Path>) -> FileFormat {
+    let s = s.as_ref();
+    let Some(e) = s.extension() else {
+        return FileFormat::Unknown;
+    };
+    let Some(e) = e.to_str() else {
+        return FileFormat::Unknown;
+    };
+    match e {
+        "glb" => FileFormat::GLB,
+        "fbx" => FileFormat::FBX,
+        "obj" => FileFormat::OBJ,
+        _ => FileFormat::Unknown,
+    }
+}
+
 #[test]
 fn test_basic() {
     let v = rel_path_btwn("test/a/b", "b").unwrap();

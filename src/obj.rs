@@ -793,7 +793,7 @@ fn write_mtls(
             assert_ne!(v, "", "Cannot specify empty new MTL");
             let p: &Path = v.as_ref();
             let obj_path: &Path = obj_file_path.as_ref();
-            obj_path.with_file_name(p.as_os_str())
+            obj_path.with_file_name(p.file_name().unwrap())
         }
     };
 

@@ -7,6 +7,7 @@ use std::ascii::Char;
 use std::collections::HashMap;
 use std::io::{self, BufRead, Write};
 use std::mem::size_of;
+use std::path::Path;
 
 /// Magic binary length.
 const MAGIC_LEN: usize = 23;
@@ -640,6 +641,15 @@ fn read_scope(
     assert_eq!(read as u64, block_len);
 
     Ok((true, read))
+}
+
+pub fn load<P: AsRef<Path>>(p: P) -> std::io::Result<FBXScene> {
+    use std::fs::File;
+    use std::io::BufReader;
+    let f = File::open(p)?;
+    let tokens = tokenize_binary(BufReader::new(f)).expect("Failed to tokenize FBX");
+    let kvs = parse_tokens(tokens.into_iter());
+    Ok(kvs.to_scene())
 }
 
 #[test]

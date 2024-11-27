@@ -9,6 +9,8 @@
 #![feature(ascii_char)]
 #![feature(ascii_char_variants)]
 
+use std::path::Path;
+
 #[cfg(not(feature = "f64"))]
 pub type F = f32;
 
@@ -62,7 +64,37 @@ pub mod tri_to_quad;
 /// FBX parsing.
 pub mod fbx;
 
-mod util;
+pub mod util;
+
+pub fn load(v: impl AsRef<Path>) -> std::io::Result<mesh::Scene> {
+    use util::FileFormat::*;
+    let scene = match util::extension_to_format(&v) {
+        OBJ => obj::parse(v, false, false)?.into(),
+        FBX => fbx::parser::load(v)?.into(),
+        GLB => gltf::load(v).map_err(|e| std::io::Error::other(e))?.into(),
+        Unknown => return Err(std::io::Error::other("Don't know how to load")),
+    };
+    Ok(scene)
+}
+
+pub fn save(v: impl AsRef<Path>, scene: &mesh::Scene) -> std::io::Result<()> {
+    use util::FileFormat::*;
+    match util::extension_to_format(&v) {
+        OBJ => obj::save_obj(
+            scene,
+            v,
+            |mtl_file| obj::OutputKind::New(mtl_file.into()),
+            |_tk, s| obj::OutputKind::New(s.into()),
+        ),
+        FBX => todo!("FBX export is not yet supported"),
+        GLB => {
+          let f = std::fs::File::create(v)?;
+          let buf = std::io::BufWriter::new(f);
+          gltf::save_glb(scene, buf)
+        },
+        Unknown => return Err(std::io::Error::other("Don't know how to save")),
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum FaceKind {
