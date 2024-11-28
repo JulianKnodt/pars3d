@@ -14,6 +14,9 @@ impl From<FBXMesh> for Mesh {
             uv_idx,
             global_mat: _,
             per_face_mat: _,
+            // unused
+            vertex_colors: _,
+            vertex_color_idx: _,
         } = fbx_mesh;
 
         let n = vert_norm_idx

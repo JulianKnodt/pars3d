@@ -5,7 +5,7 @@ use crate::{FaceKind, F};
 
 use std::ascii::Char;
 use std::collections::HashMap;
-use std::io::{self, BufRead, Write};
+use std::io::{self, BufRead, Seek, SeekFrom, Write};
 use std::mem::size_of;
 use std::path::Path;
 
@@ -37,6 +37,9 @@ pub enum Data {
     F32Arr(Vec<f32>),
     F64Arr(Vec<f64>),
     BoolArr(Vec<bool>),
+
+    /// Unknown how to read this data, has the size in it
+    Unknown(usize),
 
     /// Marker to indicate that data was moved from this
     Used,
@@ -72,6 +75,13 @@ impl Data {
     }
 }
 
+/// How to map some information to a mesh
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MappingKind {
+    PerPolygon,
+    Uniform,
+}
+
 #[derive(Debug)]
 pub enum Token {
     Key(String),
@@ -81,7 +91,7 @@ pub enum Token {
 }
 
 #[derive(Debug, Clone, Default)]
-struct KV {
+pub(crate) struct KV {
     key: String,
     values: Vec<Data>,
     parent: Option<usize>,
@@ -94,7 +104,7 @@ impl KV {
 }
 
 #[derive(Debug, Clone, Default)]
-struct KVs {
+pub struct KVs {
     kvs: Vec<KV>,
     roots: Vec<usize>,
     children: HashMap<usize, Vec<usize>>,
@@ -136,15 +146,16 @@ impl KVs {
 
     // TODO reconvert KVs to tokens
 
-    /*
     /// Constructs a graphviz representation of this FBX file, for viewing externally
-    #[allow(unused)]
     pub fn to_graphviz(&self, mut dst: impl Write) -> io::Result<()> {
         writeln!(dst, "graph FBX {{")?;
         for (i, kv) in self.kvs.iter().enumerate() {
-            writeln!(dst, "\t{i} [label=\"{}\"]", kv.key)?;
+            match kv.id() {
+                Some(id) => writeln!(dst, "\t{i} [label=\"{id}, {}\"]", kv.key)?,
+                None => writeln!(dst, "\t{i} [label=\"{}\"]", kv.key)?,
+            }
         }
-        for &(k, vs) in self.children.iter() {
+        for (k, vs) in self.children.iter() {
             for &v in vs.iter() {
                 writeln!(dst, "\t{k} -- {v}")?;
             }
@@ -152,14 +163,14 @@ impl KVs {
         writeln!(dst, "}}")?;
         Ok(())
     }
-    */
+
     fn parse_node(&self, node_id: i64, kvi: usize) -> FBXNode {
         let mut out = FBXNode::default();
         assert!(node_id >= 0);
         out.id = node_id as usize;
         for &c in &self.children[&kvi] {
             let child = &self.kvs[c];
-            println!("{child:?}");
+            println!("TODO handle {child:?}");
             // TODO do something with children
         }
         out
@@ -228,6 +239,7 @@ impl KVs {
                                     .map(|v| v as usize);
                                 out.vert_norm_idx.extend(idxs);
                             }
+                            "NormalsW" => { /*wtf is this*/ }
                             x => todo!("{x:?}"),
                         }
                     }
@@ -268,13 +280,19 @@ impl KVs {
                     }
                 }
                 "LayerElementMaterial" => {
+                    let mut mapping_kind = MappingKind::Uniform;
                     for &cc in &self.children[&c] {
                         let gc = &self.kvs[cc];
                         match gc.key.as_str() {
                             "Version" => {}
                             "Name" => {}
                             "MappingInformationType" => {
-                                assert_eq!(gc.values, &[Data::str("AllSame")]);
+                                assert_eq!(gc.values.len(), 1);
+                                mapping_kind = match gc.values[0].as_str().unwrap() {
+                                    "AllSame" => MappingKind::Uniform,
+                                    "ByPolygon" => MappingKind::PerPolygon,
+                                    x => todo!("Unknown mapping kind {x:?}"),
+                                };
                             }
                             "ReferenceInformationType" => {}
                             "Materials" => {
@@ -282,6 +300,7 @@ impl KVs {
                                 match &gc.values[0] {
                                     &Data::I32(i) => {
                                         assert!(i >= 0);
+                                        assert_eq!(mapping_kind, MappingKind::Uniform);
                                         out.global_mat = Some(i as usize);
                                     }
                                     Data::I32Arr(ref arr) => {
@@ -289,15 +308,52 @@ impl KVs {
                                         assert!(arr.iter().all(|&v| v >= 0));
                                         if arr.len() == 1 {
                                             out.global_mat = Some(arr[0] as usize);
-                                        } else {
-                                            // here per face
-                                            todo!();
+                                            continue;
                                         }
+                                        assert_eq!(mapping_kind, MappingKind::PerPolygon);
+                                        let mat_idxs = arr.iter().map(|&i| i as usize);
+                                        out.per_face_mat.extend(mat_idxs);
                                     }
                                     x => todo!("{x:?}"),
                                 }
                             }
                             x => todo!("{x:?}"),
+                        }
+                    }
+                }
+                "LayerElementColor" => {
+                    for &cc in &self.children[&c] {
+                        for &cc in &self.children[&c] {
+                            let gc = &self.kvs[cc];
+                            match gc.key.as_str() {
+                                "Version" => {}
+                                "Name" => {}
+                                "MappingInformationType" => {
+                                    assert_eq!(&gc.values, &[Data::str("ByPolygonVertex")]);
+                                }
+                                "ReferenceInformationType" => {}
+                                "Colors" => {
+                                    assert_eq!(gc.values.len(), 1);
+                                    let Some(v) = gc.values[0].as_f64_arr() else {
+                                        todo!();
+                                    };
+                                    let vc = v.array_chunks::<3>().map(|v| v.map(|v| v as F));
+                                    out.vertex_colors.extend(vc);
+                                }
+                                "ColorIndex" => {
+                                    assert_eq!(gc.values.len(), 1);
+                                    let Data::I32Arr(ref arr) = &gc.values[0] else {
+                                        todo!("Did not get I32Arr, got {:?}", gc.values);
+                                    };
+                                    let idxs = arr
+                                        .iter()
+                                        .copied()
+                                        .inspect(|&idx| assert!(idx >= 0))
+                                        .map(|v| v as usize);
+                                    out.vertex_color_idx.extend(idxs);
+                                }
+                                x => todo!("{x:?}"),
+                            }
                         }
                     }
                 }
@@ -314,6 +370,9 @@ impl KVs {
                         }
                     }
                 }
+                // omit for now
+                "LayerElementSmoothing" => {}
+                "LayerElementVisibility" => {}
 
                 x => todo!("{x:?} {:?}", child.values),
             }
@@ -334,6 +393,7 @@ impl KVs {
 
         // parent->child pairs
         let mut connections = vec![];
+        let mut prop_connections = vec![];
         let conn_idx = self
             .roots
             .iter()
@@ -343,12 +403,20 @@ impl KVs {
         for &child in conns {
             let kv = &self.kvs[child];
             assert_eq!(kv.key, "C");
-            assert_eq!(kv.values.len(), 3);
-            let [marker, dst, src] = &kv.values[..] else {
-                todo!("{:?}", kv.values);
-            };
-            assert_eq!(marker.as_str().unwrap(), "OO", "Temporary check {marker:?}");
-            connections.push((src.as_int().unwrap(), dst.as_int().unwrap()));
+            match kv.values.as_slice() {
+                [oo, dst, src] if oo == &Data::str("OO") => {
+                    let src = src.as_int().unwrap();
+                    let dst = dst.as_int().unwrap();
+                    connections.push((src, dst));
+                }
+                [op, dst, src, name] if op == &Data::str("OP") => {
+                    let src = src.as_int().unwrap();
+                    let dst = dst.as_int().unwrap();
+                    let name = name.as_str().unwrap();
+                    prop_connections.push((src, dst, name));
+                }
+                x => todo!("{x:?}"),
+            }
         }
 
         let mut objects = self.roots.iter().find(|&&v| self.kvs[v].key == "Objects");
@@ -392,15 +460,21 @@ impl KVs {
                         let mut node = self.parse_node(id, id_to_kv[&id]);
                         let parents = connections.iter().filter(|&&(_src, dst)| dst == id);
                         let mut num_parents = 0;
-                        for p in parents {
-                            if p.0 == 0 {
-                                fbx_scene.root_nodes.push(fbx_scene.nodes.len());
-                            } else {
-                                todo!();
+                        let new_idx = fbx_scene.nodes.len();
+                        for &(parent_id, _) in parents {
+                            if parent_id == 0 {
+                                fbx_scene.root_nodes.push(new_idx);
+                                num_parents += 1;
+                                continue;
+                            }
+                            let parent = &self.kvs[id_to_kv[&parent_id]];
+                            match parent.key.as_str() {
+                                "CollectionExclusive" => continue,
+                                x => todo!("{x:?}"),
                             }
                             num_parents += 1;
                         }
-                        assert!(num_parents == 1);
+                        assert_eq!(num_parents, 1);
 
                         let children = connections.iter().filter(|&&(src, _dst)| src == id);
                         for (_, c) in children {
@@ -427,6 +501,10 @@ impl KVs {
 
                 // Don't handle materials yet
                 "Material" => continue,
+                "Texture" => continue,
+
+                "DisplayLayer" => continue,
+                "Video" => continue,
 
                 _ => todo!("{obj_type:?}"),
             };
@@ -436,13 +514,13 @@ impl KVs {
     }
 }
 
-fn parse_tokens(mut tokens: impl Iterator<Item = Token>) -> KVs {
+pub fn parse_tokens(mut tokens: impl Iterator<Item = Token>) -> KVs {
     let mut kvs = KVs::default();
     kvs.parse_scope(&mut tokens, None);
     kvs
 }
 
-pub fn tokenize_binary(mut src: impl BufRead) -> io::Result<Vec<Token>> {
+pub fn tokenize_binary(mut src: impl BufRead + Seek) -> io::Result<Vec<Token>> {
     let mut buf = [0u8; MAGIC_LEN];
     src.read_exact(&mut buf)?;
     assert_eq!(&buf, MAGIC, "FBX Header mismatch");
@@ -468,7 +546,7 @@ pub fn tokenize_binary(mut src: impl BufRead) -> io::Result<Vec<Token>> {
 }
 
 fn read_scope(
-    src: &mut impl BufRead,
+    src: &mut (impl BufRead + Seek),
     is_64_bit: bool,
     output_tokens: &mut Vec<Token>,
     prev_read: usize,
@@ -529,8 +607,13 @@ fn read_scope(
             let comp_len = read_word!(u32) as usize;
 
             let stride = size_of::<bool>();
-            assert_eq!(len * stride, comp_len);
+            assert_eq!(
+                len * stride,
+                comp_len,
+                "Mismatch in read size: {len} * {stride} != {comp_len}"
+            );
             let mut out = vec![];
+            out.reserve(len);
             match enc {
                 0 => {
                     for _ in 0..len {
@@ -585,39 +668,50 @@ fn read_scope(
     let prop_len = read_word!();
     let scope_name = read_string!(false, false);
 
-    output_tokens.push(Token::Key(scope_name));
+    output_tokens.push(Token::Key(scope_name.clone()));
 
     let curr_read = read;
     for _pi in 0..prop_count {
-        let data = match read_word!(u8).as_ascii() {
-            None => todo!(),
+        let Some(d) = read_word!(u8).as_ascii() else {
+            todo!();
+        };
+        let data = match d {
             // TODO are these signed or unsigned?
-            Some(Char::CapitalY) => Data::I16(read_word!(i16)),
-            Some(Char::CapitalI) => Data::I32(read_word!(i32)),
-            Some(Char::CapitalL) => Data::I64(read_word!(i64)),
+            Char::CapitalY => Data::I16(read_word!(i16)),
+            Char::CapitalI => Data::I32(read_word!(i32)),
+            Char::CapitalL => Data::I64(read_word!(i64)),
 
-            Some(Char::CapitalF) => Data::F32(read_word!(f32)),
-            Some(Char::CapitalD) => Data::F64(read_word!(f64)),
-            Some(Char::CapitalR) => {
+            Char::CapitalF => Data::F32(read_word!(f32)),
+            Char::CapitalD => Data::F64(read_word!(f64)),
+            Char::CapitalR => {
                 let len = read_word!(u32);
                 Data::Binary(read_buf!(len as usize))
             }
 
-            Some(Char::SmallF) => Data::F32Arr(read_array!(f32)),
-            Some(Char::SmallD) => Data::F64Arr(read_array!(f64)),
-            Some(Char::SmallI) => Data::I32Arr(read_array!(i32)),
-            Some(Char::SmallL) => Data::I64Arr(read_array!(i64)),
-            Some(Char::SmallC) => Data::BoolArr(read_array!(bool)),
+            Char::SmallF => Data::F32Arr(read_array!(f32)),
+            Char::SmallD => Data::F64Arr(read_array!(f64)),
+            Char::SmallI => Data::I32Arr(read_array!(i32)),
+            Char::SmallL => Data::I64Arr(read_array!(i64)),
+            Char::SmallC => Data::BoolArr(read_array!(bool)),
 
-            Some(Char::CapitalS) => Data::String(read_string!(true, true)),
-            Some(Char::CapitalC) => Data::Bool(read_word!(bool)),
-            Some(Char::SmallB) => todo!("Unknown how to handle small b"),
+            Char::SmallB => {
+                // TODO not sure what this is, but skip it for now
+                let _ = read_word!(u32);
+                let _ = read_word!(u32);
+                let len = read_word!(u32);
+                src.seek(SeekFrom::Current(len as i64));
+                read += len as usize;
+                Data::Unknown(len as usize)
+            }
 
-            Some(c) => todo!("unhandled {c:?} (u8 = {})", c.to_u8()),
+            Char::CapitalS => Data::String(read_string!(true, true)),
+            Char::CapitalC => Data::Bool(read_word!(bool)),
+
+            c => todo!("unhandled {c:?} (u8 = {})", c.to_u8()),
         };
         output_tokens.push(Token::Data(data));
     }
-    assert_eq!((read - curr_read) as u64, prop_len);
+    assert_eq!((read - curr_read) as u64, prop_len, "{scope_name}");
 
     let sentinel_block_len = if is_64_bit {
         size_of::<u64>() * 3 + 1

@@ -1,4 +1,4 @@
-use pars3d::{save, load};
+use pars3d::{load, save};
 
 fn main() {
     let mut src = None;

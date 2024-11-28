@@ -88,10 +88,10 @@ pub fn save(v: impl AsRef<Path>, scene: &mesh::Scene) -> std::io::Result<()> {
         ),
         FBX => todo!("FBX export is not yet supported"),
         GLB => {
-          let f = std::fs::File::create(v)?;
-          let buf = std::io::BufWriter::new(f);
-          gltf::save_glb(scene, buf)
-        },
+            let f = std::fs::File::create(v)?;
+            let buf = std::io::BufWriter::new(f);
+            gltf::save_glb(scene, buf)
+        }
         Unknown => return Err(std::io::Error::other("Don't know how to save")),
     }
 }

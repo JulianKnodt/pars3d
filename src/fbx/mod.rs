@@ -36,6 +36,9 @@ pub struct FBXMesh {
     uv: Vec<[F; 2]>,
     uv_idx: Vec<usize>,
 
+    vertex_colors: Vec<[F; 3]>,
+    vertex_color_idx: Vec<usize>,
+
     global_mat: Option<usize>,
     per_face_mat: Vec<usize>,
 }
