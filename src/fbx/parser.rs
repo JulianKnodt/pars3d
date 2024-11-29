@@ -9,6 +9,8 @@ use std::io::{self, BufRead, Seek, SeekFrom, Write};
 use std::mem::size_of;
 use std::path::Path;
 
+use std::assert_matches::assert_matches;
+
 /// Magic binary length.
 pub(crate) const MAGIC_LEN: usize = 23;
 
@@ -110,6 +112,27 @@ impl KV {
     }
 }
 
+macro_rules! root_fields {
+  ($self: ident, $key: expr, $no_values: expr, $( $sub_field: expr, $mtch: pat => $values_func: expr $(,)?)*) => {{
+    if let Some(r) = $self.find_root($key) {
+      if $no_values {
+        assert_eq!($self.kvs[r].values, &[]);
+      }
+
+      for &c in &$self.children[&r] {
+        let c_kv = &$self.kvs[c];
+        match c_kv.key.as_str() {
+          $($sub_field => {
+            assert_matches!(c_kv.values.as_slice(), $mtch, "{} {}", $key, c_kv.key);
+            $values_func(&c_kv.values);
+          })*
+          x => todo!("Unhandled {x} in {}", $key),
+        }
+      }
+    }
+  }}
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct KVs {
     kvs: Vec<KV>,
@@ -118,6 +141,9 @@ pub struct KVs {
 }
 
 impl KVs {
+    fn find_root(&self, v: &str) -> Option<usize> {
+        self.roots.iter().find(|&&i| self.kvs[i].key == v).copied()
+    }
     // parses the token stream until a scope end.
     // returns the index of the newly produced datablock.
     fn parse_scope(&mut self, tokens: &mut impl Iterator<Item = Token>, parent: Option<usize>) {
@@ -178,8 +204,15 @@ impl KVs {
         let cs = self.children.get(&kvi).unwrap_or(&empty);
         for &c in cs {
             let child = &self.kvs[c];
-            println!("TODO handle node child {child:?}");
-            // TODO do something with children
+            match child.key.as_str() {
+                "Version" => {}
+                "Properties70" => {}
+                "MultiLayer" => {}
+                "Shading" => {}
+                "Culling" => {}
+                "MultiTake" => {}
+                x => todo!("Unhandled node attrib {x:?}"),
+            }
         }
         out
     }
@@ -190,6 +223,10 @@ impl KVs {
         for &c in &self.children[&kvi] {
             let child = &self.kvs[c];
             match child.key.as_str() {
+                "Properties70" => {
+                    assert!(child.values.is_empty());
+                    assert_eq!(self.children[&c].len(), 1);
+                }
                 "Vertices" => {
                     assert_eq!(child.values.len(), 1);
                     // TODO or this can be f32?
@@ -200,10 +237,9 @@ impl KVs {
                         .map(|[a, b, c]| [*a as F, *b as F, *c as F]);
                     out.v.extend(v);
                 }
-                "Properties70" => {
-                    assert!(child.values.is_empty());
+                "GeometryVersion" => {
+                    assert_eq!(child.values.len(), 1);
                 }
-                "GeometryVersion" => {}
                 "PolygonVertexIndex" => {
                     assert_eq!(child.values.len(), 1,);
                     let mut curr_face = FaceKind::empty();
@@ -406,12 +442,8 @@ impl KVs {
         // parent->child pairs
         let mut connections = vec![];
         let mut prop_connections = vec![];
-        let conn_idx = self
-            .roots
-            .iter()
-            .find(|&&v| self.kvs[v].key == "Connections");
-
-        let conns = conn_idx.into_iter().flat_map(|ci| &self.children[ci]);
+        let conn_idx = self.find_root("Connections");
+        let conns = conn_idx.into_iter().flat_map(|ci| &self.children[&ci]);
         for &child in conns {
             let kv = &self.kvs[child];
             assert_eq!(kv.key, "C");
@@ -526,6 +558,61 @@ impl KVs {
 
                 _ => todo!("{obj_type:?}"),
             };
+        }
+
+        root_fields!(
+            self,
+            "FBXHeaderExtension",
+            true,
+            "FBXHeaderVersion", &[Data::I32(_)] => |v| {},
+            "FBXVersion", &[Data::I32(_)] => |v| {},
+            "EncryptionType", &[Data::I32(0)] => |v| {},
+            "CreationTimeStamp", &[] => |v| {},
+            "Creator", &[Data::String(_)] => |v| {},
+            "SceneInfo", &[Data::String(_), Data::String(_)] => |v| {},
+        );
+
+        root_fields!(
+          self,
+          "GlobalSettings",
+          true,
+          "Version", &[Data::I32(_)] => |v| {},
+          "Properties70", &[] => |v| {},
+        );
+
+        root_fields!(
+          self,
+          "Documents",
+          true,
+          "Count", &[Data::I32(_)] => |v| {},
+          "Document", &[Data::I64(_), Data::String(_), Data::String(_)] => |v| {},
+        );
+
+        root_fields!(
+          self,
+          "References",
+          true,
+          "", &[] => |v| {},
+        );
+
+        root_fields!(
+          self,
+          "Takes",
+          true,
+          "Current", &[Data::String(_)] => |v| {},
+        );
+
+        /*
+        if let Some(file_id) = self.find_root("FileId") {
+          let Data::Binary(ref b) = self.kvs[file_id].values[0] else {
+            todo!();
+          };
+          println!("{:?}", std::str::from_utf8(b));
+        }
+        */
+
+        for &r in &self.roots {
+            println!("{:?}", self.kvs[r].key);
         }
 
         fbx_scene

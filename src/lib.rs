@@ -8,6 +8,7 @@
 #![feature(array_chunks)]
 #![feature(ascii_char)]
 #![feature(ascii_char_variants)]
+#![feature(assert_matches)]
 
 use std::path::Path;
 

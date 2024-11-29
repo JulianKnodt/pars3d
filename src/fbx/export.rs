@@ -81,6 +81,11 @@ impl FBXMesh {
         ];
         let mesh_kv = push_kv!(kvs, KV::new("Geometry", &vals, Some(parent)));
 
+        push_kv!(
+            kvs,
+            KV::new("GeometryVersion", &[Data::I32(101)], Some(mesh_kv))
+        );
+
         let vert_vals = self
             .v
             .iter()
