@@ -86,7 +86,13 @@ pub fn save(v: impl AsRef<Path>, scene: &mesh::Scene) -> std::io::Result<()> {
             |mtl_file| obj::OutputKind::New(mtl_file.into()),
             |_tk, s| obj::OutputKind::New(s.into()),
         ),
-        FBX => todo!("FBX export is not yet supported"),
+        FBX => {
+            let scene: mesh::Scene = scene.clone();
+            let fbx_scene: fbx::FBXScene = scene.into();
+            let f = std::fs::File::create(v)?;
+            let buf = std::io::BufWriter::new(f);
+            fbx::export::export_fbx(&fbx_scene, buf)
+        }
         GLB => {
             let f = std::fs::File::create(v)?;
             let buf = std::io::BufWriter::new(f);

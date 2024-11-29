@@ -1,7 +1,9 @@
 use crate::{FaceKind, F};
 
+pub mod export;
 pub mod parser;
 
+/// From/Into conversions between unified representation and FBX representation.
 pub mod to_mesh;
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -10,6 +12,12 @@ pub struct FBXScene {
     nodes: Vec<FBXNode>,
 
     root_nodes: Vec<usize>,
+}
+
+impl FBXScene {
+    pub(crate) fn parent_node(&self, node: usize) -> Option<usize> {
+        self.nodes.iter().position(|n| n.children.contains(&node))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]

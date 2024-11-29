@@ -10,7 +10,7 @@ use std::mem::size_of;
 use std::path::Path;
 
 /// Magic binary length.
-const MAGIC_LEN: usize = 23;
+pub(crate) const MAGIC_LEN: usize = 23;
 
 /// Magic binary.
 pub(crate) const MAGIC: &[u8; MAGIC_LEN] = b"Kaydara FBX Binary  \x00\x1a\x00";
@@ -21,8 +21,6 @@ pub enum Data {
     I16(i16),
     I32(i32),
     I64(i64),
-
-    U32(u32),
 
     F32(f32),
     F64(f64),
@@ -70,7 +68,7 @@ impl Data {
         }
     }
 
-    fn str(s: &str) -> Self {
+    pub fn str(s: &str) -> Self {
         Data::String(String::from(s))
     }
 }
@@ -82,7 +80,7 @@ pub enum MappingKind {
     Uniform,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Token {
     Key(String),
     Data(Data),
@@ -92,12 +90,21 @@ pub enum Token {
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct KV {
-    key: String,
-    values: Vec<Data>,
-    parent: Option<usize>,
+    pub(crate) key: String,
+    pub(crate) values: Vec<Data>,
+    pub(crate) parent: Option<usize>,
 }
 
 impl KV {
+    pub fn new(key: impl Into<String>, values: &[Data], parent: Option<usize>) -> KV {
+        let key = key.into();
+        let values = values.to_vec();
+        KV {
+            key,
+            values,
+            parent,
+        }
+    }
     pub fn id(&self) -> Option<i64> {
         self.values.get(0).and_then(Data::as_int)
     }
@@ -144,8 +151,6 @@ impl KVs {
         }
     }
 
-    // TODO reconvert KVs to tokens
-
     /// Constructs a graphviz representation of this FBX file, for viewing externally
     pub fn to_graphviz(&self, mut dst: impl Write) -> io::Result<()> {
         writeln!(dst, "graph FBX {{")?;
@@ -168,9 +173,12 @@ impl KVs {
         let mut out = FBXNode::default();
         assert!(node_id >= 0);
         out.id = node_id as usize;
-        for &c in &self.children[&kvi] {
+        let empty = vec![];
+
+        let cs = self.children.get(&kvi).unwrap_or(&empty);
+        for &c in cs {
             let child = &self.kvs[c];
-            println!("TODO handle {child:?}");
+            println!("TODO handle node child {child:?}");
             // TODO do something with children
         }
         out
@@ -183,6 +191,7 @@ impl KVs {
             let child = &self.kvs[c];
             match child.key.as_str() {
                 "Vertices" => {
+                    assert_eq!(child.values.len(), 1);
                     // TODO or this can be f32?
                     let v_arr: &[f64] = child.values[0].as_f64_arr().unwrap();
                     let v = v_arr
@@ -196,8 +205,11 @@ impl KVs {
                 }
                 "GeometryVersion" => {}
                 "PolygonVertexIndex" => {
+                    assert_eq!(child.values.len(), 1,);
                     let mut curr_face = FaceKind::empty();
-                    let idxs = child.values[0].as_i32_arr().unwrap();
+                    let Some(idxs) = child.values[0].as_i32_arr() else {
+                        todo!("{:?}", child.values[0]);
+                    };
                     for &vi in idxs {
                         if vi >= 0 {
                             curr_face.insert(vi as usize);
@@ -417,17 +429,22 @@ impl KVs {
                 }
                 x => todo!("{x:?}"),
             }
+
+            assert!(
+                !self.children.contains_key(&child),
+                "No children expected for conn"
+            );
         }
 
         let mut objects = self.roots.iter().find(|&&v| self.kvs[v].key == "Objects");
         let objects = objects.into_iter().flat_map(|o| &self.children[o]);
         for &o in objects {
             let kv = &self.kvs[o];
+            assert_eq!(kv.values.len(), 3);
             let [id, name_objtype, classtag] = &kv.values[..] else {
                 todo!("{:?}", kv.values);
             };
             let id = id.as_int().unwrap();
-            assert_eq!(kv.values.len(), 3);
             let n_o = name_objtype.as_str().unwrap().split_once("\\x00\\x01");
             let Some((name, obj_type)) = n_o else {
                 todo!("{name_objtype:?}");
@@ -458,6 +475,7 @@ impl KVs {
                             todo!();
                         };
                         let mut node = self.parse_node(id, id_to_kv[&id]);
+                        node.name.clone_from(name);
                         let parents = connections.iter().filter(|&&(_src, dst)| dst == id);
                         let mut num_parents = 0;
                         let new_idx = fbx_scene.nodes.len();
@@ -470,14 +488,14 @@ impl KVs {
                             let parent = &self.kvs[id_to_kv[&parent_id]];
                             match parent.key.as_str() {
                                 "CollectionExclusive" => continue,
-                                x => todo!("{x:?}"),
+                                x => todo!("{x:?} {}", kv.key),
                             }
                             num_parents += 1;
                         }
                         assert_eq!(num_parents, 1);
 
-                        let children = connections.iter().filter(|&&(src, _dst)| src == id);
-                        for (_, c) in children {
+                        let conns = connections.iter().filter(|&&(src, _dst)| src == id);
+                        for (_, c) in conns {
                             let c_kv = &self.kvs[id_to_kv[&c]];
                             match c_kv.key.as_str() {
                                 "Geometry" => {
@@ -566,7 +584,8 @@ fn read_scope(
         }};
         ($t: ty) => {{
             let mut v = [0u8; size_of::<$t>()];
-            src.read_exact(&mut v)?;
+            // here is failing
+            src.read_exact(&mut v).expect("tmp");
             read += size_of::<$t>();
             <$t>::from_le_bytes(v)
         }};
@@ -659,6 +678,7 @@ fn read_scope(
 
     let end_offset = read_word!();
 
+    // this marks the end of the tokens of the tokens of the tokens of the tokens
     if end_offset == 0 {
         return Ok((false, read));
     }
@@ -667,6 +687,7 @@ fn read_scope(
     let prop_count = read_word!();
     let prop_len = read_word!();
     let scope_name = read_string!(false, false);
+    assert_ne!(scope_name, "");
 
     output_tokens.push(Token::Key(scope_name.clone()));
 
@@ -678,20 +699,24 @@ fn read_scope(
         let data = match d {
             // TODO are these signed or unsigned?
             Char::CapitalY => Data::I16(read_word!(i16)),
+
             Char::CapitalI => Data::I32(read_word!(i32)),
+            Char::SmallI => Data::I32Arr(read_array!(i32)),
+
             Char::CapitalL => Data::I64(read_word!(i64)),
+            Char::SmallL => Data::I64Arr(read_array!(i64)),
 
             Char::CapitalF => Data::F32(read_word!(f32)),
+            Char::SmallF => Data::F32Arr(read_array!(f32)),
+
             Char::CapitalD => Data::F64(read_word!(f64)),
+            Char::SmallD => Data::F64Arr(read_array!(f64)),
+
             Char::CapitalR => {
                 let len = read_word!(u32);
                 Data::Binary(read_buf!(len as usize))
             }
 
-            Char::SmallF => Data::F32Arr(read_array!(f32)),
-            Char::SmallD => Data::F64Arr(read_array!(f64)),
-            Char::SmallI => Data::I32Arr(read_array!(i32)),
-            Char::SmallL => Data::I64Arr(read_array!(i64)),
             Char::SmallC => Data::BoolArr(read_array!(bool)),
 
             Char::SmallB => {
@@ -754,13 +779,5 @@ fn test_parse_fbx() {
     let tokens = tokenize_binary(BufReader::new(f)).expect("Failed to tokenize FBX");
     let kvs = parse_tokens(tokens.into_iter());
 
-    /*
-    let vis = File::create("fbx.dot").expect("Failed to create dot file for viewing FBX");
-    kvs.to_graphviz(io::BufWriter::new(vis))
-        .expect("Failed to write graphviz");
-    */
-
-    let _scene = kvs.to_scene();
-
-    todo!();
+    let scene = kvs.to_scene();
 }
