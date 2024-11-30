@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use super::{FBXMesh, FBXNode, FBXScene};
+use super::{FBXMesh, FBXNode, FBXScene, FBXSettings};
 use crate::{FaceKind, F};
 
 use std::ascii::Char;
@@ -61,7 +61,11 @@ impl Data {
     cast!(as_f64_arr, &[f64], F64Arr);
     cast!(as_i64_arr, &[i64], I64Arr);
     cast!(as_i32_arr, &[i32], I32Arr);
+
     cast!(as_i64, &i64, I64);
+    cast!(as_i32, &i32, I32);
+
+    cast!(as_f64, &f64, F64);
 
     fn as_int(&self) -> Option<i64> {
         match self {
@@ -128,7 +132,7 @@ macro_rules! match_children {
       match c_kv.key.as_str() {
         $($key => {
           assert_matches!(c_kv.values.as_slice(), $mtch, "{} {}", $key, kv.key);
-          $val(&c_kv.values)
+          $val(c)
         })*
         x => todo!("Unhandled key {x:?} in {} children", kv.key),
       }
@@ -466,8 +470,11 @@ impl KVs {
         // parent->child pairs
         let mut connections = vec![];
         let mut prop_connections = vec![];
-        let conn_idx = self.find_root("Connections");
-        let conns = conn_idx.into_iter().flat_map(|ci| &self.children[&ci]);
+
+        let conns = self
+            .find_root("Connections")
+            .into_iter()
+            .flat_map(|ci| &self.children[&ci]);
         for &child in conns {
             let kv = &self.kvs[child];
             assert_eq!(kv.key, "C");
@@ -486,14 +493,15 @@ impl KVs {
                 x => todo!("{x:?}"),
             }
 
-            assert!(
-                !self.children.contains_key(&child),
-                "No children expected for conn"
-            );
+            assert!(!self.children.contains_key(&child));
         }
 
-        let mut objects = self.roots.iter().find(|&&v| self.kvs[v].key == "Objects");
-        let objects = objects.into_iter().flat_map(|o| &self.children[o]);
+        let objects = self
+            .roots
+            .iter()
+            .find(|&&v| self.kvs[v].key == "Objects")
+            .into_iter()
+            .flat_map(|o| &self.children[o]);
         for &o in objects {
             let kv = &self.kvs[o];
             assert_eq!(kv.values.len(), 3);
@@ -506,9 +514,7 @@ impl KVs {
                 todo!("{name_objtype:?}");
             };
 
-            let Some(classtag) = classtag.as_str() else {
-                todo!("{classtag:?}");
-            };
+            let classtag = classtag.as_str().unwrap();
 
             let out_object = match obj_type {
                 "NodeAttribute" => match classtag {
@@ -611,17 +617,7 @@ impl KVs {
             assert_matches!(kv.values.as_slice(), &[Data::String(_)]);
         }
 
-        let mut up_axis = None;
-        let mut up_axis_sign = None;
-        let mut front_axis = None;
-        let mut front_axis_sign = None;
-        let mut coord_axis = None;
-        let mut coord_axis_sign = None;
-        let mut og_up_axis = None;
-        let mut og_up_axis_sign = None;
-
-        let mut unit_scale_factor = None;
-        let mut og_unit_scale_factor = None;
+        let settings = &mut fbx_scene.global_settings;
 
         root_fields!(
           self,
@@ -640,18 +636,20 @@ impl KVs {
                 Data::String(_), Data::String(_), Data::String(_), Data::String(_),
                 Data::F64(_), Data::F64(_), Data::F64(_)
               ]
-              => |vals: &[Data]| {
+              => |v: usize| {
+                let vals = &self.kvs[v].values;
+                let v4 = &vals[4];
                 match vals[0].as_str().unwrap() {
-                  "UpAxis" => { up_axis = vals[4].as_int(); }
-                  "UpAxisSign" => { up_axis_sign = vals[4].as_int(); }
-                  "FrontAxis" => { front_axis = vals[4].as_int(); }
-                  "FrontAxisSign" => { front_axis_sign = vals[4].as_int(); }
-                  "CoordAxis" => { coord_axis = vals[4].as_int(); }
-                  "CoordAxisSign" => { coord_axis_sign = vals[4].as_int(); }
-                  "OriginalUpAxis" => { og_up_axis = vals[4].as_int(); }
-                  "OriginalUpAxisSign" => { og_up_axis_sign = vals[4].as_int(); }
-                  "UnitScaleFactor" => { unit_scale_factor = vals[4].as_float(); }
-                  "OriginalUnitScaleFactor" => { og_unit_scale_factor = vals[4].as_float(); }
+                  "UpAxis" => { settings.up_axis = *v4.as_i32().unwrap_or(&settings.up_axis); }
+                  "UpAxisSign" => { settings.up_axis_sign = *v4.as_i32().unwrap_or(&settings.up_axis_sign); }
+                  "FrontAxis" => { settings.front_axis = *v4.as_i32().unwrap_or(&settings.front_axis); }
+                  "FrontAxisSign" => { settings.front_axis_sign = *v4.as_i32().unwrap_or(&settings.front_axis_sign); }
+                  "CoordAxis" => { settings.coord_axis = *v4.as_i32().unwrap_or(&settings.coord_axis); }
+                  "CoordAxisSign" => { settings.coord_axis_sign = *v4.as_i32().unwrap_or(&settings.coord_axis_sign); }
+                  "OriginalUpAxis" => { settings.og_up_axis = *v4.as_i32().unwrap_or(&settings.og_up_axis); }
+                  "OriginalUpAxisSign" => { settings.og_up_axis_sign = *v4.as_i32().unwrap_or(&settings.og_up_axis_sign); }
+                  "UnitScaleFactor" => { settings.unit_scale_factor = *v4.as_f64().unwrap_or(&settings.unit_scale_factor); }
+                  "OriginalUnitScaleFactor" => { settings.og_unit_scale_factor = *v4.as_f64().unwrap_or(&settings.og_unit_scale_factor); }
                   // ignored
                   "AmbientColor" => {},
                   "DefaultCamera" => {},
@@ -670,8 +668,36 @@ impl KVs {
           self,
           "Documents",
           true,
-          "Count", &[Data::I32(_)] => |v| {},
-          "Document", &[Data::I64(_), Data::String(_), Data::String(_)] => |v| {},
+          "Count", &[Data::I32(1)] => |_| {},
+          "Document", &[Data::I64(_), Data::String(_), Data::String(_)] => |v| {
+            match_children!(
+              self, v,
+              "Properties70", &[] => |v| {
+                match_children!(self,v,
+
+                "P",
+                &[
+                  Data::String(_), Data::String(_), Data::String(_),
+                  Data::I32(_) | Data::String(_)
+                ] |
+                &[
+                  Data::String(_), Data::String(_), Data::String(_),
+                  Data::String(_), Data::String(_)
+                ]
+                => |v: usize| {
+                    let vals = &self.kvs[v].values;
+                    match vals[0].as_str().unwrap() {
+                      "SourceObject" => {},
+                      "ActiveAnimStackName" => {},
+                      x => todo!("{x}"),
+                    }
+                  }
+                );
+              },
+
+              "RootNode", &[Data::I64(_)] => |v| assert!(!self.children.contains_key(&v)),
+            );
+          },
         );
 
         root_fields!(
