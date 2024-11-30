@@ -14,6 +14,8 @@ pub struct FBXScene {
     root_nodes: Vec<usize>,
 
     global_settings: FBXSettings,
+
+    file_id: Vec<u8>,
 }
 
 impl FBXScene {

@@ -712,8 +712,13 @@ impl KVs {
           "Definitions",
           true,
           "Version", &[Data::I32(_)] => |v| {},
-          "Count", &[Data::I32(_)] => |v| {},
-          "ObjectType", &[Data::String(_)] => |v| {},
+          "Count", &[Data::I32(4)] => |v| {},
+          "ObjectType", &[Data::String(_)] => |v| {
+            match_children!(self, v,
+              "Count", &[Data::I32(_)] => |v| {}
+              "PropertyTemplate", &[Data::String(_)] => |v| {}
+            );
+          },
         );
 
         // objects (handled earlier)
@@ -726,17 +731,11 @@ impl KVs {
           "Current", &[Data::String(_)] => |v| {},
         );
 
-        /*
         if let Some(file_id) = self.find_root("FileId") {
-          let Data::Binary(ref b) = self.kvs[file_id].values[0] else {
-            todo!();
-          };
-          println!("{:?}", std::str::from_utf8(b));
-        }
-        */
-
-        for &r in &self.roots {
-            println!("{:?}", self.kvs[r].key);
+            let Data::Binary(ref b) = self.kvs[file_id].values[0] else {
+                todo!();
+            };
+            fbx_scene.file_id.clone_from(b);
         }
 
         fbx_scene
