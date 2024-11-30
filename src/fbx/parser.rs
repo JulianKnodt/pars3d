@@ -66,6 +66,14 @@ impl Data {
     fn as_int(&self) -> Option<i64> {
         match self {
             &Data::I64(v) => Some(v),
+            &Data::I32(v) => Some(v as i64),
+            _ => None,
+        }
+    }
+    fn as_float(&self) -> Option<F> {
+        match self {
+            &Data::F64(v) => Some(v as F),
+            &Data::F32(v) => Some(v as F),
             _ => None,
         }
     }
@@ -112,6 +120,22 @@ impl KV {
     }
 }
 
+macro_rules! match_children {
+  ($self: ident, $i: expr, $( $key:expr, $mtch: pat => $val:expr $(,)? )*) => {{
+    let kv = &$self.kvs[$i];
+    for &c in &$self.children[&$i] {
+      let c_kv = &$self.kvs[c];
+      match c_kv.key.as_str() {
+        $($key => {
+          assert_matches!(c_kv.values.as_slice(), $mtch, "{} {}", $key, kv.key);
+          $val(&c_kv.values)
+        })*
+        x => todo!("Unhandled key {x:?} in {} children", kv.key),
+      }
+    }
+  }};
+}
+
 macro_rules! root_fields {
   ($self: ident, $key: expr, $no_values: expr, $( $sub_field: expr, $mtch: pat => $values_func: expr $(,)?)*) => {{
     if let Some(r) = $self.find_root($key) {
@@ -124,7 +148,7 @@ macro_rules! root_fields {
         match c_kv.key.as_str() {
           $($sub_field => {
             assert_matches!(c_kv.values.as_slice(), $mtch, "{} {}", $key, c_kv.key);
-            $values_func(&c_kv.values);
+            $values_func(c);
           })*
           x => todo!("Unhandled {x} in {}", $key),
         }
@@ -572,12 +596,74 @@ impl KVs {
             "SceneInfo", &[Data::String(_), Data::String(_)] => |v| {},
         );
 
+        if let Some(file_id) = self.find_root("FileId") {
+            let kv = &self.kvs[file_id];
+            assert_matches!(kv.values.as_slice(), &[Data::Binary(_)]);
+        }
+
+        if let Some(ct) = self.find_root("CreationTime") {
+            let kv = &self.kvs[ct];
+            assert_matches!(kv.values.as_slice(), &[Data::String(_)]);
+        }
+
+        if let Some(ct) = self.find_root("Creator") {
+            let kv = &self.kvs[ct];
+            assert_matches!(kv.values.as_slice(), &[Data::String(_)]);
+        }
+
+        let mut up_axis = None;
+        let mut up_axis_sign = None;
+        let mut front_axis = None;
+        let mut front_axis_sign = None;
+        let mut coord_axis = None;
+        let mut coord_axis_sign = None;
+        let mut og_up_axis = None;
+        let mut og_up_axis_sign = None;
+
+        let mut unit_scale_factor = None;
+        let mut og_unit_scale_factor = None;
+
         root_fields!(
           self,
           "GlobalSettings",
           true,
           "Version", &[Data::I32(_)] => |v| {},
-          "Properties70", &[] => |v| {},
+          "Properties70", &[] => |v| {
+            match_children!(
+              self, v,
+              "P",
+              &[
+                Data::String(_), Data::String(_), Data::String(_), Data::String(_),
+                Data::I32(_) | Data::I64(_) | Data::F64(_) | Data::String(_),
+              ] |
+              &[
+                Data::String(_), Data::String(_), Data::String(_), Data::String(_),
+                Data::F64(_), Data::F64(_), Data::F64(_)
+              ]
+              => |vals: &[Data]| {
+                match vals[0].as_str().unwrap() {
+                  "UpAxis" => { up_axis = vals[4].as_int(); }
+                  "UpAxisSign" => { up_axis_sign = vals[4].as_int(); }
+                  "FrontAxis" => { front_axis = vals[4].as_int(); }
+                  "FrontAxisSign" => { front_axis_sign = vals[4].as_int(); }
+                  "CoordAxis" => { coord_axis = vals[4].as_int(); }
+                  "CoordAxisSign" => { coord_axis_sign = vals[4].as_int(); }
+                  "OriginalUpAxis" => { og_up_axis = vals[4].as_int(); }
+                  "OriginalUpAxisSign" => { og_up_axis_sign = vals[4].as_int(); }
+                  "UnitScaleFactor" => { unit_scale_factor = vals[4].as_float(); }
+                  "OriginalUnitScaleFactor" => { og_unit_scale_factor = vals[4].as_float(); }
+                  // ignored
+                  "AmbientColor" => {},
+                  "DefaultCamera" => {},
+                  "TimeMode" => {},
+                  "TimeSpanStart" => {},
+                  "TimeSpanStop" => {},
+                  "CustomFrameRate" => {},
+                  x => todo!("Unhandled Properties70 P {x:?}")
+                }
+              },
+            );
+          },
         );
 
         root_fields!(
@@ -594,6 +680,18 @@ impl KVs {
           true,
           "", &[] => |v| {},
         );
+
+        root_fields!(
+          self,
+          "Definitions",
+          true,
+          "Version", &[Data::I32(_)] => |v| {},
+          "Count", &[Data::I32(_)] => |v| {},
+          "ObjectType", &[Data::String(_)] => |v| {},
+        );
+
+        // objects (handled earlier)
+        // conections (handled earlier)
 
         root_fields!(
           self,
