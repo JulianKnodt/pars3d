@@ -72,7 +72,7 @@ pub fn load(v: impl AsRef<Path>) -> std::io::Result<mesh::Scene> {
     let scene = match util::extension_to_format(&v) {
         OBJ => obj::parse(v, false, false)?.into(),
         FBX => fbx::parser::load(v)?.into(),
-        GLB => gltf::load(v).map_err(|e| std::io::Error::other(e))?.into(),
+        GLB => gltf::load(v).map_err(std::io::Error::other)?.into(),
         Unknown => return Err(std::io::Error::other("Don't know how to load")),
     };
     Ok(scene)
@@ -99,7 +99,7 @@ pub fn save(v: impl AsRef<Path>, scene: &mesh::Scene) -> std::io::Result<()> {
             let buf = std::io::BufWriter::new(f);
             gltf::save_glb(scene, buf)
         }
-        Unknown => return Err(std::io::Error::other("Don't know how to save")),
+        Unknown => Err(std::io::Error::other("Don't know how to save")),
     }
 }
 
@@ -205,8 +205,8 @@ impl FaceKind {
             &mut Quad([a, b, c, d]) => Poly(vec![a, b, c, d, v]),
             Poly(ref mut vis) => match vis.len() {
                 2 => Tri([vis[0], vis[1], v]),
-                3 | 4 => unreachable!(),
-                0 | 1 | _ => {
+                3 => Quad([vis[0], vis[1], vis[2], v]),
+                _ => {
                     vis.push(v);
                     return;
                 }

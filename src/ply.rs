@@ -13,6 +13,7 @@ pub struct Ply {
     f: Vec<FaceKind>,
 }
 
+#[derive(PartialEq)]
 enum ReadExpect {
     Header,
     Format,

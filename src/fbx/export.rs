@@ -89,7 +89,7 @@ impl FBXMesh {
         let vert_vals = self
             .v
             .iter()
-            .flat_map(|v| v.into_iter().map(|&v| v as f64))
+            .flat_map(|v| v.iter().map(|&v| v as f64))
             .collect::<Vec<f64>>();
 
         push_kv!(
@@ -103,7 +103,7 @@ impl FBXMesh {
             .flat_map(|f| {
                 let (&last, rest) = f.as_slice().split_last().unwrap();
                 let last = last as i32;
-                rest.into_iter()
+                rest.iter()
                     .map(|&v| v as i32)
                     .chain(std::iter::once(-last - 1))
             })
@@ -289,7 +289,7 @@ pub fn write_token_set(
 pub fn write_tokens(token_sets: &[Vec<Token>], mut w: (impl Write + Seek)) -> io::Result<()> {
     let mut offset = 0;
     offset += w.write(super::parser::MAGIC)?;
-    let version = (7600 as u32).to_le_bytes();
+    let version = (7600u32).to_le_bytes();
     offset += w.write(&version)?;
     assert_eq!(offset, super::parser::MAGIC.len() + 4);
 
@@ -298,7 +298,7 @@ pub fn write_tokens(token_sets: &[Vec<Token>], mut w: (impl Write + Seek)) -> io
         assert_eq!(tkns, t.len());
         offset += w;
     }
-    w.write(&(0u64).to_le_bytes())?;
+    let _ = w.write(&(0u64).to_le_bytes())?;
 
     Ok(())
 }

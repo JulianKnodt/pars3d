@@ -68,16 +68,16 @@ impl Data {
     cast!(as_f64, &f64, F64);
 
     fn as_int(&self) -> Option<i64> {
-        match self {
-            &Data::I64(v) => Some(v),
-            &Data::I32(v) => Some(v as i64),
+        match *self {
+            Data::I64(v) => Some(v),
+            Data::I32(v) => Some(v as i64),
             _ => None,
         }
     }
     fn as_float(&self) -> Option<F> {
-        match self {
-            &Data::F64(v) => Some(v as F),
-            &Data::F32(v) => Some(v as F),
+        match *self {
+            Data::F64(v) => Some(v as F),
+            Data::F32(v) => Some(v as F),
             _ => None,
         }
     }
@@ -120,7 +120,7 @@ impl KV {
         }
     }
     pub fn id(&self) -> Option<i64> {
-        self.values.get(0).and_then(Data::as_int)
+        self.values.first().and_then(Data::as_int)
     }
 }
 
@@ -516,7 +516,7 @@ impl KVs {
 
             let classtag = classtag.as_str().unwrap();
 
-            let out_object = match obj_type {
+            match obj_type {
                 "NodeAttribute" => match classtag {
                     "Light" => continue,
                     "Camera" => continue,
@@ -558,7 +558,7 @@ impl KVs {
 
                         let conns = connections.iter().filter(|&&(src, _dst)| src == id);
                         for (_, c) in conns {
-                            let c_kv = &self.kvs[id_to_kv[&c]];
+                            let c_kv = &self.kvs[id_to_kv[c]];
                             match c_kv.key.as_str() {
                                 "Geometry" => {
                                     let Some(p) =
@@ -587,7 +587,7 @@ impl KVs {
                 "Video" => continue,
 
                 _ => todo!("{obj_type:?}"),
-            };
+            }
         }
 
         root_fields!(
@@ -841,8 +841,7 @@ fn read_scope(
                 comp_len,
                 "Mismatch in read size: {len} * {stride} != {comp_len}"
             );
-            let mut out = vec![];
-            out.reserve(len);
+            let mut out = Vec::with_capacity(len);
             match enc {
                 0 => {
                     for _ in 0..len {
@@ -860,8 +859,7 @@ fn read_scope(
             let comp_len = read_word!(u32) as usize;
 
             let stride = size_of::<$ty>();
-            let mut out = vec![];
-            out.reserve(len);
+            let mut out = Vec::with_capacity(len);
             match enc {
                 0 => {
                     assert_eq!(len * stride, comp_len);

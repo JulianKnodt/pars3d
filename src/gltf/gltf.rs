@@ -402,7 +402,7 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
         inv_bind_mat_offsets.push(bytes.len());
         for &ibm in &skin.inv_bind_matrices {
             let raw_bytes = ibm.iter().flat_map(|col| {
-                col.into_iter()
+                col.iter()
                     .flat_map(|&v| (v as f32).to_le_bytes().into_iter())
             });
             bytes.extend(raw_bytes);
@@ -455,7 +455,7 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
                 OutputProperty::Rotation(t) => {
                     let raw = t
                         .iter()
-                        .flat_map(|p| p.into_iter().flat_map(|&v| (v as f32).to_le_bytes()));
+                        .flat_map(|p| p.iter().flat_map(|&v| (v as f32).to_le_bytes()));
                     bytes.extend(raw)
                 }
                 OutputProperty::MorphTargetWeight(t) => {
