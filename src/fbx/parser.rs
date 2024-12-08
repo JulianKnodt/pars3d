@@ -125,9 +125,9 @@ impl KV {
 }
 
 macro_rules! match_children {
-  ($self: ident, $i: expr, $( $key:expr, $mtch: pat => $val:expr $(,)? )*) => {{
+  ($self: ident, $i: expr $(, $key:expr, $mtch: pat => $val:expr )* $(,)? ) => {{
     let kv = &$self.kvs[$i];
-    for &c in &$self.children[&$i] {
+    for &c in $self.children.get(&$i).map(Vec::as_slice).unwrap_or(&[]) {
       let c_kv = &$self.kvs[c];
       match c_kv.key.as_str() {
         $($key => {
@@ -141,13 +141,12 @@ macro_rules! match_children {
 }
 
 macro_rules! root_fields {
-  ($self: ident, $key: expr, $no_values: expr, $( $sub_field: expr, $mtch: pat => $values_func: expr $(,)?)*) => {{
+  ($self: ident, $key: expr, $vals: pat
+  $(, $sub_field: expr, $mtch: pat => $values_func: expr)* $(,)?) => {{
     if let Some(r) = $self.find_root($key) {
-      if $no_values {
-        assert_eq!($self.kvs[r].values, &[]);
-      }
+      assert_matches!($self.kvs[r].values.as_slice(), $vals);
 
-      for &c in &$self.children[&r] {
+      for &c in $self.children.get(&r).map(Vec::as_slice).unwrap_or(&[]) {
         let c_kv = &$self.kvs[c];
         match c_kv.key.as_str() {
           $($sub_field => {
@@ -157,6 +156,8 @@ macro_rules! root_fields {
           x => todo!("Unhandled {x} in {}", $key),
         }
       }
+    } else {
+      eprintln!("FBX missing root field {}", $key);
     }
   }}
 }
@@ -227,21 +228,38 @@ impl KVs {
         let mut out = FBXNode::default();
         assert!(node_id >= 0);
         out.id = node_id as usize;
-        let empty = vec![];
 
-        let cs = self.children.get(&kvi).unwrap_or(&empty);
-        for &c in cs {
-            let child = &self.kvs[c];
-            match child.key.as_str() {
-                "Version" => {}
-                "Properties70" => {}
-                "MultiLayer" => {}
-                "Shading" => {}
-                "Culling" => {}
-                "MultiTake" => {}
-                x => todo!("Unhandled node attrib {x:?}"),
-            }
-        }
+        match_children!(
+          self,
+          kvi,
+          "Version", &[Data::I32(_)] => |v| {},
+          "Properties70", &[] => |v| match_children!(
+            self,
+            v,
+            "P", &[
+                Data::String(_), Data::String(_), Data::String(_), Data::String(_),
+                Data::F64(_), Data::F64(_), Data::F64(_)
+            ] | &[
+                Data::String(_), Data::String(_), Data::String(_), Data::String(_),
+                Data::I32(_),
+            ] => |v: usize| {
+                let vals = &self.kvs[v].values;
+                match vals[0].as_str().unwrap() {
+                  "Lcl Rotation" => {},
+                  "Lcl Scaling" => {},
+                  "DefaultAttributeIndex" => {},
+                  "InheritType" => {},
+                  x => todo!("{x:?}"),
+                }
+             },
+          ),
+          "MultiLayer", &[Data::I32(_)] => |v| {},
+          "Culling", &[Data::String(_)] => |v: usize| {
+            assert_matches!(self.kvs[v].values[0].as_str(), Some("CullingOff" | "CullingOn"));
+          },
+          "MultiTake", &[Data::I32(_)] => |v| {},
+          "Shading", &[Data::Bool(_)] => |v| {},
+        );
         out
     }
     fn parse_mesh(&self, mesh_id: i64, kvi: usize) -> FBXMesh {
@@ -251,10 +269,7 @@ impl KVs {
         for &c in &self.children[&kvi] {
             let child = &self.kvs[c];
             match child.key.as_str() {
-                "Properties70" => {
-                    assert!(child.values.is_empty());
-                    assert_eq!(self.children[&c].len(), 1);
-                }
+                "Properties70" => match_children!(self, c),
                 "Vertices" => {
                     assert_eq!(child.values.len(), 1);
                     // TODO or this can be f32?
@@ -576,6 +591,8 @@ impl KVs {
 
                         fbx_scene.nodes.push(node);
                     }
+                    "Light" => continue,
+                    "Camera" => continue,
                     x => todo!("{x:?}"),
                 },
 
@@ -585,6 +602,7 @@ impl KVs {
 
                 "DisplayLayer" => continue,
                 "Video" => continue,
+                "Light" => continue,
 
                 _ => todo!("{obj_type:?}"),
             }
@@ -592,19 +610,31 @@ impl KVs {
 
         root_fields!(
             self,
-            "FBXHeaderExtension",
-            true,
+            "FBXHeaderExtension", &[],
             "FBXHeaderVersion", &[Data::I32(_)] => |v| {},
             "FBXVersion", &[Data::I32(_)] => |v| {},
             "EncryptionType", &[Data::I32(0)] => |v| {},
             "CreationTimeStamp", &[] => |v| {},
             "Creator", &[Data::String(_)] => |v| {},
-            "SceneInfo", &[Data::String(_), Data::String(_)] => |v| {},
+            "SceneInfo", &[Data::String(_), Data::String(_)] => |v: usize| {
+              match_children!(
+                self, v,
+                "Type", &[Data::String(_)] => |v| {},
+                "Version", &[Data::I32(_)] => |v| {},
+                "MetaData", &[] => |v| {},
+                "Properties70", &[] => |v| {},
+              );
+            },
         );
 
         if let Some(file_id) = self.find_root("FileId") {
             let kv = &self.kvs[file_id];
             assert_matches!(kv.values.as_slice(), &[Data::Binary(_)]);
+            let Data::Binary(ref b) = kv.values[0] else {
+                unreachable!();
+            };
+            assert_eq!(b.len(), 16);
+            fbx_scene.file_id.clone_from(b);
         }
 
         if let Some(ct) = self.find_root("CreationTime") {
@@ -621,8 +651,7 @@ impl KVs {
 
         root_fields!(
           self,
-          "GlobalSettings",
-          true,
+          "GlobalSettings", &[],
           "Version", &[Data::I32(_)] => |v| {},
           "Properties70", &[] => |v| {
             match_children!(
@@ -639,26 +668,32 @@ impl KVs {
               => |v: usize| {
                 let vals = &self.kvs[v].values;
                 let v4 = &vals[4];
-                match vals[0].as_str().unwrap() {
-                  "UpAxis" => { settings.up_axis = *v4.as_i32().unwrap_or(&settings.up_axis); }
-                  "UpAxisSign" => { settings.up_axis_sign = *v4.as_i32().unwrap_or(&settings.up_axis_sign); }
-                  "FrontAxis" => { settings.front_axis = *v4.as_i32().unwrap_or(&settings.front_axis); }
-                  "FrontAxisSign" => { settings.front_axis_sign = *v4.as_i32().unwrap_or(&settings.front_axis_sign); }
-                  "CoordAxis" => { settings.coord_axis = *v4.as_i32().unwrap_or(&settings.coord_axis); }
-                  "CoordAxisSign" => { settings.coord_axis_sign = *v4.as_i32().unwrap_or(&settings.coord_axis_sign); }
-                  "OriginalUpAxis" => { settings.og_up_axis = *v4.as_i32().unwrap_or(&settings.og_up_axis); }
-                  "OriginalUpAxisSign" => { settings.og_up_axis_sign = *v4.as_i32().unwrap_or(&settings.og_up_axis_sign); }
-                  "UnitScaleFactor" => { settings.unit_scale_factor = *v4.as_f64().unwrap_or(&settings.unit_scale_factor); }
-                  "OriginalUnitScaleFactor" => { settings.og_unit_scale_factor = *v4.as_f64().unwrap_or(&settings.og_unit_scale_factor); }
-                  // ignored
-                  "AmbientColor" => {},
-                  "DefaultCamera" => {},
-                  "TimeMode" => {},
-                  "TimeSpanStart" => {},
-                  "TimeSpanStop" => {},
-                  "CustomFrameRate" => {},
-                  x => todo!("Unhandled Properties70 P {x:?}")
+                macro_rules! assign {
+                  ($v: expr, $fn: ident) => {{
+                    $v = *v4.$fn().unwrap_or(&$v);
+                  }};
                 }
+                match vals[0].as_str().unwrap() {
+                  "UpAxis" => assign!(settings.up_axis, as_i32),
+                  "UpAxisSign" => assign!(settings.up_axis_sign, as_i32),
+                  "FrontAxis" => assign!(settings.front_axis, as_i32),
+                  "FrontAxisSign" => assign!(settings.front_axis_sign, as_i32),
+                  "CoordAxis" => assign!(settings.coord_axis, as_i32),
+                  "CoordAxisSign" => assign!(settings.coord_axis_sign, as_i32),
+                  "OriginalUpAxis" => assign!(settings.og_up_axis, as_i32),
+                  "OriginalUpAxisSign" => assign!(settings.og_up_axis_sign, as_i32),
+                  "UnitScaleFactor" => assign!(settings.unit_scale_factor, as_f64),
+                  "OriginalUnitScaleFactor" => assign!(settings.og_unit_scale_factor, as_f64),
+                  // ignored
+                  "AmbientColor" => return,
+                  "DefaultCamera" => return,
+                  "TimeMode" => return,
+                  "TimeSpanStart" => return,
+                  "TimeSpanStop" => return,
+                  "CustomFrameRate" => return,
+                  x => todo!("Unhandled Properties70 P {x:?}")
+                };
+
               },
             );
           },
@@ -666,8 +701,8 @@ impl KVs {
 
         root_fields!(
           self,
-          "Documents",
-          true,
+          "Documents", &[],
+          // I think this is only ever 1 for 1 scene
           "Count", &[Data::I32(1)] => |_| {},
           "Document", &[Data::I64(_), Data::String(_), Data::String(_)] => |v| {
             match_children!(
@@ -700,25 +735,22 @@ impl KVs {
           },
         );
 
-        root_fields!(
-          self,
-          "References",
-          true,
-          "", &[] => |v| {},
-        );
+        root_fields!(self, "References", &[]);
 
         root_fields!(
           self,
-          "Definitions",
-          true,
+          "Definitions", &[],
           "Version", &[Data::I32(_)] => |v| {},
-          "Count", &[Data::I32(4)] => |v| {},
-          "ObjectType", &[Data::String(_)] => |v| {
-            match_children!(self, v,
-              "Count", &[Data::I32(_)] => |v| {}
-              "PropertyTemplate", &[Data::String(_)] => |v| {}
-            );
-          },
+          "Count", &[Data::I32(_)] => |v| {},
+          "ObjectType", &[Data::String(_)] => |v| match_children!(self, v,
+            "Count", &[Data::I32(_)] => |v| {},
+            "PropertyTemplate", &[Data::String(_)] => |v: usize| {
+              assert_matches!(
+                self.kvs[v].values[0].as_str().unwrap(),
+                "FbxCamera" | "FbxMesh" | "FbxNode" | "FbxSurfacePhong",
+              );
+            }
+          ),
         );
 
         // objects (handled earlier)
@@ -726,17 +758,9 @@ impl KVs {
 
         root_fields!(
           self,
-          "Takes",
-          true,
-          "Current", &[Data::String(_)] => |v| {},
+          "Takes", &[],
+          "Current", &[Data::String(_)] => |v: usize| {},
         );
-
-        if let Some(file_id) = self.find_root("FileId") {
-            let Data::Binary(ref b) = self.kvs[file_id].values[0] else {
-                todo!();
-            };
-            fbx_scene.file_id.clone_from(b);
-        }
 
         fbx_scene
     }
@@ -959,7 +983,11 @@ fn read_scope(
         while (read as u64) + sentinel_block_len < block_len {
             read += read_scope(src, is_64_bit, output_tokens, prev_read + read)?.1;
         }
-        output_tokens.push(Token::ScopeEnd);
+        if output_tokens.last() == Some(&Token::ScopeStart) {
+            output_tokens.pop();
+        } else {
+            output_tokens.push(Token::ScopeEnd);
+        }
 
         let sentinel = read_word!(sentinel_block_len as usize);
         assert!(sentinel.iter().all(|&v| v == b'\0'));

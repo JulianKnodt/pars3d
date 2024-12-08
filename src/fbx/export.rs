@@ -1,8 +1,45 @@
+#![allow(unused)]
+
 use super::parser::{Data, Token, KV};
 use super::{FBXMesh, FBXNode, FBXScene};
 use std::io::{self, Seek, SeekFrom, Write};
 
 use std::collections::{HashMap, HashSet};
+
+macro_rules! push_kv {
+    ($kvs: expr, $kv: expr) => {{
+        let idx = $kvs.len();
+        $kvs.push($kv);
+        idx
+    }};
+}
+
+macro_rules! add_kvs {
+  ($kvs: expr, $parent: expr
+    $(, $field: expr, $values: expr $( => $children_func: expr )? )* $(,)?
+  ) => {{
+    [$({
+      let c = push_kv!($kvs, KV {
+        key: $field.to_string(),
+        values: $values.to_vec(),
+        parent: Some($parent),
+      });
+      $( $children_func(c); )?
+    },)*]
+  }}
+}
+
+macro_rules! root_fields {
+  ($kvs: ident, $key: expr, $values: expr $( => $children_func: expr )? $(,)?) => {{
+    // Sometimes used
+    let _root_id = push_kv!($kvs, KV {
+      key: $key.to_string(),
+      values: $values.to_vec(),
+      parent:None
+    });
+    $( $children_func(_root_id); )?
+  }}
+}
 
 // 1. convert scene to KVs
 // 2. convert KVs to tokens
@@ -30,17 +67,10 @@ pub fn export_fbx(scene: &FBXScene, w: (impl Write + Seek)) -> io::Result<()> {
     write_tokens(&token_sets, w)
 }
 
-macro_rules! push_kv {
-    ($kvs: expr, $kv: expr) => {{
-        let idx = $kvs.len();
-        $kvs.push($kv);
-        idx
-    }};
-}
-
 impl FBXScene {
     pub(crate) fn to_kvs(&self) -> Vec<KV> {
         let mut kvs = vec![];
+        /*
         let conn_idx = push_kv!(kvs, KV::new("Connections", &[], None));
         // for each node add a connection from it to its parent
         for ni in 0..self.nodes.len() {
@@ -67,6 +97,32 @@ impl FBXScene {
         for node in &self.nodes {
             node.to_kvs(obj_kv, &mut kvs);
         }
+        */
+
+        root_fields!(
+            kvs,
+            "FBXHeaderExtension", &[] => |c| add_kvs!(
+              kvs, c,
+              "FBXVersion", &[Data::I32(7600)],
+              "FBXHeaderVersion", &[Data::I32(7600)],
+              "EncryptionType", &[Data::I32(0)],
+              "Creator", &[Data::str("pars3d")],
+              "SceneInfo", &[Data::str("GlobalInfo\x00\x01SceneInfo"), Data::str("UserData")],
+            ),
+        );
+        root_fields!(kvs, "FileId", &[Data::Binary(vec![0; 16])]);
+        root_fields!(kvs, "Takes", &[] => |c| add_kvs!(kvs, c, "Current", &[Data::str("")]));
+        root_fields!(kvs, "Refences", &[]);
+        root_fields!(kvs, "Definitions", &[] => |c| add_kvs!(kvs, c,
+          "Version", &[Data::I32(101)],
+          // This should repeat for multiple things
+          "Count", &[Data::I32(1 /* not sure what this is */)],
+          "ObjectType", &[Data::str("" /* not sure */)] => |c| add_kvs!(
+              kvs, c,
+              "Count", &[Data::I32(0)],
+              "PropertyTemplate", &[Data::str("FbxMesh")]),
+          ),
+        );
 
         kvs
     }
@@ -227,7 +283,14 @@ pub fn write_token_set(
                 Data::I32Arr(arr) => write_arr!($dst, i32, arr),
                 Data::F64Arr(arr) => write_arr!($dst, f64, arr),
                 Data::String(s) => write_string!($dst, s, true, true),
-                _ => todo!(),
+                Data::Binary(b) => {
+                    let len = write_word!($dst, u32, b.len());
+                    assert_eq!(len, 4);
+                    let v = $dst.write(&b)?;
+                    assert_eq!(v, b.len());
+                    len + v
+                }
+                x => todo!("{x:?}"),
             }
         }};
     }
@@ -264,7 +327,7 @@ pub fn write_token_set(
     i += prop_count;
     const SENTINEL_BLOCK_LEN: usize = size_of::<u64>() * 3 + 1;
     const SENTINEL: [u8; SENTINEL_BLOCK_LEN] = [b'\0'; SENTINEL_BLOCK_LEN];
-    assert!(!matches!(tokens[i], Token::Data(_)));
+    assert!(i >= tokens.len() || !matches!(tokens[i], Token::Data(_)));
     if i < tokens.len() && tokens[i] == Token::ScopeStart {
         i += 1;
         while i < tokens.len() && tokens[i] != Token::ScopeEnd {

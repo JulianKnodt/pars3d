@@ -19,6 +19,7 @@ pub struct FBXScene {
 }
 
 impl FBXScene {
+    #[allow(unused)]
     pub(crate) fn parent_node(&self, node: usize) -> Option<usize> {
         self.nodes.iter().position(|n| n.children.contains(&node))
     }
