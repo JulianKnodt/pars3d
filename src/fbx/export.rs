@@ -128,8 +128,8 @@ impl FBXScene {
           "Documents", &[] => |c| add_kvs!(
             kvs, c,
             "Count", &[Data::I32(1)],
-            "RootNode", &[Data::I64(0)],
-            "Document", &[Data::I64(id() as i64), Data::str("Scene"), Data::str("Scene")] => |v| {
+            "Document", &[Data::I64(id() as i64), Data::str("Scene"), Data::str("Scene")] => |c| {
+              add_kvs!(kvs, c, "RootNode", &[Data::I64(0)]);
             },
           ),
         );
