@@ -732,6 +732,7 @@ impl KVs {
           },
         );
 
+        // TODO what is this for?
         root_fields!(self, "References", &[]);
 
         root_fields!(

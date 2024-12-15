@@ -111,7 +111,49 @@ impl FBXScene {
         );
         root_fields!(kvs, "FileId", &[Data::Binary(vec![0; 16])]);
         root_fields!(kvs, "Takes", &[] => |c| add_kvs!(kvs, c, "Current", &[Data::str("")]));
-        root_fields!(kvs, "Refences", &[]);
+        root_fields!(kvs, "CreationTime", &[Data::str("1970-01-01 10:00:00:000")]);
+        root_fields!(kvs, "Creator", &[Data::str("pars3d")]);
+        root_fields!(kvs, "References", &[]);
+
+        let int_p = |name, val| {
+            [
+                Data::str(name),
+                Data::str("int"),
+                Data::str("Integer"),
+                Data::str(""),
+                Data::I32(val),
+            ]
+        };
+        let f64_p = |name, val| {
+            [
+                Data::str(name),
+                Data::str("double"),
+                Data::str("Number"),
+                Data::str(""),
+                Data::F64(val),
+            ]
+        };
+        let settings = &self.global_settings;
+        root_fields!(
+          kvs,
+          "GlobalSettings", &[] => |v| add_kvs!(
+            kvs, v,
+            "Version", &[Data::I32(101)],
+            "Properties70", &[] => |v| add_kvs!(kvs, v,
+              "P", int_p("UpAxis", settings.up_axis),
+              "P", int_p("UpAxisSign", settings.up_axis_sign),
+              "P", int_p("FrontAxis", settings.front_axis),
+              "P", int_p("FrontAxisSign", settings.front_axis_sign),
+              "P", int_p("CoordAxis", settings.coord_axis),
+              "P", int_p("CoordAxisSign", settings.coord_axis_sign),
+              "P", int_p("OriginalUpAxis", settings.og_up_axis),
+              "P", int_p("OriginalUpAxisSign", settings.og_up_axis_sign),
+              "P", f64_p("UnitScaleFactor", settings.unit_scale_factor),
+              "P", f64_p("OriginalUnitScaleFactor", settings.og_unit_scale_factor),
+            ),
+          ),
+        );
+
         root_fields!(kvs, "Definitions", &[] => |c| add_kvs!(kvs, c,
           "Version", &[Data::I32(101)],
           // This should repeat for multiple things
@@ -289,6 +331,7 @@ pub fn write_token_set(
             c + match $d {
                 Data::I32(i) => write_word!($dst, i32, *i),
                 Data::I64(i) => write_word!($dst, i64, *i),
+                Data::F64(i) => write_word!($dst, f64, *i),
                 Data::I64Arr(arr) => write_arr!($dst, i64, arr),
                 Data::I32Arr(arr) => write_arr!($dst, i32, arr),
                 Data::F64Arr(arr) => write_arr!($dst, f64, arr),
