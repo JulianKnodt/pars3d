@@ -1,19 +1,8 @@
-use super::{FBXMesh, FBXNode, FBXScene};
+use super::{id, FBXMesh, FBXNode, FBXScene};
 use crate::mesh::{Mesh, Node, Scene};
 use crate::F;
-use std::sync::atomic::AtomicUsize;
 
 use std::collections::{btree_map::Entry, BTreeMap};
-
-fn id() -> usize {
-    static mut CURR_ID: AtomicUsize = AtomicUsize::new(3333);
-    let id = unsafe {
-        #[allow(static_mut_refs)]
-        CURR_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
-    };
-    assert_ne!(id, 0);
-    id
-}
 
 /// Converts per vertex values to unique values and idxs into it.
 fn to_idx_vecs<const N: usize>(vals: &[[F; N]]) -> (Vec<[F; N]>, Vec<usize>) {

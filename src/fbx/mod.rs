@@ -1,4 +1,5 @@
 use crate::{FaceKind, F};
+use std::sync::atomic::AtomicUsize;
 
 pub mod export;
 pub mod parser;
@@ -87,4 +88,14 @@ impl Default for FBXSettings {
             og_unit_scale_factor: 1.,
         }
     }
+}
+
+pub(crate) fn id() -> usize {
+    static mut CURR_ID: AtomicUsize = AtomicUsize::new(3333);
+    let id = unsafe {
+        #[allow(static_mut_refs)]
+        CURR_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+    };
+    assert_ne!(id, 0);
+    id
 }

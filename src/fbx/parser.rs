@@ -497,6 +497,7 @@ impl KVs {
                 [oo, dst, src] if oo == &Data::str("OO") => {
                     let src = src.as_int().unwrap();
                     let dst = dst.as_int().unwrap();
+                    println!("{src} {dst}");
                     connections.push((src, dst));
                 }
                 [op, dst, src, name] if op == &Data::str("OP") => {
@@ -637,15 +638,9 @@ impl KVs {
             fbx_scene.file_id.clone_from(b);
         }
 
-        if let Some(ct) = self.find_root("CreationTime") {
-            let kv = &self.kvs[ct];
-            assert_matches!(kv.values.as_slice(), &[Data::String(_)]);
-        }
+        root_fields!(self, "CreationTime", &[Data::String(_)]);
 
-        if let Some(ct) = self.find_root("Creator") {
-            let kv = &self.kvs[ct];
-            assert_matches!(kv.values.as_slice(), &[Data::String(_)]);
-        }
+        root_fields!(self, "Creator", &[Data::String(_)]);
 
         let settings = &mut fbx_scene.global_settings;
 
@@ -704,7 +699,9 @@ impl KVs {
           "Documents", &[],
           // I think this is only ever 1 for 1 scene
           "Count", &[Data::I32(1)] => |_| {},
-          "Document", &[Data::I64(_), Data::String(_), Data::String(_)] => |v| {
+          "Document", &[Data::I64(_), Data::String(_), Data::String(_)] => |v: usize| {
+            assert_eq!(self.kvs[v].values[1].as_str().unwrap(), "Scene");
+            assert_eq!(self.kvs[v].values[2].as_str().unwrap(), "Scene");
             match_children!(
               self, v,
               "Properties70", &[] => |v| {
