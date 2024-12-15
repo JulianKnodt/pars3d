@@ -266,208 +266,194 @@ impl KVs {
         let mut out = FBXMesh::default();
         assert!(mesh_id >= 0);
         out.id = mesh_id as usize;
-        for &c in &self.children[&kvi] {
-            let child = &self.kvs[c];
-            match child.key.as_str() {
-                "Properties70" => match_children!(self, c),
-                "Vertices" => {
-                    assert_eq!(child.values.len(), 1);
-                    // TODO or this can be f32?
-                    let v_arr: &[f64] = child.values[0].as_f64_arr().unwrap();
-                    let v = v_arr
-                        .iter()
-                        .array_chunks::<3>()
-                        .map(|[a, b, c]| [*a as F, *b as F, *c as F]);
-                    out.v.extend(v);
-                }
-                "GeometryVersion" => {
-                    assert_eq!(child.values.len(), 1);
-                }
-                "PolygonVertexIndex" => {
-                    assert_eq!(child.values.len(), 1,);
-                    let mut curr_face = FaceKind::empty();
-                    let Some(idxs) = child.values[0].as_i32_arr() else {
-                        todo!("{:?}", child.values[0]);
-                    };
-                    for &vi in idxs {
-                        if vi >= 0 {
-                            curr_face.insert(vi as usize);
-                        } else {
-                            curr_face.insert(-(vi + 1) as usize);
-                            let f = std::mem::replace(&mut curr_face, FaceKind::empty());
-                            out.f.push(f);
-                        }
-                    }
-                }
-                "Edges" => { /* No idea what to do here */ }
-                "LayerElementNormal" => {
-                    for &cc in &self.children[&c] {
-                        let gc = &self.kvs[cc];
-                        match gc.key.as_str() {
-                            "Version" => {}
-                            "Name" => {}
-                            "MappingInformationType" => {
-                                assert_eq!(&gc.values, &[Data::str("ByPolygonVertex")]);
-                            }
-                            "ReferenceInformationType" => {}
-                            "Normals" => {
-                                assert_eq!(gc.values.len(), 1);
-                                let Data::F64Arr(ref arr) = &gc.values[0] else {
-                                    todo!("Expected F64 Arr got {:?}", gc.values);
-                                };
-                                out.n
-                                    .extend(arr.array_chunks::<3>().map(|n| n.map(|v| v as F)));
-                            }
-                            "NormalsIndex" => {
-                                assert_eq!(gc.values.len(), 1);
-                                let Data::I32Arr(ref arr) = &gc.values[0] else {
-                                    todo!("Did not get I32Arr, got {:?}", gc.values);
-                                };
-                                let idxs = arr
-                                    .iter()
-                                    .copied()
-                                    .inspect(|&idx| assert!(idx >= 0))
-                                    .map(|v| v as usize);
-                                out.vert_norm_idx.extend(idxs);
-                            }
-                            "NormalsW" => { /*wtf is this*/ }
-                            x => todo!("{x:?}"),
-                        }
-                    }
-                }
-                "LayerElementUV" => {
-                    for &cc in &self.children[&c] {
-                        let gc = &self.kvs[cc];
-                        match gc.key.as_str() {
-                            "Version" => {}
-                            "Name" => {}
-                            "MappingInformationType" => {
-                                assert_eq!(&gc.values, &[Data::str("ByPolygonVertex")]);
-                            }
-                            "ReferenceInformationType" => {
-                                assert_eq!(&gc.values, &[Data::str("IndexToDirect")]);
-                            }
-                            "UV" => {
-                                let Data::F64Arr(ref arr) = &gc.values[0] else {
-                                    todo!("exp F64Arr, got {:?}", gc.values);
-                                };
-                                out.uv
-                                    .extend(arr.array_chunks::<2>().map(|uv| uv.map(|v| v as F)));
-                            }
-                            "UVIndex" => {
-                                assert_eq!(gc.values.len(), 1);
-                                let Data::I32Arr(ref arr) = &gc.values[0] else {
-                                    todo!("Did not get I32Arr, got {:?}", gc.values);
-                                };
-                                let idxs = arr
-                                    .iter()
-                                    .copied()
-                                    .inspect(|&idx| assert!(idx >= 0))
-                                    .map(|v| v as usize);
-                                out.uv_idx.extend(idxs);
-                            }
-                            x => todo!("{x:?}"),
-                        }
-                    }
-                }
-                "LayerElementMaterial" => {
-                    let mut mapping_kind = MappingKind::Uniform;
-                    for &cc in &self.children[&c] {
-                        let gc = &self.kvs[cc];
-                        match gc.key.as_str() {
-                            "Version" => {}
-                            "Name" => {}
-                            "MappingInformationType" => {
-                                assert_eq!(gc.values.len(), 1);
-                                mapping_kind = match gc.values[0].as_str().unwrap() {
-                                    "AllSame" => MappingKind::Uniform,
-                                    "ByPolygon" => MappingKind::PerPolygon,
-                                    x => todo!("Unknown mapping kind {x:?}"),
-                                };
-                            }
-                            "ReferenceInformationType" => {}
-                            "Materials" => {
-                                assert_eq!(gc.values.len(), 1);
-                                match &gc.values[0] {
-                                    &Data::I32(i) => {
-                                        assert!(i >= 0);
-                                        assert_eq!(mapping_kind, MappingKind::Uniform);
-                                        out.global_mat = Some(i as usize);
-                                    }
-                                    Data::I32Arr(ref arr) => {
-                                        assert!(!arr.is_empty());
-                                        assert!(arr.iter().all(|&v| v >= 0));
-                                        if arr.len() == 1 {
-                                            out.global_mat = Some(arr[0] as usize);
-                                            continue;
-                                        }
-                                        assert_eq!(mapping_kind, MappingKind::PerPolygon);
-                                        let mat_idxs = arr.iter().map(|&i| i as usize);
-                                        out.per_face_mat.extend(mat_idxs);
-                                    }
-                                    x => todo!("{x:?}"),
-                                }
-                            }
-                            x => todo!("{x:?}"),
-                        }
-                    }
-                }
-                "LayerElementColor" => {
-                    for &cc in &self.children[&c] {
-                        for &cc in &self.children[&c] {
-                            let gc = &self.kvs[cc];
-                            match gc.key.as_str() {
-                                "Version" => {}
-                                "Name" => {}
-                                "MappingInformationType" => {
-                                    assert_eq!(&gc.values, &[Data::str("ByPolygonVertex")]);
-                                }
-                                "ReferenceInformationType" => {}
-                                "Colors" => {
-                                    assert_eq!(gc.values.len(), 1);
-                                    let Some(v) = gc.values[0].as_f64_arr() else {
-                                        todo!();
-                                    };
-                                    let vc = v.array_chunks::<3>().map(|v| v.map(|v| v as F));
-                                    out.vertex_colors.extend(vc);
-                                }
-                                "ColorIndex" => {
-                                    assert_eq!(gc.values.len(), 1);
-                                    let Data::I32Arr(ref arr) = &gc.values[0] else {
-                                        todo!("Did not get I32Arr, got {:?}", gc.values);
-                                    };
-                                    let idxs = arr
-                                        .iter()
-                                        .copied()
-                                        .inspect(|&idx| assert!(idx >= 0))
-                                        .map(|v| v as usize);
-                                    out.vertex_color_idx.extend(idxs);
-                                }
-                                x => todo!("{x:?}"),
-                            }
-                        }
-                    }
-                }
-                "Layer" => {
-                    for &cc in &self.children[&c] {
-                        let gc = &self.kvs[cc];
-                        match gc.key.as_str() {
-                            "Version" => {}
-                            "Name" => {}
-                            "MappingInformationType" => {}
-                            "ReferenceInformationType" => {}
-                            "LayerElement" => {}
-                            x => todo!("{x:?}"),
-                        }
-                    }
-                }
-                // omit for now
-                "LayerElementSmoothing" => {}
-                "LayerElementVisibility" => {}
-
-                x => todo!("{x:?} {:?}", child.values),
-            }
-        }
+        match_children!(
+          self,
+          kvi,
+          "Properties70", &[] => |c| match_children!(self, c),
+          "Vertices", &[Data::F64Arr(_)] => |c: usize| {
+              let child = &self.kvs[c];
+              // TODO or this can be f32?
+              let v_arr: &[f64] = child.values[0].as_f64_arr().unwrap();
+              let v = v_arr
+                  .iter()
+                  .array_chunks::<3>()
+                  .map(|[a, b, c]| [*a as F, *b as F, *c as F]);
+              out.v.extend(v);
+          },
+          "GeometryVersion", &[Data::I32(_)] => |c| match_children!(self, c),
+          "PolygonVertexIndex", &[Data::I32Arr(_)] => |c: usize| {
+              let child = &self.kvs[c];
+              let mut curr_face = FaceKind::empty();
+              let idxs = child.values[0].as_i32_arr().unwrap();
+              for &vi in idxs {
+                  if vi >= 0 {
+                      curr_face.insert(vi as usize);
+                  } else {
+                      curr_face.insert(-(vi + 1) as usize);
+                      let f = std::mem::replace(&mut curr_face, FaceKind::empty());
+                      out.f.push(f);
+                  }
+              }
+          },
+          "Edges", &[Data::I32Arr(_)] => |c| { /* No idea what to do here */ },
+          "LayerElementNormal", &[Data::I32(_/*index of normal*/)] => |c| match_children!(
+              self, c,
+              "Version", &[Data::I32(_)] => |_| {},
+              "Name", &[Data::String(_)] => |_| {},
+              "MappingInformationType", &[Data::String(_)] => |c: usize| {
+                  let gc = &self.kvs[c];
+                  assert_eq!(&gc.values, &[Data::str("ByPolygonVertex")]);
+              },
+              "ReferenceInformationType", &[Data::String(_)] => |c: usize| {},
+              "Normals", &[Data::F64Arr(_)] => |c: usize| {
+                  let gc = &self.kvs[c];
+                  let Data::F64Arr(ref arr) = &gc.values[0] else {
+                    todo!();
+                  };
+                  out.n
+                      .extend(arr.array_chunks::<3>().map(|n| n.map(|v| v as F)));
+              },
+              "NormalsIndex", &[Data::I32Arr(_)] => |c: usize| {
+                  let gc = &self.kvs[c];
+                  let Data::I32Arr(ref arr) = &gc.values[0] else {
+                      todo!("Did not get I32Arr, got {:?}", gc.values);
+                  };
+                  let idxs = arr
+                      .iter()
+                      .copied()
+                      .inspect(|&idx| assert!(idx >= 0))
+                      .map(|v| v as usize);
+                  out.vert_norm_idx.extend(idxs);
+              },
+              "NormalsW", &[Data::F64Arr(_)] => |c| { /*wtf is this*/ },
+          ),
+          "LayerElementUV", &[Data::I32(_/*idx of uv*/)] => |c| {
+              for &cc in &self.children[&c] {
+                  let gc = &self.kvs[cc];
+                  match gc.key.as_str() {
+                      "Version" => {}
+                      "Name" => {}
+                      "MappingInformationType" => {
+                          assert_eq!(&gc.values, &[Data::str("ByPolygonVertex")]);
+                      }
+                      "ReferenceInformationType" => {
+                          assert_eq!(&gc.values, &[Data::str("IndexToDirect")]);
+                      }
+                      "UV" => {
+                          let Data::F64Arr(ref arr) = &gc.values[0] else {
+                              todo!("exp F64Arr, got {:?}", gc.values);
+                          };
+                          out.uv
+                              .extend(arr.array_chunks::<2>().map(|uv| uv.map(|v| v as F)));
+                      }
+                      "UVIndex" => {
+                          assert_eq!(gc.values.len(), 1);
+                          let Data::I32Arr(ref arr) = &gc.values[0] else {
+                              todo!("Did not get I32Arr, got {:?}", gc.values);
+                          };
+                          let idxs = arr
+                              .iter()
+                              .copied()
+                              .inspect(|&idx| assert!(idx >= 0))
+                              .map(|v| v as usize);
+                          out.uv_idx.extend(idxs);
+                      }
+                      x => todo!("{x:?}"),
+                  }
+              }
+          },
+          "LayerElementMaterial", &[Data::I32(_/*idx of mat*/)] => |c| {
+              let mut mapping_kind = MappingKind::Uniform;
+              for &cc in &self.children[&c] {
+                  let gc = &self.kvs[cc];
+                  match gc.key.as_str() {
+                      "Version" => {}
+                      "Name" => {}
+                      "MappingInformationType" => {
+                          assert_eq!(gc.values.len(), 1);
+                          mapping_kind = match gc.values[0].as_str().unwrap() {
+                              "AllSame" => MappingKind::Uniform,
+                              "ByPolygon" => MappingKind::PerPolygon,
+                              x => todo!("Unknown mapping kind {x:?}"),
+                          };
+                      }
+                      "ReferenceInformationType" => {}
+                      "Materials" => {
+                          assert_eq!(gc.values.len(), 1);
+                          match &gc.values[0] {
+                              &Data::I32(i) => {
+                                  assert!(i >= 0);
+                                  assert_eq!(mapping_kind, MappingKind::Uniform);
+                                  out.global_mat = Some(i as usize);
+                              }
+                              Data::I32Arr(ref arr) => {
+                                  assert!(!arr.is_empty());
+                                  assert!(arr.iter().all(|&v| v >= 0));
+                                  if arr.len() == 1 {
+                                      out.global_mat = Some(arr[0] as usize);
+                                      continue;
+                                  }
+                                  assert_eq!(mapping_kind, MappingKind::PerPolygon);
+                                  let mat_idxs = arr.iter().map(|&i| i as usize);
+                                  out.per_face_mat.extend(mat_idxs);
+                              }
+                              x => todo!("{x:?}"),
+                          }
+                      }
+                      x => todo!("{x:?}"),
+                  }
+              }
+          },
+          "LayerElementColor", &[] => |c| {
+              for &cc in &self.children[&c] {
+                  for &cc in &self.children[&c] {
+                      let gc = &self.kvs[cc];
+                      match gc.key.as_str() {
+                          "Version" => {}
+                          "Name" => {}
+                          "MappingInformationType" => {
+                              assert_eq!(&gc.values, &[Data::str("ByPolygonVertex")]);
+                          }
+                          "ReferenceInformationType" => {}
+                          "Colors" => {
+                              assert_eq!(gc.values.len(), 1);
+                              let Some(v) = gc.values[0].as_f64_arr() else {
+                                  todo!();
+                              };
+                              let vc = v.array_chunks::<3>().map(|v| v.map(|v| v as F));
+                              out.vertex_colors.extend(vc);
+                          }
+                          "ColorIndex" => {
+                              assert_eq!(gc.values.len(), 1);
+                              let Data::I32Arr(ref arr) = &gc.values[0] else {
+                                  todo!("Did not get I32Arr, got {:?}", gc.values);
+                              };
+                              let idxs = arr
+                                  .iter()
+                                  .copied()
+                                  .inspect(|&idx| assert!(idx >= 0))
+                                  .map(|v| v as usize);
+                              out.vertex_color_idx.extend(idxs);
+                          }
+                          x => todo!("{x:?}"),
+                      }
+                  }
+              }
+          },
+          "Layer", &[Data::I32(0)] => |c| match_children!(
+            self, c,
+            "Version", &[Data::I32(_)] => |_| {},
+            "Name", &[Data::String(_)] => |c: usize| {
+              out.name = self.kvs[c].values[0].as_str().unwrap().to_string();
+            },
+            "MappingInformationType", &[Data::String(_)] => |_| {},
+            "ReferenceInformationType", &[Data::String(_)] => |_| {},
+            "LayerElement", &[] => |_| {},
+          ),
+          // omit for now
+          "LayerElementSmoothing", &[] => |_| {},
+          "LayerElementVisibility", &[] => |_| {},
+        );
         out
     }
 
