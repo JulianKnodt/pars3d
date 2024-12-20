@@ -203,21 +203,11 @@ impl FBXMesh {
         ];
         let mesh_kv = push_kv!(kvs, KV::new("Geometry", &vals, Some(parent)));
 
-        push_kv!(
-            kvs,
-            KV::new("GeometryVersion", &[Data::I32(101)], Some(mesh_kv))
-        );
-
         let vert_vals = self
             .v
             .iter()
             .flat_map(|v| v.iter().map(|&v| v as f64))
             .collect::<Vec<f64>>();
-
-        push_kv!(
-            kvs,
-            KV::new("Vertices", &[Data::F64Arr(vert_vals)], Some(mesh_kv))
-        );
 
         let faces = self
             .f
@@ -231,9 +221,17 @@ impl FBXMesh {
             })
             .collect::<Vec<i32>>();
 
-        push_kv!(
+        add_kvs!(
             kvs,
-            KV::new("PolygonVertexIndex", &[Data::I32Arr(faces)], Some(mesh_kv))
+            mesh_kv,
+            "Properties70",
+            &[],
+            "GeometryVersion",
+            &[Data::I32(101)],
+            "Vertices",
+            &[Data::F64Arr(vert_vals)],
+            "PolygonVertexIndex",
+            &[Data::I32Arr(faces)],
         );
 
         // TODO export UV and normals
@@ -248,7 +246,20 @@ impl FBXNode {
             Data::str("Mesh"),
         ];
 
-        let _node_kv = push_kv!(kvs, KV::new("Model", &vals, Some(parent)));
+        let node_kv = push_kv!(kvs, KV::new("Model", &vals, Some(parent)));
+        add_kvs!(
+            kvs,
+            node_kv,
+            "Version",
+            &[Data::I32(101)],
+            "Properties70",
+            &[], /* children properties */
+
+                 /* MultiTake */
+                 /* Culling */
+                 /* MultiLayer */
+                 /* Shading */
+        );
     }
 }
 
