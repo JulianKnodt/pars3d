@@ -65,10 +65,12 @@ pub struct FBXSettings {
     front_axis_sign: i32,
     coord_axis: i32,
     coord_axis_sign: i32,
+    // no idea wtf these next two are
     og_up_axis: i32,
     og_up_axis_sign: i32,
 
     unit_scale_factor: f64,
+    // no idea wtf this is
     og_unit_scale_factor: f64,
 }
 

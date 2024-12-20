@@ -1,5 +1,5 @@
-use super::{id, FBXMesh, FBXNode, FBXScene};
-use crate::mesh::{Mesh, Node, Scene};
+use super::{id, FBXMesh, FBXNode, FBXScene, FBXSettings};
+use crate::mesh::{Axis, Mesh, Node, Scene, Settings};
 use crate::F;
 
 use std::collections::{btree_map::Entry, BTreeMap};
@@ -22,6 +22,58 @@ fn to_idx_vecs<const N: usize>(vals: &[[F; N]]) -> (Vec<[F; N]>, Vec<usize>) {
 
     assert_eq!(idxs.len(), vals.len());
     (uniq_vals, idxs)
+}
+
+impl From<FBXSettings> for Settings {
+    fn from(fbx_settings: FBXSettings) -> Settings {
+        use Axis::*;
+        let int_to_axis = |i, sign| match (i, sign) {
+            (0, 1) => PosX,
+            (1, 1) => PosY,
+            (2, 1) => PosZ,
+            (0, -1) => NegX,
+            (1, -1) => NegY,
+            (2, -1) => NegZ,
+            _ => todo!("Unknown axis {i} or sign {sign}"),
+        };
+        Settings {
+            up_axis: int_to_axis(fbx_settings.up_axis, fbx_settings.up_axis_sign),
+            fwd_axis: int_to_axis(fbx_settings.front_axis, fbx_settings.front_axis_sign),
+            tan_axis: int_to_axis(fbx_settings.coord_axis, fbx_settings.coord_axis_sign),
+            scale: fbx_settings.unit_scale_factor as F,
+        }
+    }
+}
+
+impl From<Settings> for FBXSettings {
+    fn from(settings: Settings) -> FBXSettings {
+        use Axis::*;
+        let axis_to_int = |axis| match axis {
+            PosX | NegX => 0,
+            PosY | NegY => 1,
+            PosZ | NegZ => 2,
+        };
+        let axis_to_sign = |axis| match axis {
+            PosX | PosY | PosZ => 1,
+            NegX | NegY | NegZ => -1,
+        };
+        FBXSettings {
+            up_axis: axis_to_int(settings.up_axis),
+            up_axis_sign: axis_to_sign(settings.up_axis),
+
+            front_axis: axis_to_int(settings.fwd_axis),
+            front_axis_sign: axis_to_sign(settings.fwd_axis),
+
+            coord_axis: axis_to_int(settings.tan_axis),
+            coord_axis_sign: axis_to_sign(settings.tan_axis),
+
+            og_up_axis: axis_to_int(settings.up_axis),
+            og_up_axis_sign: axis_to_sign(settings.up_axis),
+
+            unit_scale_factor: settings.scale as f64,
+            og_unit_scale_factor: settings.scale as f64,
+        }
+    }
 }
 
 impl From<FBXMesh> for Mesh {
@@ -154,6 +206,7 @@ impl From<FBXScene> for Scene {
         out.nodes
             .extend(fbx_scene.nodes.into_iter().map(Into::into));
         out.root_nodes.extend_from_slice(&fbx_scene.root_nodes);
+        out.settings = fbx_scene.global_settings.into();
         out
     }
 }
@@ -164,6 +217,7 @@ impl From<Scene> for FBXScene {
         out.meshes.extend(scene.meshes.into_iter().map(Into::into));
         out.nodes.extend(scene.nodes.into_iter().map(Into::into));
         out.root_nodes.extend_from_slice(&scene.root_nodes);
+        out.global_settings = scene.settings.into();
         out
     }
 }

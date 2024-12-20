@@ -57,4 +57,7 @@ makes it more clear what can be exported. This is also because it is much easier
 importer and exporter for a single file format. This was inspired by intermediate
 representations (IRs) in compilers which allow for performing certain tasks more easily.
 
+The one downside is that now there is more code to maintain. I believe this trade-off is worth it
+though.
+
 ![VRML](https://web.archive.org/web/20000929035521/http://www.geocities.com:80/SiliconValley/4944/VRML.gif)

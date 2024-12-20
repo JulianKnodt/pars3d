@@ -8,6 +8,35 @@ use std::ops::Range;
 
 const MAX_UV: usize = 4;
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Axis {
+    PosX,
+    PosY,
+    PosZ,
+    NegX,
+    NegY,
+    NegZ,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Settings {
+    pub up_axis: Axis,
+    pub fwd_axis: Axis,
+    pub tan_axis: Axis,
+    pub scale: F,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Settings {
+            up_axis: Axis::PosY,
+            fwd_axis: Axis::NegZ,
+            tan_axis: Axis::PosX,
+            scale: 1.,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextureKind {
     Diffuse,
@@ -98,6 +127,8 @@ pub struct Scene {
     /// Path to the input file
     /// Needed for saving output later
     pub(crate) input_file: String,
+
+    pub settings: Settings,
 }
 
 impl Scene {
