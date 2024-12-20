@@ -88,6 +88,20 @@ impl FBXScene {
             push_kv!(kvs, KV::new("C", vals, Some(conn_idx)));
         }
 
+        // also add connections from nodes to their mesh
+        for node in &self.nodes {
+            let Some(mi) = node.mesh else {
+                continue;
+            };
+
+            let vals = &[
+                Data::str("OO"),
+                Data::I64(self.meshes[mi].id as i64),
+                Data::I64(node.id as i64),
+            ];
+            push_kv!(kvs, KV::new("C", vals, Some(conn_idx)));
+        }
+
         let obj_kv = push_kv!(kvs, KV::new("Objects", &[], None));
 
         for mesh in &self.meshes {
@@ -184,7 +198,7 @@ impl FBXMesh {
     fn to_kvs(&self, parent: usize, kvs: &mut Vec<KV>) {
         let vals = [
             Data::I64(self.id as i64),
-            Data::str("\x00\x01Geometry"),
+            Data::String(format!("{}\x00\x01Geometry", self.name)),
             Data::str("Mesh"),
         ];
         let mesh_kv = push_kv!(kvs, KV::new("Geometry", &vals, Some(parent)));

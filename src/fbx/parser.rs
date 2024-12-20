@@ -271,9 +271,8 @@ impl KVs {
           kvi,
           "Properties70", &[] => |c| match_children!(self, c),
           "Vertices", &[Data::F64Arr(_)] => |c: usize| {
-              let child = &self.kvs[c];
-              // TODO or this can be f32?
-              let v_arr: &[f64] = child.values[0].as_f64_arr().unwrap();
+              // TODO can this be f32 arr?
+              let v_arr: &[f64] = self.kvs[c].values[0].as_f64_arr().unwrap();
               let v = v_arr
                   .iter()
                   .array_chunks::<3>()
@@ -282,9 +281,8 @@ impl KVs {
           },
           "GeometryVersion", &[Data::I32(_)] => |c| match_children!(self, c),
           "PolygonVertexIndex", &[Data::I32Arr(_)] => |c: usize| {
-              let child = &self.kvs[c];
               let mut curr_face = FaceKind::empty();
-              let idxs = child.values[0].as_i32_arr().unwrap();
+              let idxs = self.kvs[c].values[0].as_i32_arr().unwrap();
               for &vi in idxs {
                   if vi >= 0 {
                       curr_face.insert(vi as usize);
@@ -422,9 +420,7 @@ impl KVs {
           "Layer", &[Data::I32(0)] => |c| match_children!(
             self, c,
             "Version", &[Data::I32(_)] => |_| {},
-            "Name", &[Data::String(_)] => |c: usize| {
-              out.name = self.kvs[c].values[0].as_str().unwrap().to_string();
-            },
+            "Name", &[Data::String(_)] => |c| {},
             "MappingInformationType", &[Data::String(_)] => |_| {},
             "ReferenceInformationType", &[Data::String(_)] => |_| {},
             "LayerElement", &[] => |_| {},
@@ -462,7 +458,10 @@ impl KVs {
                 [oo, dst, src] if oo == &Data::str("OO") => {
                     let src = src.as_int().unwrap();
                     let dst = dst.as_int().unwrap();
-                    println!("{src} {dst}");
+                    println!(
+                        "{src} {dst} {:?} {:?}",
+                        self.kvs[id_to_kv[&src]].values, self.kvs[id_to_kv[&dst]].values
+                    );
                     connections.push((src, dst));
                 }
                 [op, dst, src, name] if op == &Data::str("OP") => {
@@ -503,7 +502,8 @@ impl KVs {
                 },
                 "Geometry" => match classtag {
                     "Mesh" => {
-                        let fbx_mesh = self.parse_mesh(id, id_to_kv[&id]);
+                        let mut fbx_mesh = self.parse_mesh(id, id_to_kv[&id]);
+                        fbx_mesh.name = String::from(name);
                         fbx_scene.meshes.push(fbx_mesh);
                     }
                     _ => todo!("Geometry::{classtag} not handled"),
@@ -512,11 +512,8 @@ impl KVs {
                 "Model" => match classtag {
                     "Mesh" => {
                         let kv = &self.kvs[id_to_kv[&id]];
-                        let Data::String(ref name) = kv.values[1] else {
-                            todo!();
-                        };
                         let mut node = self.parse_node(id, id_to_kv[&id]);
-                        node.name.clone_from(name);
+                        node.name = String::from(name);
                         let parents = connections.iter().filter(|&&(_src, dst)| dst == id);
                         let mut num_parents = 0;
                         let new_idx = fbx_scene.nodes.len();
