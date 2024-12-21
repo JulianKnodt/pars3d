@@ -39,10 +39,15 @@ pub fn rel_path_btwn(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result
 /// File formats supported.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FileFormat {
+    // Primary support
     GLB,
     FBX,
     OBJ,
+
+    // Secondary Support
     PLY,
+    STL,
+
     Unknown,
 }
 
@@ -60,6 +65,7 @@ pub fn extension_to_format(s: impl AsRef<Path>) -> FileFormat {
         "fbx" => FileFormat::FBX,
         "obj" => FileFormat::OBJ,
         "ply" => FileFormat::PLY,
+        "stl" => FileFormat::STL,
         _ => FileFormat::Unknown,
     }
 }

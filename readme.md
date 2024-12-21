@@ -10,18 +10,20 @@ Currently supports the following formats:
 - .obj
 - .glb (with `feature = "gltf"`, binary only)
 - .fbx (experimental export, binary only)
-- .ply
 
 
 ##### Secondary Support
-- .off
 - .stl
+- .ply
+
+##### Tertiary Support
+- .off
 
 | |obj|glb|fbx|off|stl|ply|
 |-|  -|  -|  -|  -|  -|  -|
 |import|Y|Y|Y|Y|Y|Y|
-|export|Y|Y|In progress|Y|N|Y|
-|Unified Repr|Y|Y|Y|N|N|Y|
+|export|Y|Y|In progress|Y|Y|Y|
+|Unified Repr|Y|Y|Y|N|Y|Y|
 
 Unified Repr indicates that there is a single struct which can be used to interchange between
 each format. That is the main difference between primary and secondary support. Each secondary

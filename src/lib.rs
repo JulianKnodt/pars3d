@@ -10,6 +10,16 @@
 #![feature(ascii_char_variants)]
 #![feature(assert_matches)]
 
+#[cfg(not(feature = "f64"))]
+pub type U = u32;
+#[cfg(not(feature = "f64"))]
+pub type I = i32;
+
+#[cfg(feature = "f64")]
+pub type U = u64;
+#[cfg(feature = "f64")]
+pub type I = i64;
+
 use std::path::Path;
 
 #[cfg(not(feature = "f64"))]
@@ -73,8 +83,8 @@ pub fn load(v: impl AsRef<Path>) -> std::io::Result<mesh::Scene> {
         OBJ => obj::parse(v, false, false)?.into(),
         FBX => fbx::parser::load(v)?.into(),
         GLB => gltf::load(v).map_err(std::io::Error::other)?.into(),
-        PLY => mesh::Mesh::from(ply::Ply::read_from_file(v).map_err(std::io::Error::other)?)
-            .into_scene(),
+        PLY => mesh::Mesh::from(ply::Ply::read_from_file(v)?).into_scene(),
+        STL => mesh::Mesh::from(stl::read_from_file(v)?).into_scene(),
         Unknown => return Err(std::io::Error::other("Don't know how to load")),
     };
     Ok(scene)
@@ -106,6 +116,12 @@ pub fn save(v: impl AsRef<Path>, scene: &mesh::Scene) -> std::io::Result<()> {
             let buf = std::io::BufWriter::new(f);
             let p: ply::Ply = scene.into_flattened_mesh().into();
             p.write(buf)
+        }
+        STL => {
+            let f = std::fs::File::create(v)?;
+            let buf = std::io::BufWriter::new(f);
+            let s: stl::STL = scene.into_flattened_mesh().into();
+            stl::write(&s, buf)
         }
         Unknown => Err(std::io::Error::other("Don't know how to save")),
     }

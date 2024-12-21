@@ -2,15 +2,7 @@ use super::{Vec3, F};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
-#[cfg(not(feature = "f64"))]
-pub type U = u32;
-#[cfg(not(feature = "f64"))]
-pub type I = i32;
-
-#[cfg(feature = "f64")]
-pub type U = u64;
-#[cfg(feature = "f64")]
-pub type I = i64;
+use super::{I, U};
 
 /// Returns mapping between original vertex coordinate and new vertex coordinate
 pub fn fuse_vertices(vertices: &[Vec3], dist: F) -> Vec<usize> {
