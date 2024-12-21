@@ -5,7 +5,8 @@ use std::array::from_fn;
 use std::collections::HashMap;
 use std::ops::Range;
 
-const MAX_UV: usize = 4;
+/// Max number of supported UV channels
+pub const MAX_UV: usize = 4;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Axis {

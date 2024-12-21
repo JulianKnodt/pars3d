@@ -716,12 +716,12 @@ impl KVs {
                   "UnitScaleFactor" => assign!(settings.unit_scale_factor, as_f64),
                   "OriginalUnitScaleFactor" => assign!(settings.og_unit_scale_factor, as_f64),
                   // ignored
-                  "AmbientColor" => return,
-                  "DefaultCamera" => return,
-                  "TimeMode" => return,
-                  "TimeSpanStart" => return,
-                  "TimeSpanStop" => return,
-                  "CustomFrameRate" => return,
+                  "AmbientColor" => {},
+                  "DefaultCamera" => {},
+                  "TimeMode" => {},
+                  "TimeSpanStart" => {},
+                  "TimeSpanStop" => {},
+                  "CustomFrameRate" => {},
                   x => todo!("Unhandled Properties70 P {x:?}")
                 };
 

@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use std::io;
 
-#[inline]
+/// Computes the relative path from src to dst.
 pub fn rel_path_btwn(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result<PathBuf> {
     let src: &Path = src.as_ref();
     let dst: &Path = dst.as_ref();
@@ -36,6 +36,7 @@ pub fn rel_path_btwn(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result
     Ok(backs)
 }
 
+/// File formats supported.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FileFormat {
     GLB,
@@ -44,6 +45,7 @@ pub enum FileFormat {
     Unknown,
 }
 
+/// Given something that looks like a path parse it into a FileFormat.
 pub fn extension_to_format(s: impl AsRef<Path>) -> FileFormat {
     let s = s.as_ref();
     let Some(e) = s.extension() else {

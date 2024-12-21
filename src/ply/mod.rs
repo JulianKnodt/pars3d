@@ -1,6 +1,7 @@
+use super::{FaceKind, F};
 use std::io::{BufRead, BufReader, Error, ErrorKind, Read, Write};
 
-use super::{FaceKind, F};
+pub mod to_mesh;
 
 /// A PLY mesh
 #[derive(Debug, Clone, PartialEq)]

@@ -46,6 +46,9 @@ impl OutputProperty {
             OutputProperty::MorphTargetWeight(t) => t.len(),
         }
     }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
