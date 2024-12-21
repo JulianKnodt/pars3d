@@ -301,7 +301,12 @@ impl KVs {
               "MappingInformationType", &[Data::String(_)] => |c: usize| {
                   assert_eq!(&self.kvs[c].values[0], &Data::str("ByPolygonVertex"));
               },
-              "ReferenceInformationType", &[Data::String(_)] => |c: usize| {},
+              "ReferenceInformationType", &[Data::String(_)] => |c: usize| {
+                  assert_matches!(
+                    self.kvs[c].values[0].as_str().unwrap(),
+                    "Direct" | "IndexToDirect"
+                  );
+              },
               "Normals", &[Data::F64Arr(_)] => |c: usize| {
                   let gc = &self.kvs[c];
                   let Data::F64Arr(ref arr) = &gc.values[0] else {
@@ -583,7 +588,7 @@ impl KVs {
                 "Type", &[Data::String(_)] => |v| {},
                 "Version", &[Data::I32(_)] => |v| {},
                 "MetaData", &[] => |v| {},
-                "Properties70", &[] => |v| {},
+                "Properties70", &[] => |v| { /* match_children!(self, v) */ },
               );
             },
         );

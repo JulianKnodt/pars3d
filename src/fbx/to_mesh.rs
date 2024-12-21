@@ -5,10 +5,11 @@ use crate::F;
 use std::collections::{btree_map::Entry, BTreeMap};
 
 /// Converts per vertex values to unique values and idxs into it.
-fn to_idx_vecs<const N: usize>(vals: &[[F; N]]) -> (Vec<[F; N]>, Vec<usize>) {
+fn to_idx_vecs<const N: usize>(vals: &[[F; N]]) -> (Vec<[F; N]>, Vec<usize>, bool) {
     let mut uniq = BTreeMap::new();
     let mut uniq_vals = vec![];
     let mut idxs = vec![];
+    let mut any_repeats = false;
     for &val in vals {
         match uniq.entry(val.map(|v| v.to_bits())) {
             Entry::Vacant(v) => {
@@ -16,12 +17,15 @@ fn to_idx_vecs<const N: usize>(vals: &[[F; N]]) -> (Vec<[F; N]>, Vec<usize>) {
                 idxs.push(uniq_vals.len());
                 uniq_vals.push(val);
             }
-            Entry::Occupied(o) => idxs.push(*o.get()),
+            Entry::Occupied(o) => {
+                any_repeats = true;
+                idxs.push(*o.get())
+            }
         }
     }
 
     assert_eq!(idxs.len(), vals.len());
-    (uniq_vals, idxs)
+    (uniq_vals, idxs, any_repeats)
 }
 
 impl From<FBXSettings> for Settings {
@@ -94,10 +98,14 @@ impl From<FBXMesh> for Mesh {
             vertex_color_idx: _,
         } = fbx_mesh;
 
-        let n = vert_norm_idx
-            .into_iter()
-            .map(|ni| n[ni])
-            .collect::<Vec<_>>();
+        let n = if vert_norm_idx.is_empty() {
+            n
+        } else {
+            vert_norm_idx
+                .into_iter()
+                .map(|ni| n[ni])
+                .collect::<Vec<_>>()
+        };
         let uv0 = uv_idx.into_iter().map(|uvi| uv[uvi]).collect::<Vec<_>>();
         let uv = [uv0, vec![], vec![], vec![]];
         Mesh {
@@ -136,8 +144,9 @@ impl From<Mesh> for FBXMesh {
             joint_weights: _,
         } = mesh;
 
-        let (n, vert_norm_idx) = to_idx_vecs(&n);
-        let (uv, uv_idx) = to_idx_vecs(&uv[0]);
+        let (n, vert_norm_idx, _any_n_repeats) = to_idx_vecs(&n);
+        // FIXME? can change the output format if there are no repeats
+        let (uv, uv_idx, _) = to_idx_vecs(&uv[0]);
 
         FBXMesh {
             id: id(),

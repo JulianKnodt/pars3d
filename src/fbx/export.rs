@@ -203,10 +203,12 @@ impl FBXMesh {
         ];
         let mesh_kv = push_kv!(kvs, KV::new("Geometry", &vals, Some(parent)));
 
+        let to_f64 = |&v| v as f64;
+        let to_i32 = |&v| v as i32;
         let vert_vals = self
             .v
             .iter()
-            .flat_map(|v| v.iter().map(|&v| v as f64))
+            .flat_map(|v| v.iter().map(to_f64))
             .collect::<Vec<f64>>();
 
         let faces = self
@@ -215,9 +217,7 @@ impl FBXMesh {
             .flat_map(|f| {
                 let (&last, rest) = f.as_slice().split_last().unwrap();
                 let last = last as i32;
-                rest.iter()
-                    .map(|&v| v as i32)
-                    .chain(std::iter::once(-last - 1))
+                rest.iter().map(to_i32).chain(std::iter::once(-last - 1))
             })
             .collect::<Vec<i32>>();
 
@@ -226,12 +226,41 @@ impl FBXMesh {
             mesh_kv,
             "Properties70",
             &[],
-            "GeometryVersion",
-            &[Data::I32(101)],
-            "Vertices",
-            &[Data::F64Arr(vert_vals)],
-            "PolygonVertexIndex",
-            &[Data::I32Arr(faces)],
+            "GeometryVersion", &[Data::I32(101)],
+            "Vertices", &[Data::F64Arr(vert_vals)],
+            "PolygonVertexIndex", &[Data::I32Arr(faces)],
+
+            "LayerElementNormal", &[Data::I32(0)] => |c| add_kvs!(
+              kvs, c,
+              "Version", &[Data::I32(101)],
+              "Name", &[Data::str("Normal1")],
+              "MappingInformationType", &[Data::str("ByPolygonVertex")],
+              "ReferenceInformationType", &[Data::str(if self.vert_norm_idx.is_empty() {
+                "Direct"
+              } else {
+                "IndexToDirect"
+              })],
+              "Normals", &[Data::F64Arr(
+                self.n.iter().flat_map(|v| v.iter().map(to_f64)).collect::<Vec<f64>>()
+              )],
+              "NormalsIndex", &[Data::I32Arr(
+                self.vert_norm_idx.iter().map(to_i32).collect::<Vec<i32>>()
+              )],
+            ),
+
+            "LayerElementUV", &[Data::I32(0)] => |c| add_kvs!(
+              kvs, c,
+              "Version", &[Data::I32(101)],
+              "Name", &[Data::str("UV0")],
+              "MappingInformationType", &[Data::str("ByPolygonVertex")],
+              "ReferenceInformationType", &[Data::str("IndexToDirect")],
+              "UV", &[Data::F64Arr(
+                self.uv.iter().flat_map(|uv| uv.iter().map(to_f64)).collect::<Vec<f64>>()
+              )],
+              "UVIndex", &[Data::I32Arr(
+                self.uv_idx.iter().map(to_i32).collect::<Vec<i32>>()
+              )],
+            ),
         );
 
         // TODO export UV and normals
