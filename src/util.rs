@@ -42,6 +42,7 @@ pub enum FileFormat {
     GLB,
     FBX,
     OBJ,
+    PLY,
     Unknown,
 }
 
@@ -58,6 +59,7 @@ pub fn extension_to_format(s: impl AsRef<Path>) -> FileFormat {
         "glb" => FileFormat::GLB,
         "fbx" => FileFormat::FBX,
         "obj" => FileFormat::OBJ,
+        "ply" => FileFormat::PLY,
         _ => FileFormat::Unknown,
     }
 }

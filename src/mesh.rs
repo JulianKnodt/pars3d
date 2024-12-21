@@ -292,6 +292,19 @@ impl Mesh {
             }
         }
     }
+
+    /// Converts a single mesh into a scene
+    pub fn into_scene(self) -> Scene {
+        assert!(
+            self.face_mesh_idx.is_empty(),
+            "Use repopulate scene instead"
+        );
+        Scene {
+            meshes: vec![self],
+            ..Default::default()
+        }
+    }
+
     /// Returns an iterator over (edge, face) pairs in this mesh.
     /// Each edge will be visited multiple times, equaling the number of its adjacent faces.
     pub fn edges(&self) -> impl Iterator<Item = ([usize; 2], usize)> + '_ {

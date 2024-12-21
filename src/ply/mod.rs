@@ -1,5 +1,7 @@
 use super::{FaceKind, F};
-use std::io::{BufRead, BufReader, Error, ErrorKind, Read, Write};
+use std::fs::File;
+use std::io::{self, BufRead, BufReader, Error, ErrorKind, Read, Write};
+use std::path::Path;
 
 pub mod to_mesh;
 
@@ -50,10 +52,14 @@ impl Ply {
         Self { v, vc, f }
     }
 
-    pub fn read(r: impl Read) -> std::io::Result<Self> {
+    pub fn read_from_file(p: impl AsRef<Path>) -> io::Result<Self> {
+        Self::read(File::open(p)?)
+    }
+
+    pub fn read(r: impl Read) -> io::Result<Self> {
         Self::buf_read(BufReader::new(r))
     }
-    pub fn buf_read(r: impl BufRead) -> std::io::Result<Self> {
+    pub fn buf_read(r: impl BufRead) -> io::Result<Self> {
         let mut state = ReadExpect::Header;
         let mut prop_set = vec![];
         let mut fields = vec![];
