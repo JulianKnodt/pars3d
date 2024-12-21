@@ -127,6 +127,9 @@ pub fn save(v: impl AsRef<Path>, scene: &mesh::Scene) -> std::io::Result<()> {
     }
 }
 
+/// Face representation for meshes.
+/// Tris and quads are stack allocated,
+/// If you're a madman and store general polygons they're on the heap.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum FaceKind {
     Tri([usize; 3]),
@@ -144,7 +147,7 @@ impl FaceKind {
         }
     }
     pub fn num_tris(&self) -> usize {
-        self.as_slice().len() - 2
+        self.as_slice().len().saturating_sub(2)
     }
     pub fn as_mut_slice(&mut self) -> &mut [usize] {
         use FaceKind::*;
@@ -154,6 +157,7 @@ impl FaceKind {
             Poly(v) => v.as_mut_slice(),
         }
     }
+    /// Number of vertices in this face.
     pub fn len(&self) -> usize {
         use FaceKind::*;
         match self {
@@ -162,6 +166,7 @@ impl FaceKind {
             Poly(v) => v.len(),
         }
     }
+    /// For a quad, returns the edge opposite to the provided edge.
     pub fn quad_opp_edge(&self, e0: usize, e1: usize) -> Option<[usize; 2]> {
         match self {
             &Self::Quad([a, b, c, d] | [d, a, b, c] | [c, d, a, b] | [b, c, d, a])
@@ -172,6 +177,7 @@ impl FaceKind {
             _ => None,
         }
     }
+    /// `true` if there are any vertices in this face.
     pub fn is_empty(&self) -> bool {
         use FaceKind::*;
         match self {
@@ -185,6 +191,7 @@ impl FaceKind {
         let (&v0, rest) = self.as_slice().split_first().unwrap();
         rest.array_windows::<2>().map(move |&[v1, v2]| [v0, v1, v2])
     }
+    /// Remaps each vertex in this face.
     pub fn map(&mut self, mut f: impl FnMut(usize) -> usize) {
         for v in self.as_mut_slice() {
             *v = f(*v);
@@ -281,6 +288,8 @@ pub fn tform_point(tform: [[F; 4]; 4], p: [F; 3]) -> [F; 3] {
     assert_ne!(out[3], 0., "{tform:?}*{p:?} = {out:?}");
     std::array::from_fn(|i| out[i] / out[3])
 }
+
+/// Identity Matrix
 pub fn identity<const N: usize>() -> [[F; N]; N] {
     let mut out = [[0.; N]; N];
     for i in 0..N {
@@ -303,6 +312,7 @@ pub fn matmul<const N: usize>(ta: [[F; N]; N], tb: [[F; N]; N]) -> [[F; N]; N] {
     out
 }
 
+/// Normalizes a vector, returning a zero vector if it has 0 norm
 #[inline]
 pub fn normalize<const N: usize>(v: [F; N]) -> [F; N] {
     let sum: F = v.iter().map(|v| v * v).sum();

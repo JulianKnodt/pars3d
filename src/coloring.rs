@@ -1,6 +1,6 @@
 use super::{add, kmul, F};
 
-/// Converts a hue in [0,1] to RGB.
+/// Converts a hue in \[0,1\] to RGB.
 pub fn hue_to_rgb(v: F) -> [F; 3] {
     assert!(
         (0.0..=1.0).contains(&v),

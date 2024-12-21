@@ -28,7 +28,7 @@ pub enum QuadPreference {
 }
 
 /// Quadrangulate a set of vertices and faces.
-/// Epsilon is given in [0,1] for both.
+/// Epsilon is given in \[0,1\] for both.
 pub fn quadrangulate(
     vs: &[[F; 3]],
     faces: &[FaceKind],
