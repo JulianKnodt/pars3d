@@ -1,5 +1,5 @@
 use super::gltf::{GLTFMesh, GLTFNode, GLTFScene, GLTFSkin};
-use crate::mesh::{Mesh, Node, Scene, Skin};
+use crate::mesh::{Mesh, Node, Scene, Skin, Transform};
 
 use crate::FaceKind;
 
@@ -64,7 +64,7 @@ impl From<GLTFScene> for Scene {
             Node {
                 mesh,
                 children,
-                transform,
+                transform: Transform::Matrix(transform),
                 skin,
                 name,
             }

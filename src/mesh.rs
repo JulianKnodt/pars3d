@@ -70,11 +70,67 @@ pub struct Skin {
     pub name: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DecomposedTransform {
+    pub scale: [F; 3],
+    pub rotation: [F; 3],
+    pub translation: [F; 3],
+}
+
+impl Default for DecomposedTransform {
+    fn default() -> Self {
+        Self {
+            scale: [1.; 3],
+            rotation: [0.; 3],
+            translation: [0.; 3],
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Transform {
+    Decomposed(DecomposedTransform),
+    Matrix([[F; 4]; 4]),
+}
+
+impl Default for Transform {
+    fn default() -> Self {
+        Self::ident_mat()
+    }
+}
+
+impl Transform {
+    pub fn ident_mat() -> Self {
+        Transform::Matrix(super::identity::<4>())
+    }
+    /// Checks if this transform is the identity transformation
+    pub fn is_identity(&self) -> bool {
+        match self {
+          Transform::Matrix(m) => *m == super::identity::<4>(),
+          Transform::Decomposed(d) => *d == DecomposedTransform::default(),
+        }
+    }
+    pub fn to_mat(self) -> [[F; 4]; 4] {
+        match self {
+            Transform::Matrix(m) => m,
+            _ => todo!(),
+        }
+    }
+    pub fn to_decomposed(self) -> DecomposedTransform {
+        match self {
+            Transform::Decomposed(d) => d,
+            _ => todo!(),
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Node {
     pub mesh: Option<usize>,
     pub children: Vec<usize>,
-    pub transform: [[F; 4]; 4],
+
+    pub transform: Transform,
+
     pub skin: Option<usize>,
     pub name: String,
 }
@@ -453,7 +509,7 @@ impl From<Obj> for Scene {
             out.nodes.push(Node {
                 mesh: Some(i),
                 children: vec![],
-                transform: super::identity::<4>(),
+                transform: Transform::ident_mat(),
                 skin: None,
                 name: String::new(),
             });

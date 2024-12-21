@@ -802,12 +802,12 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
 
     let mut nodes = vec![];
     for (ni, n) in scene.nodes.iter().enumerate() {
-        let matrix = if n.transform == identity::<4>() {
+        let matrix = if n.transform.is_identity() {
             None
         } else {
             Some(unsafe {
                 std::mem::transmute::<[[f32; 4]; 4], [f32; 16]>(
-                    n.transform.map(|col| col.map(|v| v as f32)),
+                    n.transform.to_mat().map(|col| col.map(|v| v as f32)),
                 )
             })
         };

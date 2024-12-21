@@ -1,3 +1,4 @@
+use crate::mesh::DecomposedTransform;
 use crate::{FaceKind, F};
 use std::sync::atomic::AtomicUsize;
 
@@ -32,6 +33,8 @@ pub struct FBXNode {
     mesh: Option<usize>,
     children: Vec<usize>,
     name: String,
+
+    transform: DecomposedTransform,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]

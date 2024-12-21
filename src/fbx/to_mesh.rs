@@ -1,5 +1,5 @@
 use super::{id, FBXMesh, FBXNode, FBXScene, FBXSettings};
-use crate::mesh::{Axis, Mesh, Node, Scene, Settings};
+use crate::mesh::{Axis, Mesh, Node, Scene, Settings, Transform};
 use crate::F;
 
 use std::collections::{btree_map::Entry, BTreeMap};
@@ -175,6 +175,7 @@ impl From<FBXNode> for Node {
             mesh,
             children,
             name,
+            transform,
         } = fbx_node;
         Node {
             mesh,
@@ -182,7 +183,7 @@ impl From<FBXNode> for Node {
 
             name,
             skin: None,
-            transform: crate::identity(),
+            transform: Transform::Decomposed(transform),
         }
     }
 }
@@ -195,7 +196,7 @@ impl From<Node> for FBXNode {
 
             name,
             skin: _,
-            transform: _,
+            transform,
         } = node;
 
         FBXNode {
@@ -203,6 +204,7 @@ impl From<Node> for FBXNode {
             mesh,
             children,
             name,
+            transform: transform.to_decomposed(),
         }
     }
 }

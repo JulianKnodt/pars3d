@@ -245,8 +245,12 @@ impl KVs {
             ] => |v: usize| {
                 let vals = &self.kvs[v].values;
                 match vals[0].as_str().unwrap() {
-                  "Lcl Rotation" => {},
-                  "Lcl Scaling" => {},
+                  "Lcl Rotation" => {
+                    out.transform.rotation = [4,5,6].map(|i| *vals[i].as_f64().unwrap() as F);
+                  },
+                  "Lcl Scaling" => {
+                    out.transform.scale = [4,5,6].map(|i| *vals[i].as_f64().unwrap() as F);
+                  },
                   "DefaultAttributeIndex" => {},
                   "InheritType" => {},
                   x => todo!("{x:?}"),
@@ -402,7 +406,12 @@ impl KVs {
               "MappingInformationType", &[Data::String(_)] => |c: usize| {
                   assert_eq!(self.kvs[c].values[0], Data::str("ByPolygonVertex"));
               },
-              "ReferenceInformationType", &[Data::String(_)] => |_| {},
+              "ReferenceInformationType", &[Data::String(_)] => |_| {
+                  assert_matches!(
+                    self.kvs[c].values[0].as_str().unwrap(),
+                    "Direct" | "IndexToDirect"
+                  );
+              },
               "Colors", &[Data::F64Arr(_)] => |c: usize| {
                   let Some(v) = self.kvs[c].values[0].as_f64_arr() else {
                       todo!();
@@ -422,10 +431,10 @@ impl KVs {
                   out.vertex_color_idx.extend(idxs);
               },
           ),
-          "Layer", &[Data::I32(0)] => |c| match_children!(
+          "Layer", &[Data::I32(_)] => |c| match_children!(
             self, c,
             "Version", &[Data::I32(_)] => |_| {},
-            "Name", &[Data::String(_)] => |c| {},
+            "Name", &[Data::String(_)] => |c| { todo!() },
             "MappingInformationType", &[Data::String(_)] => |_| {},
             "ReferenceInformationType", &[Data::String(_)] => |_| {},
             "LayerElement", &[] => |_| {},
@@ -487,7 +496,6 @@ impl KVs {
             .flat_map(|o| &self.children[&o]);
         for &o in objects {
             let kv = &self.kvs[o];
-            assert_eq!(kv.values.len(), 3);
             let [id, name_objtype, classtag] = &kv.values[..] else {
                 todo!("{:?}", kv.values);
             };
@@ -575,22 +583,31 @@ impl KVs {
         }
 
         root_fields!(
-            self,
-            "FBXHeaderExtension", &[],
-            "FBXHeaderVersion", &[Data::I32(_)] => |v| {},
-            "FBXVersion", &[Data::I32(_)] => |v| {},
-            "EncryptionType", &[Data::I32(0)] => |v| {},
-            "CreationTimeStamp", &[] => |v| {},
-            "Creator", &[Data::String(_)] => |v| {},
-            "SceneInfo", &[Data::String(_), Data::String(_)] => |v: usize| {
-              match_children!(
+          self,
+          "FBXHeaderExtension", &[],
+          "FBXHeaderVersion", &[Data::I32(_)] => |v| {},
+          "FBXVersion", &[Data::I32(_)] => |v| {},
+          "EncryptionType", &[Data::I32(0)] => |v| {},
+          "CreationTimeStamp", &[] => |v| {},
+          "Creator", &[Data::String(_)] => |v| {},
+          "SceneInfo", &[Data::String(_), Data::String(_)] => |v: usize| {
+            match_children!(
+              self, v,
+              "Type", &[Data::String(_)] => |v| {},
+              "Version", &[Data::I32(_)] => |v| {},
+              "MetaData", &[] => |v| match_children!(
                 self, v,
-                "Type", &[Data::String(_)] => |v| {},
                 "Version", &[Data::I32(_)] => |v| {},
-                "MetaData", &[] => |v| {},
-                "Properties70", &[] => |v| { /* match_children!(self, v) */ },
-              );
-            },
+                "Title", &[Data::String(_)] => |v| {},
+                "Subject", &[Data::String(_)] => |v| {},
+                "Author", &[Data::String(_)] => |v| {},
+                "Keywords", &[Data::String(_)] => |v| {},
+                "Revision", &[Data::String(_)] => |v| {},
+                "Comment", &[Data::String(_)] => |v| {},
+              ),
+              "Properties70", &[] => |v| { /* match_children!(self, v) */ },
+            );
+          },
         );
 
         if let Some(file_id) = self.find_root("FileId") {
@@ -604,7 +621,6 @@ impl KVs {
         }
 
         root_fields!(self, "CreationTime", &[Data::String(_)]);
-
         root_fields!(self, "Creator", &[Data::String(_)]);
 
         let settings = &mut fbx_scene.global_settings;
