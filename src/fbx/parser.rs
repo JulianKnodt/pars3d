@@ -266,8 +266,7 @@ impl KVs {
         );
         out
     }
-    fn parse_material(&self, mat_id: i64, kvi: usize) -> FBXMaterial {
-        let mut out = FBXMaterial::default();
+    fn parse_material(&self, out: &mut FBXMaterial, mat_id: i64, kvi: usize) {
         assert!(mat_id >= 0);
         out.id = mat_id as usize;
         match_children!(
@@ -307,12 +306,10 @@ impl KVs {
           ),
           "MultiLayer", &[Data::I32(_)] => |c| match_children!(self, c),
         );
-        out
     }
-    fn parse_mesh(&self, mesh_id: i64, kvi: usize) -> FBXMesh {
-        let mut out = FBXMesh::default();
+    fn parse_mesh(&self, out: &mut FBXMesh, mesh_id: i64, kvi: usize) {
         assert!(mesh_id >= 0);
-        out.id = mesh_id as usize;
+        assert_eq!(out.id, mesh_id as usize);
         match_children!(
           self, kvi,
           "Properties70", &[] => |c| match_children!(self, c),
@@ -493,7 +490,6 @@ impl KVs {
           "LayerElementSmoothing", &[] => |_| {},
           "LayerElementVisibility", &[] => |_| {},
         );
-        out
     }
 
     pub fn to_scene(&self) -> FBXScene {
@@ -531,7 +527,6 @@ impl KVs {
                     connections.push((src, dst));
                 }
                 [op, dst, src, name] if op == &Data::str("OP") => {
-                    println!("{op:?} {src:?} {dst:?} {name:?}");
                     let src = src.as_int().unwrap();
                     let dst = dst.as_int().unwrap();
                     let name = name.as_str().unwrap();
@@ -568,9 +563,10 @@ impl KVs {
                 },
                 "Geometry" => match classtag {
                     "Mesh" => {
-                        let mut fbx_mesh = self.parse_mesh(id, id_to_kv[&id]);
+                        let mi = fbx_scene.mesh_by_id_or_new(id as usize);
+                        let fbx_mesh = &mut fbx_scene.meshes[mi];
+                        self.parse_mesh(fbx_mesh, id, id_to_kv[&id]);
                         fbx_mesh.name = String::from(name);
-                        fbx_scene.meshes.push(fbx_mesh);
                     }
                     _ => todo!("Geometry::{classtag} not handled"),
                 },
@@ -599,19 +595,18 @@ impl KVs {
                         assert_eq!(num_parents, 1);
 
                         let conns = connections.iter().filter(|&&(src, _dst)| src == id);
-                        for (_, c) in conns {
-                            let c_kv = &self.kvs[id_to_kv[c]];
+                        for &(_, c) in conns {
+                            let c_kv = &self.kvs[id_to_kv[&c]];
                             match c_kv.key.as_str() {
                                 "Geometry" => {
-                                    let Some(p) =
-                                        fbx_scene.meshes.iter().position(|p| p.id == *c as usize)
-                                    else {
-                                        todo!("Load mesh lazily?");
-                                    };
+                                    let p = fbx_scene.mesh_by_id_or_new(c as usize);
                                     node.mesh = Some(p);
                                 }
                                 // Don't handle materials yet
-                                "Material" => continue,
+                                "Material" => {
+                                    let p = fbx_scene.mat_by_id_or_new(c as usize);
+                                    node.materials.push(p);
+                                }
                                 x => todo!("{x:?}"),
                             }
                         }
@@ -626,8 +621,10 @@ impl KVs {
                 "Material" => {
                     assert_eq!(classtag, "");
                     let kv = &self.kvs[id_to_kv[&id]];
-                    let mut material = self.parse_material(id, id_to_kv[&id]);
-                    material.name = String::from(name);
+                    let mati = fbx_scene.mat_by_id_or_new(id as usize);
+                    let mat = &mut fbx_scene.materials[mati];
+                    self.parse_material(mat, id, id_to_kv[&id]);
+                    mat.name = String::from(name);
                 }
                 // Don't handle textures yet
                 "Texture" => continue,

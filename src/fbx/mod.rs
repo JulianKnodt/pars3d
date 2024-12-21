@@ -23,9 +23,30 @@ pub struct FBXScene {
 }
 
 impl FBXScene {
-    #[allow(unused)]
     pub(crate) fn parent_node(&self, node: usize) -> Option<usize> {
         self.nodes.iter().position(|n| n.children.contains(&node))
+    }
+
+    pub fn mat_by_id_or_new(&mut self, id: usize) -> usize {
+        if let Some(mati) = self.materials.iter().position(|v| v.id == id) {
+            return mati;
+        };
+        self.materials.push(FBXMaterial {
+            id,
+            ..Default::default()
+        });
+        self.materials.len() - 1
+    }
+
+    pub fn mesh_by_id_or_new(&mut self, id: usize) -> usize {
+        if let Some(mi) = self.meshes.iter().position(|v| v.id == id) {
+            return mi;
+        };
+        self.meshes.push(FBXMesh {
+            id,
+            ..Default::default()
+        });
+        self.meshes.len() - 1
     }
 }
 
@@ -51,12 +72,35 @@ pub struct FBXMaterial {
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
-enum FBXMeshMaterial {
+pub enum FBXMeshMaterial {
     #[default]
     None,
 
     Global(usize),
     PerFace(Vec<usize>),
+}
+
+impl FBXMeshMaterial {
+    pub fn as_slice(&self) -> &[usize] {
+        use FBXMeshMaterial::*;
+        match self {
+            None => &[],
+            Global(v) => std::slice::from_ref(v),
+            PerFace(vs) => vs.as_slice(),
+        }
+    }
+    pub(crate) fn remap(&mut self, map: impl Fn(usize) -> usize) {
+        use FBXMeshMaterial::*;
+        match self {
+            None => {}
+            Global(v) => *v = map(*v),
+            PerFace(vs) => {
+                for v in vs {
+                    *v = map(*v);
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]

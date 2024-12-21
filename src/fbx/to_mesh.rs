@@ -51,6 +51,17 @@ fn condense_adjacent_values(v: &[usize]) -> Vec<(Range<usize>, usize)> {
     out
 }
 
+fn decompress_values(vs: Vec<(Range<usize>, usize)>) -> Vec<usize> {
+    // assumes the ranges are sorted
+    let mut out = vec![];
+    for (r, v) in vs {
+        for _ in r {
+            out.push(v);
+        }
+    }
+    out
+}
+
 #[test]
 fn test_condense_adjacent_values() {
     assert_eq!(
@@ -178,8 +189,7 @@ impl From<Mesh> for FBXMesh {
             name,
             face_mesh_idx: _,
 
-            // TODO handle this
-            face_mat_idx: _,
+            face_mat_idx,
 
             joint_idxs: _,
 
@@ -189,6 +199,14 @@ impl From<Mesh> for FBXMesh {
         // FIXME? can change the output format if there are no repeats
         let (n, vert_norm_idx, _any_n_repeats) = to_idx_vecs(&n);
         let (uv, uv_idx, _) = to_idx_vecs(&uv[0]);
+
+        let mat = if face_mat_idx.is_empty() {
+            FBXMeshMaterial::None
+        } else if face_mat_idx.len() == 1 {
+            FBXMeshMaterial::Global(face_mat_idx[0].1)
+        } else {
+            FBXMeshMaterial::PerFace(decompress_values(face_mat_idx))
+        };
 
         FBXMesh {
             id: id(),
@@ -201,7 +219,7 @@ impl From<Mesh> for FBXMesh {
             uv,
             uv_idx,
 
-            mat: FBXMeshMaterial::None,
+            mat,
             // unused
             vertex_colors: vec![],
             vertex_color_idx: vec![],
@@ -217,7 +235,6 @@ impl From<FBXNode> for Node {
             children,
             name,
             transform,
-            // FIXME parse this
             materials: _,
         } = fbx_node;
         Node {
@@ -247,7 +264,7 @@ impl From<Node> for FBXNode {
             mesh,
             children,
             name,
-            // FIXME pass materials here? or in scene
+            // materials must be computed externally
             materials: vec![],
             transform: transform.to_decomposed(),
         }
@@ -259,6 +276,16 @@ impl From<FBXScene> for Scene {
         let mut out = Self::default();
         out.meshes
             .extend(fbx_scene.meshes.into_iter().map(Into::into));
+        // Materials for FBX meshes are stored with two levels of indirection
+        // mesh has an index into node's material list, which indexes into scene's materials
+        for node in &fbx_scene.nodes {
+            let Some(mi) = node.mesh else {
+                continue;
+            };
+            for fm in &mut out.meshes[mi].face_mat_idx {
+                fm.1 = node.materials[fm.1];
+            }
+        }
         out.nodes
             .extend(fbx_scene.nodes.into_iter().map(Into::into));
 
@@ -273,6 +300,23 @@ impl From<Scene> for FBXScene {
         let mut out = Self::default();
         out.meshes.extend(scene.meshes.into_iter().map(Into::into));
         out.nodes.extend(scene.nodes.into_iter().map(Into::into));
+
+        for n in &mut out.nodes {
+            let Some(mi) = n.mesh else {
+                continue;
+            };
+
+            for &mati in out.meshes[mi].mat.as_slice() {
+                if !n.materials.contains(&mati) {
+                    n.materials.push(mati)
+                }
+            }
+
+            out.meshes[mi]
+                .mat
+                .remap(|v| n.materials.iter().position(|&p| p == v).unwrap());
+        }
+
         out.root_nodes.extend_from_slice(&scene.root_nodes);
         out.global_settings = scene.settings.into();
         out
