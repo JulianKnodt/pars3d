@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use super::{FBXMesh, FBXNode, FBXScene, FBXSettings};
+use super::{FBXMaterial, FBXMesh, FBXMeshMaterial, FBXNode, FBXScene, FBXSettings};
 use crate::{FaceKind, F};
 
 use std::ascii::Char;
@@ -266,16 +266,57 @@ impl KVs {
         );
         out
     }
+    fn parse_material(&self, mat_id: i64, kvi: usize) -> FBXMaterial {
+        let mut out = FBXMaterial::default();
+        assert!(mat_id >= 0);
+        out.id = mat_id as usize;
+        match_children!(
+          self, kvi,
+          "Version", &[Data::I32(_)] => |_| {},
+          "ShadingModel", &[Data::String(_)] => |c: usize| {
+            assert_matches!(self.kvs[c].values[0].as_str(), Some("Phong"));
+          },
+          "Properties70", &[] => |c| match_children!(
+            self, c,
+            "P", &[
+              Data::String(_), Data::String(_), Data::String(_), Data::String(_),
+              Data::F64(_), Data::F64(_), Data::F64(_),
+            ] | [
+              Data::String(_), Data::String(_), Data::String(_), Data::String(_),
+              Data::F64(_)
+            ] => |c: usize| {
+              let kv = &self.kvs[c];
+              match kv.values[0].as_str().unwrap() {
+                "DiffuseColor" => out.diffuse_color = [4,5,6].map(
+                  |i| *kv.values[i].as_f64().unwrap() as F
+                ),
+                "AmbientColor" => {},
+                "AmbientFactor" => {},
+                "BumpFactor" => {},
+                "SpecularColor" => out.specular_color = [4,5,6].map(
+                  |i| *kv.values[i].as_f64().unwrap() as F
+                ),
+                "SpecularFactor" => {},
+                "Shininess" => {},
+                "ShininessExponent" => {},
+                "ReflectionColor" => {},
+                "ReflectionFactor" => {},
+                x => todo!("Unknown material property {x:?}"),
+              }
+            },
+          ),
+          "MultiLayer", &[Data::I32(_)] => |c| match_children!(self, c),
+        );
+        out
+    }
     fn parse_mesh(&self, mesh_id: i64, kvi: usize) -> FBXMesh {
         let mut out = FBXMesh::default();
         assert!(mesh_id >= 0);
         out.id = mesh_id as usize;
         match_children!(
-          self,
-          kvi,
+          self, kvi,
           "Properties70", &[] => |c| match_children!(self, c),
           "Vertices", &[Data::F64Arr(_)] => |c: usize| {
-              // TODO can this be f32 arr?
               let v_arr: &[f64] = self.kvs[c].values[0].as_f64_arr().unwrap();
               let v = v_arr
                   .iter()
@@ -314,7 +355,7 @@ impl KVs {
               "Normals", &[Data::F64Arr(_)] => |c: usize| {
                   let gc = &self.kvs[c];
                   let Data::F64Arr(ref arr) = &gc.values[0] else {
-                    todo!();
+                    unreachable!();
                   };
                   out.n
                       .extend(arr.array_chunks::<3>().map(|n| n.map(|v| v as F)));
@@ -322,7 +363,7 @@ impl KVs {
               "NormalsIndex", &[Data::I32Arr(_)] => |c: usize| {
                   let gc = &self.kvs[c];
                   let Data::I32Arr(ref arr) = &gc.values[0] else {
-                    todo!();
+                    unreachable!();
                   };
                   let idxs = arr
                       .iter()
@@ -381,18 +422,27 @@ impl KVs {
                           &Data::I32(i) => {
                               assert!(i >= 0);
                               assert_eq!(mapping_kind, MappingKind::Uniform);
-                              out.global_mat = Some(i as usize);
+                              out.mat = FBXMeshMaterial::Global(i as usize);
                           }
                           Data::I32Arr(ref arr) => {
                               assert!(!arr.is_empty());
                               assert!(arr.iter().all(|&v| v >= 0));
-                              if arr.len() == 1 {
-                                  out.global_mat = Some(arr[0] as usize);
-                                  return
+                              if arr.is_empty() {
+                                  out.mat = FBXMeshMaterial::None;
+                                  return;
+                              } else if arr.len() == 1 {
+                                  out.mat = FBXMeshMaterial::Global(arr[0] as usize);
+                                  return;
+                              }
+                              let first = arr[0];
+                              let all_same = arr[1..].iter().all(|&v| v == first);
+                              if all_same {
+                                  out.mat = FBXMeshMaterial::Global(arr[0] as usize);
+                                  return;
                               }
                               assert_eq!(mapping_kind, MappingKind::PerPolygon);
-                              let mat_idxs = arr.iter().map(|&i| i as usize);
-                              out.per_face_mat.extend(mat_idxs);
+                              let mat_idxs = arr.iter().map(|&i| i as usize).collect::<Vec<_>>();
+                              out.mat = FBXMeshMaterial::PerFace(mat_idxs);
                           }
                           x => todo!("{x:?}"),
                       }
@@ -472,13 +522,16 @@ impl KVs {
                 [oo, dst, src] if oo == &Data::str("OO") => {
                     let src = src.as_int().unwrap();
                     let dst = dst.as_int().unwrap();
+                    /*
                     println!(
                         "{src} {dst} {:?} {:?}",
                         self.kvs[id_to_kv[&src]].values, self.kvs[id_to_kv[&dst]].values
                     );
+                    */
                     connections.push((src, dst));
                 }
                 [op, dst, src, name] if op == &Data::str("OP") => {
+                    println!("{op:?} {src:?} {dst:?} {name:?}");
                     let src = src.as_int().unwrap();
                     let dst = dst.as_int().unwrap();
                     let name = name.as_str().unwrap();
@@ -570,8 +623,13 @@ impl KVs {
                     x => todo!("{x:?}"),
                 },
 
-                // Don't handle materials yet
-                "Material" => continue,
+                "Material" => {
+                    assert_eq!(classtag, "");
+                    let kv = &self.kvs[id_to_kv[&id]];
+                    let mut material = self.parse_material(id, id_to_kv[&id]);
+                    material.name = String::from(name);
+                }
+                // Don't handle textures yet
                 "Texture" => continue,
 
                 "DisplayLayer" => continue,

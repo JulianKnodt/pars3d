@@ -1,6 +1,8 @@
-use super::{id, FBXMesh, FBXNode, FBXScene, FBXSettings};
+use super::{id, FBXMesh, FBXMeshMaterial, FBXNode, FBXScene, FBXSettings};
 use crate::mesh::{Axis, Mesh, Node, Scene, Settings, Transform};
 use crate::F;
+
+use std::ops::Range;
 
 use std::collections::{btree_map::Entry, BTreeMap};
 
@@ -26,6 +28,43 @@ fn to_idx_vecs<const N: usize>(vals: &[[F; N]]) -> (Vec<[F; N]>, Vec<usize>, boo
 
     assert_eq!(idxs.len(), vals.len());
     (uniq_vals, idxs, any_repeats)
+}
+
+fn condense_adjacent_values(v: &[usize]) -> Vec<(Range<usize>, usize)> {
+    if v.is_empty() {
+        return vec![];
+    }
+
+    let mut out = vec![];
+    let mut curr_start = 0;
+    let mut curr_end = 1;
+    while curr_end < v.len() {
+        if v[curr_end] == v[curr_end - 1] {
+            curr_end += 1;
+            continue;
+        }
+        out.push((curr_start..curr_end, v[curr_end - 1]));
+        curr_start = curr_end;
+        curr_end += 1;
+    }
+    out.push((curr_start..curr_end, *v.last().unwrap()));
+    out
+}
+
+#[test]
+fn test_condense_adjacent_values() {
+    assert_eq!(
+        condense_adjacent_values(&[0, 0, 0, 0, 0, 0]),
+        vec![(0..6, 0)]
+    );
+    assert_eq!(
+        condense_adjacent_values(&[0, 0, 0, 0, 0, 1]),
+        vec![(0..5, 0), (5..6, 1)]
+    );
+    assert_eq!(
+        condense_adjacent_values(&[0, 0, 1, 0, 0, 1]),
+        vec![(0..2, 0), (2..3, 1), (3..5, 0), (5..6, 1)]
+    );
 }
 
 impl From<FBXSettings> for Settings {
@@ -91,8 +130,7 @@ impl From<FBXMesh> for Mesh {
             vert_norm_idx,
             uv,
             uv_idx,
-            global_mat: _,
-            per_face_mat: _,
+            mat,
             // unused
             vertex_colors: _,
             vertex_color_idx: _,
@@ -108,6 +146,7 @@ impl From<FBXMesh> for Mesh {
         };
         let uv0 = uv_idx.into_iter().map(|uvi| uv[uvi]).collect::<Vec<_>>();
         let uv = [uv0, vec![], vec![], vec![]];
+        let num_faces = f.len();
         Mesh {
             v,
             f,
@@ -116,8 +155,11 @@ impl From<FBXMesh> for Mesh {
             name,
             face_mesh_idx: vec![],
 
-            // TODO fill this in
-            face_mat_idx: vec![],
+            face_mat_idx: match mat {
+                FBXMeshMaterial::None => vec![],
+                FBXMeshMaterial::Global(i) => vec![(0..num_faces, i)],
+                FBXMeshMaterial::PerFace(mats) => condense_adjacent_values(&mats),
+            },
 
             joint_idxs: vec![],
 
@@ -144,8 +186,8 @@ impl From<Mesh> for FBXMesh {
             joint_weights: _,
         } = mesh;
 
-        let (n, vert_norm_idx, _any_n_repeats) = to_idx_vecs(&n);
         // FIXME? can change the output format if there are no repeats
+        let (n, vert_norm_idx, _any_n_repeats) = to_idx_vecs(&n);
         let (uv, uv_idx, _) = to_idx_vecs(&uv[0]);
 
         FBXMesh {
@@ -159,8 +201,7 @@ impl From<Mesh> for FBXMesh {
             uv,
             uv_idx,
 
-            global_mat: None,
-            per_face_mat: vec![],
+            mat: FBXMeshMaterial::None,
             // unused
             vertex_colors: vec![],
             vertex_color_idx: vec![],
@@ -176,6 +217,8 @@ impl From<FBXNode> for Node {
             children,
             name,
             transform,
+            // FIXME parse this
+            materials: _,
         } = fbx_node;
         Node {
             mesh,
@@ -204,6 +247,8 @@ impl From<Node> for FBXNode {
             mesh,
             children,
             name,
+            // FIXME pass materials here? or in scene
+            materials: vec![],
             transform: transform.to_decomposed(),
         }
     }
@@ -216,6 +261,7 @@ impl From<FBXScene> for Scene {
             .extend(fbx_scene.meshes.into_iter().map(Into::into));
         out.nodes
             .extend(fbx_scene.nodes.into_iter().map(Into::into));
+
         out.root_nodes.extend_from_slice(&fbx_scene.root_nodes);
         out.settings = fbx_scene.global_settings.into();
         out

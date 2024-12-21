@@ -13,6 +13,8 @@ pub struct FBXScene {
     meshes: Vec<FBXMesh>,
     nodes: Vec<FBXNode>,
 
+    materials: Vec<FBXMaterial>,
+
     root_nodes: Vec<usize>,
 
     global_settings: FBXSettings,
@@ -31,10 +33,30 @@ impl FBXScene {
 pub struct FBXNode {
     id: usize,
     mesh: Option<usize>,
+    // also store materials used in each node
+    materials: Vec<usize>,
+
     children: Vec<usize>,
     name: String,
 
     transform: DecomposedTransform,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct FBXMaterial {
+    id: usize,
+    name: String,
+    diffuse_color: [F; 3],
+    specular_color: [F; 3],
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+enum FBXMeshMaterial {
+    #[default]
+    None,
+
+    Global(usize),
+    PerFace(Vec<usize>),
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -56,8 +78,7 @@ pub struct FBXMesh {
     vertex_colors: Vec<[F; 3]>,
     vertex_color_idx: Vec<usize>,
 
-    global_mat: Option<usize>,
-    per_face_mat: Vec<usize>,
+    mat: FBXMeshMaterial,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

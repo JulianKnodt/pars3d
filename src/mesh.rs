@@ -106,8 +106,8 @@ impl Transform {
     /// Checks if this transform is the identity transformation
     pub fn is_identity(&self) -> bool {
         match self {
-          Transform::Matrix(m) => *m == super::identity::<4>(),
-          Transform::Decomposed(d) => *d == DecomposedTransform::default(),
+            Transform::Matrix(m) => *m == super::identity::<4>(),
+            Transform::Decomposed(d) => *d == DecomposedTransform::default(),
         }
     }
     pub fn to_mat(self) -> [[F; 4]; 4] {
