@@ -1,25 +1,27 @@
 # pars3d
 
-A standalone 3D parsing library.
+![VRML](https://web.archive.org/web/20000929035521/http://www.geocities.com:80/SiliconValley/4944/VRML.gif)
+
+A 3D parsing library with minimal dependencie.
 Currently supports the following formats:
 
 
 #### Primary Support
 - .obj
 - .glb (with `feature = "gltf"`, binary only)
-- .fbx (import only for now)
+- .fbx (experimental export, binary only)
+- .ply
 
 
 ##### Secondary Support
 - .off
 - .stl
-- .ply
 
 | |obj|glb|fbx|off|stl|ply|
 |-|  -|  -|  -|  -|  -|  -|
 |import|Y|Y|Y|Y|Y|Y|
 |export|Y|Y|In progress|Y|N|Y|
-|Unified Repr|Y|Y|Y|N|N|N|
+|Unified Repr|Y|Y|Y|N|N|Y|
 
 Unified Repr indicates that there is a single struct which can be used to interchange between
 each format. That is the main difference between primary and secondary support. Each secondary
@@ -60,4 +62,3 @@ representations (IRs) in compilers which allow for performing certain tasks more
 The one downside is that now there is more code to maintain. I believe this trade-off is worth it
 though.
 
-![VRML](https://web.archive.org/web/20000929035521/http://www.geocities.com:80/SiliconValley/4944/VRML.gif)
