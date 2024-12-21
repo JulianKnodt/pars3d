@@ -22,7 +22,7 @@ pub fn hue_to_rgb(v: F) -> [F; 3] {
     };
     let m = v - c;
     let rgb = rgb.map(|val| val + m);
-    let sum = rgb.into_iter().sum::<F>().max(1e-5);
+    let sum = rgb.into_iter().sum::<F>().max(1e-8);
     kmul(sum.recip(), rgb)
 }
 

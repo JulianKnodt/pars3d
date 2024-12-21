@@ -22,32 +22,27 @@ pub struct FBXScene {
     file_id: Vec<u8>,
 }
 
+macro_rules! by_id_or_new {
+    ($fn_name: ident, $field: ident) => {
+        pub fn $fn_name(&mut self, id: usize) -> usize {
+            if let Some(i) = self.$field.iter().position(|v| v.id == id) {
+                return i;
+            };
+
+            self.$field.push(Default::default());
+            self.$field.last_mut().unwrap().id = id;
+            self.$field.len() - 1
+        }
+    };
+}
+
 impl FBXScene {
     pub(crate) fn parent_node(&self, node: usize) -> Option<usize> {
         self.nodes.iter().position(|n| n.children.contains(&node))
     }
 
-    pub fn mat_by_id_or_new(&mut self, id: usize) -> usize {
-        if let Some(mati) = self.materials.iter().position(|v| v.id == id) {
-            return mati;
-        };
-        self.materials.push(FBXMaterial {
-            id,
-            ..Default::default()
-        });
-        self.materials.len() - 1
-    }
-
-    pub fn mesh_by_id_or_new(&mut self, id: usize) -> usize {
-        if let Some(mi) = self.meshes.iter().position(|v| v.id == id) {
-            return mi;
-        };
-        self.meshes.push(FBXMesh {
-            id,
-            ..Default::default()
-        });
-        self.meshes.len() - 1
-    }
+    by_id_or_new!(mat_by_id_or_new, materials);
+    by_id_or_new!(mesh_by_id_or_new, meshes);
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -160,6 +155,8 @@ impl Default for FBXSettings {
     }
 }
 
+/// Construct an ID for usage in FBX.
+/// Guaranteed to be unique, but may overflow if left running for too long.
 pub(crate) fn id() -> usize {
     static mut CURR_ID: AtomicUsize = AtomicUsize::new(3333);
     let id = unsafe {
