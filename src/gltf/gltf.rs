@@ -25,6 +25,10 @@ pub struct ImageData {
     format: gltf::image::Format,
 }
 
+fn to_f32(v: F) -> f32 {
+    v as f32
+}
+
 impl From<gltf::image::Data> for ImageData {
     fn from(d: gltf::image::Data) -> ImageData {
         let gltf::image::Data {
@@ -377,20 +381,16 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
     for mesh in &scene.meshes {
         for i in 0..mesh.v.len() {
             let v = Vertex {
-                v: mesh.v[i].map(|v| v as f32),
-                uv: mesh.uv[0]
-                    .get(i)
-                    .copied()
-                    .unwrap_or_default()
-                    .map(|v| v as f32),
-                n: mesh.n.get(i).copied().unwrap_or_default().map(|v| v as f32),
+                v: mesh.v[i].map(to_f32),
+                uv: mesh.uv[0].get(i).copied().unwrap_or_default().map(to_f32),
+                n: mesh.n.get(i).copied().unwrap_or_default().map(to_f32),
                 joint_idxs: mesh.joint_idxs.get(i).copied().unwrap_or_default(),
                 joint_weights: mesh
                     .joint_weights
                     .get(i)
                     .copied()
                     .unwrap_or_default()
-                    .map(|v| v as f32),
+                    .map(to_f32),
             };
             bytes.extend(v.to_bytes());
             verts.push(v);
@@ -403,7 +403,7 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
         for &ibm in &skin.inv_bind_matrices {
             let raw_bytes = ibm.iter().flat_map(|col| {
                 col.iter()
-                    .flat_map(|&v| (v as f32).to_le_bytes().into_iter())
+                    .flat_map(|&v| to_f32(v).to_le_bytes().into_iter())
             });
             bytes.extend(raw_bytes);
         }
@@ -436,7 +436,7 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
                 .last_mut()
                 .unwrap()
                 .push(bytes.len() - a_offset);
-            let input_bytes = sampler.input.iter().flat_map(|&v| (v as f32).to_le_bytes());
+            let input_bytes = sampler.input.iter().flat_map(|&v| to_f32(v).to_le_bytes());
             bytes.extend(input_bytes);
 
             a_out_offsets
@@ -449,17 +449,17 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
                 OutputProperty::Translation(t) | OutputProperty::Scale(t) => {
                     let raw = t
                         .iter()
-                        .flat_map(|p| p.into_iter().flat_map(|&v| (v as f32).to_le_bytes()));
+                        .flat_map(|p| p.iter().flat_map(|&v| to_f32(v).to_le_bytes()));
                     bytes.extend(raw)
                 }
                 OutputProperty::Rotation(t) => {
                     let raw = t
                         .iter()
-                        .flat_map(|p| p.iter().flat_map(|&v| (v as f32).to_le_bytes()));
+                        .flat_map(|p| p.iter().flat_map(|&v| to_f32(v).to_le_bytes()));
                     bytes.extend(raw)
                 }
                 OutputProperty::MorphTargetWeight(t) => {
-                    let raw = t.iter().flat_map(|&v| (v as f32).to_le_bytes());
+                    let raw = t.iter().flat_map(|&v| to_f32(v).to_le_bytes());
                     bytes.extend(raw)
                 }
             }
@@ -807,7 +807,7 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
         } else {
             Some(unsafe {
                 std::mem::transmute::<[[f32; 4]; 4], [f32; 16]>(
-                    n.transform.to_mat().map(|col| col.map(|v| v as f32)),
+                    n.transform.to_mat().map(|col| col.map(to_f32)),
                 )
             })
         };
