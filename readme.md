@@ -15,19 +15,19 @@ Currently supports the following formats:
 ##### Secondary Support
 - .stl
 - .ply
-
-##### Tertiary Support
 - .off
+
 
 | |obj|glb|fbx|off|stl|ply|
 |-|  -|  -|  -|  -|  -|  -|
 |import|Y|Y|Y|Y|Y|Y|
 |export|Y|Y|In progress|Y|Y|Y|
-|Unified Repr|Y|Y|Y|N|Y|Y|
+|Unified Repr|Y|Y|Y|Y|Y|Y|
 
 Unified Repr indicates that there is a single struct which can be used to interchange between
-each format. That is the main difference between primary and secondary support. Each secondary
-support format has to be treated uniquely.
+each format.
+
+Secondary formats are considered less important for maintenance.
 
 # Design:
 

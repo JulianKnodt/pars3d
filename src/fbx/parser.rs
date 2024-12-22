@@ -18,7 +18,7 @@ pub(crate) const MAGIC_LEN: usize = 23;
 pub(crate) const MAGIC: &[u8; MAGIC_LEN] = b"Kaydara FBX Binary  \x00\x1a\x00";
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum Data {
+pub enum Data {
     I8(i8),
     I16(i16),
     I32(i32),
