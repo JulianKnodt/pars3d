@@ -1,7 +1,9 @@
 use super::{Vec3, F};
 use std::fs::File;
-use std::io::{self, BufRead, BufReader, Write};
+use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::Path;
+
+pub mod to_mesh;
 
 #[derive(Debug, Default)]
 pub struct OFF {
@@ -9,9 +11,14 @@ pub struct OFF {
     f: Vec<[usize; 3]>,
 }
 
-pub fn parse(p: impl AsRef<Path>) -> io::Result<OFF> {
-    let f = File::open(p.as_ref())?;
-    let buf_read = BufReader::new(f);
+pub fn read_from_file(p: impl AsRef<Path>) -> io::Result<OFF> {
+    read(File::open(p.as_ref())?)
+}
+pub fn read(r: impl Read) -> io::Result<OFF> {
+    buf_read(BufReader::new(r))
+}
+
+pub fn buf_read(buf_read: impl BufRead) -> io::Result<OFF> {
     let mut off = OFF::default();
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     enum ParseState {

@@ -85,6 +85,7 @@ pub fn load(v: impl AsRef<Path>) -> std::io::Result<mesh::Scene> {
         GLB => gltf::load(v).map_err(std::io::Error::other)?.into(),
         PLY => mesh::Mesh::from(ply::Ply::read_from_file(v)?).into_scene(),
         STL => mesh::Mesh::from(stl::read_from_file(v)?).into_scene(),
+        OFF => mesh::Mesh::from(off::read_from_file(v)?).into_scene(),
         Unknown => return Err(std::io::Error::other("Don't know how to load")),
     };
     Ok(scene)
@@ -122,6 +123,12 @@ pub fn save(v: impl AsRef<Path>, scene: &mesh::Scene) -> std::io::Result<()> {
             let buf = std::io::BufWriter::new(f);
             let s: stl::STL = scene.into_flattened_mesh().into();
             stl::write(&s, buf)
+        }
+        OFF => {
+            let f = std::fs::File::create(v)?;
+            let buf = std::io::BufWriter::new(f);
+            let o: off::OFF = scene.into_flattened_mesh().into();
+            o.write(buf)
         }
         Unknown => Err(std::io::Error::other("Don't know how to save")),
     }
@@ -191,6 +198,7 @@ impl FaceKind {
         let (&v0, rest) = self.as_slice().split_first().unwrap();
         rest.array_windows::<2>().map(move |&[v1, v2]| [v0, v1, v2])
     }
+
     /// Remaps each vertex in this face.
     pub fn map(&mut self, mut f: impl FnMut(usize) -> usize) {
         for v in self.as_mut_slice() {

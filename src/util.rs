@@ -52,6 +52,8 @@ pub enum FileFormat {
     PLY,
     /// STL file format (.stl)
     STL,
+    /// OFF file format (.off)
+    OFF,
 
     /// Other unsupported file formats
     Unknown,
@@ -72,6 +74,7 @@ pub fn extension_to_format(s: impl AsRef<Path>) -> FileFormat {
         "obj" => FileFormat::OBJ,
         "ply" => FileFormat::PLY,
         "stl" => FileFormat::STL,
+        "off" => FileFormat::OFF,
         _ => FileFormat::Unknown,
     }
 }
