@@ -18,7 +18,7 @@ pub(crate) const MAGIC_LEN: usize = 23;
 pub(crate) const MAGIC: &[u8; MAGIC_LEN] = b"Kaydara FBX Binary  \x00\x1a\x00";
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Data {
+pub(crate) enum Data {
     I8(i8),
     I16(i16),
     I32(i32),
@@ -94,6 +94,7 @@ pub enum MappingKind {
     Uniform,
 }
 
+/// One token of a tokenized FBX file.
 #[derive(Debug, PartialEq)]
 pub enum Token {
     Key(String),
@@ -162,6 +163,7 @@ macro_rules! root_fields {
   }}
 }
 
+/// Represents the set of key-value pairs that make up an FBX file.
 #[derive(Debug, Clone, Default)]
 pub struct KVs {
     kvs: Vec<KV>,

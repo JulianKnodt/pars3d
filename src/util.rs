@@ -40,14 +40,20 @@ pub fn rel_path_btwn(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FileFormat {
     // Primary support
+    /// GLTF Binary Format (.glb)
     GLB,
+    /// FBX Binary Format (.fbx)
     FBX,
+    /// OBJ Binary Format (.obj), mtl not included
     OBJ,
 
     // Secondary Support
+    /// PLY file format (.ply)
     PLY,
+    /// STL file format (.stl)
     STL,
 
+    /// Other unsupported file formats
     Unknown,
 }
 

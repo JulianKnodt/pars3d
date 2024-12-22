@@ -10,19 +10,31 @@ pub const MAX_UV: usize = 4;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Axis {
+    /// +X
     PosX,
+    /// +Y
     PosY,
+    /// +Z
     PosZ,
+    /// -X
     NegX,
+    /// -Y
     NegY,
+    /// -Z
     NegZ,
 }
 
+/// Global settings that define the orientation of each scene.
+/// The settings depend on the input format.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Settings {
+    /// Axis of the up direction
     pub up_axis: Axis,
+    /// Axis of the fwd direction
     pub fwd_axis: Axis,
+    /// Axis of the tangent direction, is one of the +/- cross product of up and fwd
     pub tan_axis: Axis,
+    /// Scale of the model
     pub scale: F,
 }
 
@@ -37,6 +49,7 @@ impl Default for Settings {
     }
 }
 
+/// The usage of a specific texture
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextureKind {
     Diffuse,
@@ -47,11 +60,16 @@ pub enum TextureKind {
     Roughness,
 }
 
+/// Texture for use in a rendering material.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Texture {
+    /// Original usage of this texture.
     pub kind: TextureKind,
+    /// Uniform multiplier for all texels.
     pub mul: [F; 4],
+    /// Image to be sampled when sampling texels.
     pub image: Option<image::DynamicImage>,
+    /// Path to original image, if any.
     pub original_path: String,
 }
 
@@ -170,11 +188,17 @@ impl Node {
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Scene {
+    /// Root nodes
     pub root_nodes: Vec<usize>,
+    /// All nodes
     pub nodes: Vec<Node>,
+    /// Meshes in this scene, order is not relevant for rendering
     pub meshes: Vec<Mesh>,
+    /// Materials
     pub materials: Vec<Material>,
+    /// Bone structures
     pub skins: Vec<Skin>,
+    /// Set of animations
     pub animations: Vec<Animation>,
 
     /// For an OBJ input, where are the MTL files
@@ -184,10 +208,12 @@ pub struct Scene {
     /// Needed for saving output later
     pub(crate) input_file: String,
 
+    /// Global settings for axis and scale.
     pub settings: Settings,
 }
 
 impl Scene {
+    /// Traverse the node graph of a scene, with some state from the parent node.
     pub fn traverse_with_parent<T>(
         &self,
         root_init: impl Fn() -> T,
@@ -199,6 +225,7 @@ impl Scene {
             self.nodes[ri].traverse_with_parent(self, root_init(), visit);
         }
     }
+    /// Mutable traversal of the node graph of a scene, with some state from the parent node.
     pub fn traverse_mut_with_parent<T>(
         &mut self,
         root_init: impl Fn() -> T,
@@ -263,11 +290,15 @@ impl Scene {
 
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct Mesh {
+    /// Vertex positions.
     pub v: Vec<[F; 3]>,
+    /// Set of UVs.
     pub uv: [Vec<[F; 2]>; MAX_UV],
 
+    /// Normals.
     pub n: Vec<[F; 3]>,
 
+    /// Faces.
     pub f: Vec<FaceKind>,
     /// Which mesh did this face come from?
     /// Used when flattening a scene into a single mesh.
@@ -276,8 +307,10 @@ pub struct Mesh {
     /// Map of ranges for each face that correspond to a specific material
     pub face_mat_idx: Vec<(Range<usize>, usize)>,
 
+    /// For each vertex, the index of bone influences.
     /// 1-1 relation between vertices and joint/idxs weights.
     pub joint_idxs: Vec<[u16; 4]>,
+    /// The weight of each bone's influence. 0 indicates no influence.
     pub joint_weights: Vec<[F; 4]>,
 
     /// Name of this mesh.
@@ -285,6 +318,7 @@ pub struct Mesh {
 }
 
 impl Mesh {
+    /// Flips the 2nd channel of each UV.
     pub fn flip_uv_v(&mut self) {
         for uv_chan in self.uv.iter_mut() {
             for uvs in uv_chan.iter_mut() {
@@ -322,6 +356,7 @@ impl Mesh {
             .iter()
             .find_map(|(fr, mi)| fr.contains(&fi).then_some(*mi))
     }
+    /// The number of triangles in this mesh, after triangulation.
     pub fn num_tris(&self) -> usize {
         self.f.iter().map(|f| f.num_tris()).sum::<usize>()
     }
@@ -427,7 +462,7 @@ impl Mesh {
 }
 
 // For converting optional material per face index to a range of faces.
-pub fn convert_opt_usize(s: &[Option<usize>]) -> Vec<(Range<usize>, usize)> {
+fn convert_opt_usize(s: &[Option<usize>]) -> Vec<(Range<usize>, usize)> {
     let mut out = vec![];
     for (i, mati) in s.iter().enumerate() {
         let &Some(mati) = mati else {

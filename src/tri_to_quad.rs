@@ -19,6 +19,7 @@ impl Ord for OrdFloat {
     }
 }
 
+/// Metric used for preference when converting triangles to quads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QuadPreference {
     /// Prefer constructing pi/2 angles.
