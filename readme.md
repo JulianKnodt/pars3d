@@ -29,6 +29,9 @@ each format.
 
 Secondary formats are considered less important for maintenance.
 
+If you want another format supported, please feel free to file an issue and I'll do my best to
+add it.
+
 # Design:
 
 Each file format has its own `struct` which represents the data supported by that specific file
@@ -64,3 +67,8 @@ representations (IRs) in compilers which allow for performing certain tasks more
 The one downside is that now there is more code to maintain. I believe this trade-off is worth it
 though.
 
+### Shortcomings:
+
+This library may allocate more than necessary when deserializing. For many applications,
+deserialization is the final step, but if I/O is done in a long-living process this may be
+slower than necessary.
