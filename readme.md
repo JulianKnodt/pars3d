@@ -5,6 +5,27 @@
 A 3D parsing library with minimal dependencie.
 Currently supports the following formats:
 
+### Basic Usage:
+
+I/O for multiple formats:
+```rust
+use pars3d;
+
+let scene: pars3d::Scene = load("my_mesh.fbx").expect("Failed to load");
+...
+pars3d::save("new_mesh.fbx", scene).expect("Failed to save");
+```
+
+I/O for specific formats (varies per format):
+```rust
+use pars3d::fbx;
+
+let fbx_scene = fbx::parser::load("my_mesh.fbx").expect("Failed to load");
+...
+let mut out = std::fs::File::create("new_mesh.fbx");
+fbx::export::export_fbx(fbx_scene, std::io::BufWriter::new(out)).expect("Failed to save");
+```
+
 
 #### Primary Support
 - .obj
@@ -32,15 +53,16 @@ Secondary formats are considered less important for maintenance.
 If you want another format supported, please feel free to file an issue and I'll do my best to
 add it.
 
-# Design:
-
-Each file format has its own `struct` which represents the data supported by that specific file
-type. These structs are then unifiable into a single generic mesh representation.
-
 # Visualization
 
 In addition to parsing 3D file formats, there is minimal support for visualization with vertex
 colors. This can be used to output PLY files with per edge colors.
+
+### Design:
+
+Each file format has its own `struct` which represents the data supported by that specific file
+type. These structs are then unifiable into a single generic mesh representation.
+
 
 # Notes:
 
