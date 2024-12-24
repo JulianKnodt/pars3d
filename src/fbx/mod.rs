@@ -57,8 +57,12 @@ pub struct FBXNode {
     name: String,
 
     transform: DecomposedTransform,
+}
 
-    limb_node: bool,
+impl FBXNode {
+    pub fn is_limb_node(&self) -> bool {
+        todo!();
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -99,6 +103,11 @@ impl FBXMeshMaterial {
             }
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct FBXSkin {
+
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]

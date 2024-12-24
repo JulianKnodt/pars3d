@@ -73,6 +73,15 @@ impl Data {
         }
     }
     /*
+    fn as_usize(&self) -> Option<usize> {
+        assert!(self.as_int()?
+        match *self {
+            Data::I64(v) => Some(v as usize),
+            Data::I32(v) => Some(v as usize),
+            _ => None,
+        }
+    }
+    */
     fn as_float(&self) -> Option<F> {
         match *self {
             Data::F64(v) => Some(v as F),
@@ -80,7 +89,6 @@ impl Data {
             _ => None,
         }
     }
-    */
 
     pub fn str(s: &str) -> Self {
         Data::String(String::from(s))
@@ -260,15 +268,23 @@ impl KVs {
             ] | &[
                 Data::String(_), Data::String(_), Data::String(_), Data::String(_),
                 Data::I32(_) | Data::String(_),
+            ] | &[
+                Data::String(_), Data::String(_), Data::String(_), Data::String(_),
+                Data::I16(_), Data::I16(_), Data::I16(_)
             ] => |v: usize| {
                 let vals = &self.kvs[v].values;
                 match vals[0].as_str().unwrap() {
                   "Lcl Rotation" => {
-                    out.transform.rotation = [4,5,6].map(|i| *vals[i].as_f64().unwrap() as F);
+                    out.transform.rotation = [4,5,6].map(|i| vals[i].as_float().unwrap());
                   },
                   "Lcl Scaling" => {
-                    out.transform.scale = [4,5,6].map(|i| *vals[i].as_f64().unwrap() as F);
+                    out.transform.scale = [4,5,6].map(|i| vals[i].as_float().unwrap());
                   },
+                  "Lcl Translation" => {
+                    out.transform.translation = [4,5,6].map(|i| vals[i].as_float().unwrap());
+                  },
+                  "PreRotation" => {},
+
                   "DefaultAttributeIndex" => {},
                   "InheritType" => {},
                   /* Not sure how to handle these */
@@ -276,8 +292,9 @@ impl KVs {
                   "ScalingPivot" => {},
                   "RotationActive" => {},
                   "ScalingMax" => {},
-                  // wtf is this caps
+
                   "currentUVSet" => {},
+                  "filmboxTypeID" => {},
 
                   x => todo!("{x:?}"),
                 }
@@ -308,7 +325,7 @@ impl KVs {
             ] => |c: usize| {
               let vals = &self.kvs[c].values;
               match vals[0].as_str().unwrap() {
-                /* Now */ "Look" /* here see */ => {},
+                "Look" => {},
                 x => todo!("Unhandled {x:?}"),
               }
             }
@@ -328,6 +345,33 @@ impl KVs {
             assert_matches!(self.kvs[c].values[0].as_str(), Some("Skeleton"));
             match_children!(self, c);
           },
+        );
+    }
+    fn parse_skin(&self, skin_id: i64, kvi: usize) {
+        assert!(skin_id >= 0);
+        match_children!(
+          self, kvi,
+          "Version", &[Data::I32(_)] => |_| {},
+          // Damn you FBX
+          "Link_DeformAcuracy", &[Data::F64(_)] => |c| match_children!(self, c),
+          "SkinningType", &[Data::String(_)] => |c: usize| {
+            let ty = self.kvs[c].values[0].as_str().unwrap();
+            assert_matches!(ty, "Linear");
+          },
+        );
+    }
+    fn parse_cluster(&self, cluster_id: i64, kvi: usize) {
+        assert!(cluster_id >= 0);
+
+        match_children!(
+          self, kvi,
+          "Version", &[Data::I32(_)] => |_| {},
+          "UserData", &[Data::String(_), Data::String(_)] => |_| {},
+          // Damn you FBX
+          "Indexes", &[Data::I32Arr(_)] => |_| {},
+          "Weights", &[Data::F64Arr(_)] => |_| {},
+          "Transform", &[Data::F64Arr(_)] => |_| {},
+          "TransformLink", &[Data::F64Arr(_)] => |_| {},
         );
     }
     fn parse_material(&self, out: &mut FBXMaterial, mat_id: i64, kvi: usize) {
@@ -642,6 +686,7 @@ impl KVs {
 
             assert!(!self.children.contains_key(&child));
         }
+        // connections by source id or destination id
         macro_rules! conns {
             ($src: expr =>) => {{
                 connections.iter().filter(|&&(src, _dst)| src == $src)
@@ -672,23 +717,15 @@ impl KVs {
                 "NodeAttribute" => match classtag {
                     "Light" => continue,
                     "Camera" => continue,
+                    // I believe these are attributes for nodes, so they're not actual nodes.
+                    // For now, no idea what to do with them.
                     "Null" => {
                         self.parse_null(id, id_to_kv[&id]);
+                        assert_eq!(conns!(id =>).count(), 0);
                     }
                     "LimbNode" => {
                         self.parse_limb_node(id, id_to_kv[&id]);
-                        for &(node_id, _) in conns!(=> id) {
-                            let kv = &self.kvs[id_to_kv[&node_id]];
-                            match kv.key.as_str() {
-                                "Node" => {
-                                    let node_idx = fbx_scene.node_by_id_or_new(node_id as usize);
-                                    let node = &mut fbx_scene.nodes[node_idx];
-                                    node.limb_node = true;
-                                }
-                                "Model" => { /* ??? */ }
-                                x => todo!("{x:?}"),
-                            }
-                        }
+                        assert_eq!(conns!(id =>).count(), 0);
                     }
                     _ => todo!("NodeAttribute::{classtag} not handled"),
                 },
@@ -701,34 +738,39 @@ impl KVs {
                     }
                     _ => todo!("Geometry::{classtag} not handled"),
                 },
+                // constructs nodes?
                 "Model" => {
                     if matches!(classtag, "Light" | "Camera") {
                         continue;
                     }
 
+                    let kv = &self.kvs[id_to_kv[&id]];
+                    assert_matches!(kv.key.as_str(), "Node" | "Model");
+
                     let node_idx = fbx_scene.node_by_id_or_new(id as usize);
-                    {
                     let node = &mut fbx_scene.nodes[node_idx];
                     self.parse_node(node, id, id_to_kv[&id]);
                     node.name = String::from(name);
+
+                    let mut num_parents = 0;
+                    for &(parent_id, _) in conns!(=> id) {
+                        let parent = &self.kvs[id_to_kv[&parent_id]];
+                        match parent.key.as_str() {
+                            "RootNode" => fbx_scene.root_nodes.push(node_idx),
+                            "Node" => {
+                                let parent_idx = fbx_scene.node_by_id_or_new(parent_id as usize);
+                                fbx_scene.nodes[parent_idx].children.push(node_idx)
+                            }
+                            "CollectionExclusive" => continue,
+                            "Deformer" => continue,
+                            x => todo!("{x:?} {:?}", self.kvs[id_to_kv[&id]]),
+                        }
+                        num_parents += 1;
                     }
+                    assert_eq!(num_parents, 1);
 
                     match classtag {
                         "Mesh" => {
-                            //let kv = &self.kvs[id_to_kv[&id]];
-                            let mut num_parents = 0;
-                            for &(parent_id, _) in conns!(=> id) {
-                                let parent = &self.kvs[id_to_kv[&parent_id]];
-                                match parent.key.as_str() {
-                                    "RootNode" => fbx_scene.root_nodes.push(node_idx),
-                                    "Node" => {}
-                                    "CollectionExclusive" => continue,
-                                    x => todo!("{x:?} {}", kv.key),
-                                }
-                                num_parents += 1;
-                            }
-                            assert_eq!(num_parents, 1);
-
                             for &(_, c) in conns!(id =>) {
                                 let c_kv = &self.kvs[id_to_kv[&c]];
                                 match c_kv.key.as_str() {
@@ -745,16 +787,17 @@ impl KVs {
                                 }
                             }
                         }
-                        "Light" => continue,
-                        "Camera" => continue,
                         // FIXME handle these?
-                        "Null" => continue,
-                        "LimbNode" => match classtag {
-                            "LimbNode" => {
-                                //let kv = &self.kvs[id_to_kv[&id]];
-                            }
+                        "Null" => match classtag {
+                            "Null" => {}
                             x => todo!("{x:?}"),
                         },
+                        "LimbNode" => match classtag {
+                            "LimbNode" => {}
+                            x => todo!("{x:?}"),
+                        },
+                        "Light" => continue,
+                        "Camera" => continue,
                         x => todo!("{x:?}"),
                     }
                 }
@@ -766,8 +809,18 @@ impl KVs {
                     self.parse_material(mat, id, id_to_kv[&id]);
                     mat.name = String::from(name);
                 }
-                "Deformer" => continue,
-                "SubDeformer" => continue,
+                "Deformer" => match classtag {
+                  "Skin" => {
+                    self.parse_skin(id, id_to_kv[&id]);
+                  },
+                  _ => todo!("handle deformer {classtag}"),
+                },
+                "SubDeformer" => match classtag {
+                  "Cluster" => {
+                    self.parse_cluster(id, id_to_kv[&id]);
+                  },
+                  _ => todo!("handle subdeformer {classtag}"),
+                },
                 "Implementation" => continue,
                 "BindingTable" => continue,
                 "AnimStack" => continue,
