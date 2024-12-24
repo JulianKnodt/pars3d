@@ -250,7 +250,7 @@ impl KVs {
         match_children!(
           self,
           kvi,
-          "Version", &[Data::I32(_)] => |v| {},
+          "Version", &[Data::I32(_)] => |_| {},
           "Properties70", &[] => |v| match_children!(
             self,
             v,
@@ -283,12 +283,12 @@ impl KVs {
                 }
              },
           ),
-          "MultiLayer", &[Data::I32(_)] => |v| {},
+          "MultiLayer", &[Data::I32(_)] => |_| {},
           "Culling", &[Data::String(_)] => |v: usize| {
             assert_matches!(self.kvs[v].values[0].as_str(), Some("CullingOff" | "CullingOn"));
           },
-          "MultiTake", &[Data::I32(_)] => |v| {},
-          "Shading", &[Data::Bool(_)] => |v| {},
+          "MultiTake", &[Data::I32(_)] => |_| {},
+          "Shading", &[Data::Bool(_)] => |_| {},
         );
     }
     fn parse_null(&self, null_id: i64, kvi: usize) {
@@ -436,7 +436,7 @@ impl KVs {
                   }
               }
           },
-          "Edges", &[Data::I32Arr(_)] => |c| { /* No idea what to do here */ },
+          "Edges", &[Data::I32Arr(_)] => |_| { /* No idea what to do here */ },
           "LayerElementNormal", &[Data::I32(_/*index of normal*/)] => |c| {
               let mut mapping_kind = VertexMappingKind::ByPolygonVertex;
               match_children!(
@@ -474,7 +474,7 @@ impl KVs {
                         .map(|v| v as usize);
                     out.vert_norm_idx.extend(idxs);
                 },
-                "NormalsW", &[Data::F64Arr(_)] => |c| { /*wtf is this*/ },
+                "NormalsW", &[Data::F64Arr(_)] => |_| { /*wtf is this*/ },
             );
           },
           "LayerElementUV", &[Data::I32(_/*idx of uv*/)] => |c| match_children!(
@@ -587,7 +587,7 @@ impl KVs {
           "Layer", &[Data::I32(_)] => |c| match_children!(
             self, c,
             "Version", &[Data::I32(_)] => |_| {},
-            "Name", &[Data::String(_)] => |c| { todo!() },
+            "Name", &[Data::String(_)] => |_| { todo!() },
             "MappingInformationType", &[Data::String(_)] => |_| {},
             "ReferenceInformationType", &[Data::String(_)] => |_| {},
             "LayerElement", &[] => |_| {},
@@ -788,27 +788,27 @@ impl KVs {
         root_fields!(
           self,
           "FBXHeaderExtension", &[],
-          "FBXHeaderVersion", &[Data::I32(_)] => |v| {},
-          "FBXVersion", &[Data::I32(_)] => |v| {},
-          "EncryptionType", &[Data::I32(0)] => |v| {},
-          "CreationTimeStamp", &[] => |v| {},
-          "Creator", &[Data::String(_)] => |v| {},
+          "FBXHeaderVersion", &[Data::I32(_)] => |_| {},
+          "FBXVersion", &[Data::I32(_)] => |_| {},
+          "EncryptionType", &[Data::I32(0)] => |_| {},
+          "CreationTimeStamp", &[] => |_| {},
+          "Creator", &[Data::String(_)] => |_| {},
           "SceneInfo", &[Data::String(_), Data::String(_)] => |v: usize| {
             match_children!(
               self, v,
-              "Type", &[Data::String(_)] => |v| {},
-              "Version", &[Data::I32(_)] => |v| {},
+              "Type", &[Data::String(_)] => |_| {},
+              "Version", &[Data::I32(_)] => |_| {},
               "MetaData", &[] => |v| match_children!(
                 self, v,
-                "Version", &[Data::I32(_)] => |v| {},
-                "Title", &[Data::String(_)] => |v| {},
-                "Subject", &[Data::String(_)] => |v| {},
-                "Author", &[Data::String(_)] => |v| {},
-                "Keywords", &[Data::String(_)] => |v| {},
-                "Revision", &[Data::String(_)] => |v| {},
-                "Comment", &[Data::String(_)] => |v| {},
+                "Version", &[Data::I32(_)] => |_| {},
+                "Title", &[Data::String(_)] => |_| {},
+                "Subject", &[Data::String(_)] => |_| {},
+                "Author", &[Data::String(_)] => |_| {},
+                "Keywords", &[Data::String(_)] => |_| {},
+                "Revision", &[Data::String(_)] => |_| {},
+                "Comment", &[Data::String(_)] => |_| {},
               ),
-              "Properties70", &[] => |v| { /* match_children!(self, v) */ },
+              "Properties70", &[] => |_| { /* match_children!(self, v) */ },
             );
           },
         );
@@ -831,7 +831,7 @@ impl KVs {
         root_fields!(
           self,
           "GlobalSettings", &[],
-          "Version", &[Data::I32(_)] => |v| {},
+          "Version", &[Data::I32(_)] => |_| {},
           "Properties70", &[] => |v| {
             match_children!(
               self, v,
@@ -945,8 +945,8 @@ impl KVs {
         root_fields!(
           self,
           "Takes", &[],
-          "Current", &[Data::String(_)] => |c: usize| {},
-          "Take", &[Data::String(_)] => |c| {}
+          "Current", &[Data::String(_)] => |_| {},
+          "Take", &[Data::String(_)] => |_| {}
         );
 
         fbx_scene
