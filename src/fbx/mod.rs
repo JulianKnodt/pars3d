@@ -43,6 +43,7 @@ impl FBXScene {
 
     by_id_or_new!(mat_by_id_or_new, materials);
     by_id_or_new!(mesh_by_id_or_new, meshes);
+    by_id_or_new!(node_by_id_or_new, nodes);
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -56,6 +57,8 @@ pub struct FBXNode {
     name: String,
 
     transform: DecomposedTransform,
+
+    limb_node: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]

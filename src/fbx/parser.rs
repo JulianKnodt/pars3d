@@ -1,6 +1,4 @@
-#![allow(unused)]
-
-use super::{FBXMaterial, FBXMesh, FBXMeshMaterial, FBXNode, FBXScene, FBXSettings};
+use super::{FBXMaterial, FBXMesh, FBXMeshMaterial, FBXNode, FBXScene};
 use crate::{FaceKind, F};
 
 use std::ascii::Char;
@@ -59,10 +57,10 @@ macro_rules! cast {
 impl Data {
     cast!(as_str, &str, String);
     cast!(as_f64_arr, &[f64], F64Arr);
-    cast!(as_i64_arr, &[i64], I64Arr);
+    //cast!(as_i64_arr, &[i64], I64Arr);
     cast!(as_i32_arr, &[i32], I32Arr);
 
-    cast!(as_i64, &i64, I64);
+    //cast!(as_i64, &i64, I64);
     cast!(as_i32, &i32, I32);
 
     cast!(as_f64, &f64, F64);
@@ -74,6 +72,7 @@ impl Data {
             _ => None,
         }
     }
+    /*
     fn as_float(&self) -> Option<F> {
         match *self {
             Data::F64(v) => Some(v as F),
@@ -81,6 +80,7 @@ impl Data {
             _ => None,
         }
     }
+    */
 
     pub fn str(s: &str) -> Self {
         Data::String(String::from(s))
@@ -92,6 +92,23 @@ impl Data {
 pub enum MappingKind {
     PerPolygon,
     Uniform,
+}
+
+/// How to map some information to a mesh
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VertexMappingKind {
+    ByPolygonVertex,
+    ByVertices,
+}
+
+impl VertexMappingKind {
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "ByPolygonVertex" => VertexMappingKind::ByPolygonVertex,
+            "ByVertice" => VertexMappingKind::ByVertices,
+            _ => todo!("Unknown vertex mapping kind {s}, please file a bug."),
+        }
+    }
 }
 
 /// One token of a tokenized FBX file.
@@ -226,8 +243,7 @@ impl KVs {
         Ok(())
     }
 
-    fn parse_node(&self, node_id: i64, kvi: usize) -> FBXNode {
-        let mut out = FBXNode::default();
+    fn parse_node(&self, out: &mut FBXNode, node_id: i64, kvi: usize) {
         assert!(node_id >= 0);
         out.id = node_id as usize;
 
@@ -243,7 +259,7 @@ impl KVs {
                 Data::F64(_), Data::F64(_), Data::F64(_)
             ] | &[
                 Data::String(_), Data::String(_), Data::String(_), Data::String(_),
-                Data::I32(_),
+                Data::I32(_) | Data::String(_),
             ] => |v: usize| {
                 let vals = &self.kvs[v].values;
                 match vals[0].as_str().unwrap() {
@@ -255,6 +271,14 @@ impl KVs {
                   },
                   "DefaultAttributeIndex" => {},
                   "InheritType" => {},
+                  /* Not sure how to handle these */
+                  "RotationPivot" => {},
+                  "ScalingPivot" => {},
+                  "RotationActive" => {},
+                  "ScalingMax" => {},
+                  // wtf is this caps
+                  "currentUVSet" => {},
+
                   x => todo!("{x:?}"),
                 }
              },
@@ -266,7 +290,45 @@ impl KVs {
           "MultiTake", &[Data::I32(_)] => |v| {},
           "Shading", &[Data::Bool(_)] => |v| {},
         );
-        out
+    }
+    fn parse_null(&self, null_id: i64, kvi: usize) {
+        assert!(null_id >= 0);
+
+        match_children!(
+          self, kvi,
+          "Version", &[Data::I32(_)] => |_| {},
+          "Properties70", &[] => |c| match_children!(
+            self, c,
+            "P", &[
+              Data::String(_), Data::String(_), Data::String(_), Data::String(_),
+              Data::F64(_), Data::F64(_), Data::F64(_),
+            ] | &[
+              Data::String(_), Data::String(_), Data::String(_), Data::String(_),
+              Data::I32(_)
+            ] => |c: usize| {
+              let vals = &self.kvs[c].values;
+              match vals[0].as_str().unwrap() {
+                /* Now */ "Look" /* here see */ => {},
+                x => todo!("Unhandled {x:?}"),
+              }
+            }
+          ),
+          "TypeFlags", &[Data::String(_)] => |c: usize| {
+              assert_matches!(self.kvs[c].values[0].as_str(), Some("Null"));
+          },
+        );
+    }
+    fn parse_limb_node(&self, limb_node_id: i64, kvi: usize) {
+        assert!(limb_node_id >= 0);
+
+        match_children!(
+          self, kvi,
+          "Version", &[Data::I32(_)] => |_| {},
+          "TypeFlags", &[Data::String(_)] => |c: usize| {
+            assert_matches!(self.kvs[c].values[0].as_str(), Some("Skeleton"));
+            match_children!(self, c);
+          },
+        );
     }
     fn parse_material(&self, out: &mut FBXMaterial, mat_id: i64, kvi: usize) {
         assert!(mat_id >= 0);
@@ -275,7 +337,8 @@ impl KVs {
           self, kvi,
           "Version", &[Data::I32(_)] => |_| {},
           "ShadingModel", &[Data::String(_)] => |c: usize| {
-            assert_matches!(self.kvs[c].values[0].as_str(), Some("Phong"));
+            let shading_model = self.kvs[c].values[0].as_str().unwrap();
+            assert_matches!(shading_model, "Phong" | "lambert" | "unknown");
           },
           "Properties70", &[] => |c| match_children!(
             self, c,
@@ -284,14 +347,21 @@ impl KVs {
               Data::F64(_), Data::F64(_), Data::F64(_),
             ] | [
               Data::String(_), Data::String(_), Data::String(_), Data::String(_),
-              Data::F64(_)
-            ] => |c: usize| {
+              Data::F64(_) | Data::String(_) | Data::I32(_) | Data::F32(_)
+            ] | [
+              Data::String(_), Data::String(_), Data::String(_), Data::String(_),
+              Data::F64(_), Data::F64(_)
+            ] | [
+              Data::String(_), Data::String(_), Data::String(_), Data::String(_),
+            ]=> |c: usize| {
               let kv = &self.kvs[c];
               match kv.values[0].as_str().unwrap() {
-                "DiffuseColor" => out.diffuse_color = [4,5,6].map(
+                "Diffuse" | "DiffuseColor" => out.diffuse_color = [4,5,6].map(
                   |i| *kv.values[i].as_f64().unwrap() as F
                 ),
-                "AmbientColor" => {},
+                "DiffuseFactor" => {},
+
+                "Ambient" | "AmbientColor" => {},
                 "AmbientFactor" => {},
                 "BumpFactor" => {},
                 "SpecularColor" => out.specular_color = [4,5,6].map(
@@ -302,6 +372,35 @@ impl KVs {
                 "ShininessExponent" => {},
                 "ReflectionColor" => {},
                 "ReflectionFactor" => {},
+                "Opacity" => {},
+                "TransparencyFactor" => {},
+                "Emissive" => {},
+
+                // monopoly powers
+                "Maya" => {/*???*/},
+                "Maya|TypeId" => {},
+                "Maya|TEX_global_diffuse_cube" => {},
+                "Maya|TEX_global_specular_cube" => {},
+                "Maya|TEX_brdf_lut" => {},
+                "Maya|use_normal_map" => {},
+                "Maya|uv_offset" => {},
+                "Maya|uv_scale" => {},
+                "Maya|TEX_normal_map" => {},
+                "Maya|TEX_color_map" => {},
+                "Maya|use_color_map" => {},
+                "Maya|base_color" => {},
+                "Maya|use_metallic_map" => {},
+                "Maya|TEX_metallic_map" => {},
+                "Maya|metallic" => {},
+                "Maya|use_roughness_map" => {},
+                "Maya|TEX_roughness_map" => {},
+                "Maya|roughness" => {},
+                "Maya|use_emissive_map" => {},
+                "Maya|TEX_emissive_map" => {},
+                "Maya|emissive" => {},
+                "Maya|emissive_intensity" => {},
+                "Maya|use_ao_map" => {},
+                "Maya|TEX_ao_map" => {},
                 x => todo!("Unknown material property {x:?}"),
               }
             },
@@ -338,41 +437,46 @@ impl KVs {
               }
           },
           "Edges", &[Data::I32Arr(_)] => |c| { /* No idea what to do here */ },
-          "LayerElementNormal", &[Data::I32(_/*index of normal*/)] => |c| match_children!(
-              self, c,
-              "Version", &[Data::I32(_)] => |_| {},
-              "Name", &[Data::String(_)] => |_| {},
-              "MappingInformationType", &[Data::String(_)] => |c: usize| {
-                  assert_eq!(&self.kvs[c].values[0], &Data::str("ByPolygonVertex"));
-              },
-              "ReferenceInformationType", &[Data::String(_)] => |c: usize| {
-                  assert_matches!(
-                    self.kvs[c].values[0].as_str().unwrap(),
-                    "Direct" | "IndexToDirect"
-                  );
-              },
-              "Normals", &[Data::F64Arr(_)] => |c: usize| {
-                  let gc = &self.kvs[c];
-                  let Data::F64Arr(ref arr) = &gc.values[0] else {
-                    unreachable!();
-                  };
-                  out.n
-                      .extend(arr.array_chunks::<3>().map(|n| n.map(|v| v as F)));
-              },
-              "NormalsIndex", &[Data::I32Arr(_)] => |c: usize| {
-                  let gc = &self.kvs[c];
-                  let Data::I32Arr(ref arr) = &gc.values[0] else {
-                    unreachable!();
-                  };
-                  let idxs = arr
-                      .iter()
-                      .copied()
-                      .inspect(|&idx| assert!(idx >= 0))
-                      .map(|v| v as usize);
-                  out.vert_norm_idx.extend(idxs);
-              },
-              "NormalsW", &[Data::F64Arr(_)] => |c| { /*wtf is this*/ },
-          ),
+          "LayerElementNormal", &[Data::I32(_/*index of normal*/)] => |c| {
+              let mut mapping_kind = VertexMappingKind::ByPolygonVertex;
+              match_children!(
+                self, c,
+                "Version", &[Data::I32(_)] => |_| {},
+                "Name", &[Data::String(_)] => |_| {},
+                "MappingInformationType", &[Data::String(_)] => |c: usize| {
+                    mapping_kind = VertexMappingKind::from_str(
+                      self.kvs[c].values[0].as_str().unwrap()
+                    );
+                },
+                "ReferenceInformationType", &[Data::String(_)] => |c: usize| {
+                    assert_matches!(
+                      self.kvs[c].values[0].as_str().unwrap(),
+                      "Direct" | "IndexToDirect"
+                    );
+                },
+                "Normals", &[Data::F64Arr(_)] => |c: usize| {
+                    let gc = &self.kvs[c];
+                    let Data::F64Arr(ref arr) = &gc.values[0] else {
+                      unreachable!();
+                    };
+                    out.n
+                        .extend(arr.array_chunks::<3>().map(|n| n.map(|v| v as F)));
+                },
+                "NormalsIndex", &[Data::I32Arr(_)] => |c: usize| {
+                    let gc = &self.kvs[c];
+                    let Data::I32Arr(ref arr) = &gc.values[0] else {
+                      unreachable!();
+                    };
+                    let idxs = arr
+                        .iter()
+                        .copied()
+                        .inspect(|&idx| assert!(idx >= 0))
+                        .map(|v| v as usize);
+                    out.vert_norm_idx.extend(idxs);
+                },
+                "NormalsW", &[Data::F64Arr(_)] => |c| { /*wtf is this*/ },
+            );
+          },
           "LayerElementUV", &[Data::I32(_/*idx of uv*/)] => |c| match_children!(
               self, c,
               "Version", &[Data::I32(_)] => |_| {},
@@ -489,8 +593,10 @@ impl KVs {
             "LayerElement", &[] => |_| {},
           ),
           // omit for now
-          "LayerElementSmoothing", &[] => |_| {},
+          "LayerElementSmoothing", &[] | &[Data::I32(_)] => |_| {},
           "LayerElementVisibility", &[] => |_| {},
+          "LayerElementBinormal", &[Data::I32(_/*idx*/)] => |_| {},
+          "LayerElementTangent", &[Data::I32(_/*idx*/)] => |_| {},
         );
     }
 
@@ -498,8 +604,11 @@ impl KVs {
         let mut id_to_kv = HashMap::new();
 
         for (i, kv) in self.kvs.iter().enumerate() {
-            let Some(p) = kv.parent else { continue };
+            let Some(_) = kv.parent else { continue };
             if let Some(id) = kv.id() {
+                if id == 0 && !matches!(kv.key.as_str(), "RootNode") {
+                    continue;
+                }
                 id_to_kv.insert(id, i);
             }
         }
@@ -520,12 +629,6 @@ impl KVs {
                 [oo, dst, src] if oo == &Data::str("OO") => {
                     let src = src.as_int().unwrap();
                     let dst = dst.as_int().unwrap();
-                    /*
-                    println!(
-                        "{src} {dst} {:?} {:?}",
-                        self.kvs[id_to_kv[&src]].values, self.kvs[id_to_kv[&dst]].values
-                    );
-                    */
                     connections.push((src, dst));
                 }
                 [op, dst, src, name] if op == &Data::str("OP") => {
@@ -538,6 +641,14 @@ impl KVs {
             }
 
             assert!(!self.children.contains_key(&child));
+        }
+        macro_rules! conns {
+            ($src: expr =>) => {{
+                connections.iter().filter(|&&(src, _dst)| src == $src)
+            }};
+            (=> $dst: expr) => {{
+                connections.iter().filter(|&&(_src, dst)| dst == $dst)
+            }};
         }
 
         let objects = self
@@ -561,6 +672,24 @@ impl KVs {
                 "NodeAttribute" => match classtag {
                     "Light" => continue,
                     "Camera" => continue,
+                    "Null" => {
+                        self.parse_null(id, id_to_kv[&id]);
+                    }
+                    "LimbNode" => {
+                        self.parse_limb_node(id, id_to_kv[&id]);
+                        for &(node_id, _) in conns!(=> id) {
+                            let kv = &self.kvs[id_to_kv[&node_id]];
+                            match kv.key.as_str() {
+                                "Node" => {
+                                    let node_idx = fbx_scene.node_by_id_or_new(node_id as usize);
+                                    let node = &mut fbx_scene.nodes[node_idx];
+                                    node.limb_node = true;
+                                }
+                                "Model" => { /* ??? */ }
+                                x => todo!("{x:?}"),
+                            }
+                        }
+                    }
                     _ => todo!("NodeAttribute::{classtag} not handled"),
                 },
                 "Geometry" => match classtag {
@@ -572,68 +701,85 @@ impl KVs {
                     }
                     _ => todo!("Geometry::{classtag} not handled"),
                 },
-                // Do not handle lights or cameras for now
-                "Model" => match classtag {
-                    "Mesh" => {
-                        let kv = &self.kvs[id_to_kv[&id]];
-                        let mut node = self.parse_node(id, id_to_kv[&id]);
-                        node.name = String::from(name);
-                        let parents = connections.iter().filter(|&&(_src, dst)| dst == id);
-                        let mut num_parents = 0;
-                        let new_idx = fbx_scene.nodes.len();
-                        for &(parent_id, _) in parents {
-                            if parent_id == 0 {
-                                fbx_scene.root_nodes.push(new_idx);
-                                num_parents += 1;
-                                continue;
-                            }
-                            let parent = &self.kvs[id_to_kv[&parent_id]];
-                            match parent.key.as_str() {
-                                "CollectionExclusive" => continue,
-                                x => todo!("{x:?} {}", kv.key),
-                            }
-                            num_parents += 1;
-                        }
-                        assert_eq!(num_parents, 1);
-
-                        let conns = connections.iter().filter(|&&(src, _dst)| src == id);
-                        for &(_, c) in conns {
-                            let c_kv = &self.kvs[id_to_kv[&c]];
-                            match c_kv.key.as_str() {
-                                "Geometry" => {
-                                    let p = fbx_scene.mesh_by_id_or_new(c as usize);
-                                    node.mesh = Some(p);
-                                }
-                                // Don't handle materials yet
-                                "Material" => {
-                                    let p = fbx_scene.mat_by_id_or_new(c as usize);
-                                    node.materials.push(p);
-                                }
-                                x => todo!("{x:?}"),
-                            }
-                        }
-
-                        fbx_scene.nodes.push(node);
+                "Model" => {
+                    if matches!(classtag, "Light" | "Camera") {
+                        continue;
                     }
-                    "Light" => continue,
-                    "Camera" => continue,
-                    x => todo!("{x:?}"),
-                },
+
+                    let node_idx = fbx_scene.node_by_id_or_new(id as usize);
+                    {
+                    let node = &mut fbx_scene.nodes[node_idx];
+                    self.parse_node(node, id, id_to_kv[&id]);
+                    node.name = String::from(name);
+                    }
+
+                    match classtag {
+                        "Mesh" => {
+                            //let kv = &self.kvs[id_to_kv[&id]];
+                            let mut num_parents = 0;
+                            for &(parent_id, _) in conns!(=> id) {
+                                let parent = &self.kvs[id_to_kv[&parent_id]];
+                                match parent.key.as_str() {
+                                    "RootNode" => fbx_scene.root_nodes.push(node_idx),
+                                    "Node" => {}
+                                    "CollectionExclusive" => continue,
+                                    x => todo!("{x:?} {}", kv.key),
+                                }
+                                num_parents += 1;
+                            }
+                            assert_eq!(num_parents, 1);
+
+                            for &(_, c) in conns!(id =>) {
+                                let c_kv = &self.kvs[id_to_kv[&c]];
+                                match c_kv.key.as_str() {
+                                    "Geometry" => {
+                                        let p = fbx_scene.mesh_by_id_or_new(c as usize);
+                                        fbx_scene.nodes[node_idx].mesh = Some(p);
+                                    }
+                                    // Don't handle materials yet
+                                    "Material" => {
+                                        let p = fbx_scene.mat_by_id_or_new(c as usize);
+                                        fbx_scene.nodes[node_idx].materials.push(p);
+                                    }
+                                    x => todo!("{x:?}"),
+                                }
+                            }
+                        }
+                        "Light" => continue,
+                        "Camera" => continue,
+                        // FIXME handle these?
+                        "Null" => continue,
+                        "LimbNode" => match classtag {
+                            "LimbNode" => {
+                                //let kv = &self.kvs[id_to_kv[&id]];
+                            }
+                            x => todo!("{x:?}"),
+                        },
+                        x => todo!("{x:?}"),
+                    }
+                }
 
                 "Material" => {
                     assert_eq!(classtag, "");
-                    let kv = &self.kvs[id_to_kv[&id]];
                     let mati = fbx_scene.mat_by_id_or_new(id as usize);
                     let mat = &mut fbx_scene.materials[mati];
                     self.parse_material(mat, id, id_to_kv[&id]);
                     mat.name = String::from(name);
                 }
-                // Don't handle textures yet
+                "Deformer" => continue,
+                "SubDeformer" => continue,
+                "Implementation" => continue,
+                "BindingTable" => continue,
+                "AnimStack" => continue,
+                "AnimLayer" => continue,
+                "AnimCurveNode" => continue,
+                "AnimCurve" => continue,
+                // Don't handle these yet
                 "Texture" => continue,
-
                 "DisplayLayer" => continue,
                 "Video" => continue,
                 "Light" => continue,
+                "Pose" => continue,
 
                 _ => todo!("{obj_type:?}"),
             }
@@ -693,17 +839,16 @@ impl KVs {
               &[
                 Data::String(_), Data::String(_), Data::String(_), Data::String(_),
                 Data::I32(_) | Data::I64(_) | Data::F64(_) | Data::String(_),
-              ] |
-              &[
+              ] | &[
                 Data::String(_), Data::String(_), Data::String(_), Data::String(_),
                 Data::F64(_), Data::F64(_), Data::F64(_)
-              ]
-              => |v: usize| {
+              ] | &[
+                Data::String(_), Data::String(_), Data::String(_), Data::String(_),
+              ] => |v: usize| {
                 let vals = &self.kvs[v].values;
-                let v4 = &vals[4];
                 macro_rules! assign {
                   ($v: expr, $fn: ident) => {{
-                    $v = *v4.$fn().unwrap_or(&$v);
+                    $v = *vals[4].$fn().unwrap_or(&$v);
                   }};
                 }
                 match vals[0].as_str().unwrap() {
@@ -724,6 +869,10 @@ impl KVs {
                   "TimeSpanStart" => {},
                   "TimeSpanStop" => {},
                   "CustomFrameRate" => {},
+                  "TimeProtocol" => {},
+                  "SnapOnFrameMode" => {},
+                  "TimeMarker" => {},
+                  "CurrentTimeMarker" => {},
                   x => todo!("Unhandled Properties70 P {x:?}")
                 };
 
@@ -738,8 +887,9 @@ impl KVs {
           // I think this is only ever 1 for 1 scene
           "Count", &[Data::I32(1)] => |_| {},
           "Document", &[Data::I64(_), Data::String(_), Data::String(_)] => |v: usize| {
-            assert_eq!(self.kvs[v].values[1].as_str().unwrap(), "Scene");
-            assert_eq!(self.kvs[v].values[2].as_str().unwrap(), "Scene");
+            let kv = &self.kvs[v];
+            //assert_eq!(kv.values[1].as_str().unwrap(), "Scene", "{kv:?}");
+            assert_eq!(kv.values[2].as_str().unwrap(), "Scene", "{kv:?}");
             match_children!(
               self, v,
               "Properties70", &[] => |v| {
@@ -776,14 +926,14 @@ impl KVs {
         root_fields!(
           self,
           "Definitions", &[],
-          "Version", &[Data::I32(_)] => |v| {},
-          "Count", &[Data::I32(_)] => |v| {},
+          "Version", &[Data::I32(_)] => |_| {},
+          "Count", &[Data::I32(_)] => |_| {},
           "ObjectType", &[Data::String(_)] => |v| match_children!(self, v,
-            "Count", &[Data::I32(_)] => |v| {},
+            "Count", &[Data::I32(_)] => |_| {},
             "PropertyTemplate", &[Data::String(_)] => |v: usize| {
               assert_matches!(
                 self.kvs[v].values[0].as_str().unwrap(),
-                "FbxCamera" | "FbxMesh" | "FbxNode" | "FbxSurfacePhong",
+                "FbxVideo" | "FbxAnimCurveNode" | "FbxFileTexture" | "FbxBindingTable" | "FbxImplementation" | "FbxNull" | "FbxSurfaceLambert" | "FbxAnimLayer" | "FbxAnimStack" | "FbxCamera" | "FbxMesh" | "FbxNode" | "FbxSurfacePhong",
               );
             }
           ),
@@ -795,7 +945,8 @@ impl KVs {
         root_fields!(
           self,
           "Takes", &[],
-          "Current", &[Data::String(_)] => |v: usize| {},
+          "Current", &[Data::String(_)] => |c: usize| {},
+          "Take", &[Data::String(_)] => |c| {}
         );
 
         fbx_scene
@@ -992,7 +1143,7 @@ fn read_scope(
                 let _ = read_word!(u32);
                 let _ = read_word!(u32);
                 let len = read_word!(u32);
-                src.seek(SeekFrom::Current(len as i64));
+                src.seek(SeekFrom::Current(len as i64))?;
                 read += len as usize;
                 Data::Unknown(len as usize)
             }
