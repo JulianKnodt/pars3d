@@ -94,3 +94,19 @@ though.
 This library may allocate more than necessary when deserializing. For many applications,
 deserialization is the final step, but if I/O is done in a long-living process this may be
 slower than necessary.
+
+#### Why does this exist?
+
+I started this library primarily for parsing 3D models for geometry processing. Initially, it
+started just for parsing OBJ files (one of the main formats used in research), but found that
+a lot of meshes I wanted to parse where in other formats, specifically FBX. Originally, I could
+not be arsed to make an FBX parser, and since Sketchfab also provided a GLTF export, I
+downloaded the models as GLTF files. For most models this is fine, but I realized thatthe GLTF
+format has a number of shortcomings for geometry processing, so I bit the bullet and started an
+FBX importer/exporter. I also added PLY because I wanted to be able to visualize values on
+edges/faces/vertices, and PLY has great support for vertex colors.
+
+##### Comparison to Alternatives
+
+Assimp - C, I/O for FBX is a bit buggy, more feature complete than this library
+fbxcel - Rust, requires deep knowledge of the FBX file format, deprecated
