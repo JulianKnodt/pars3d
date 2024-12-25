@@ -236,6 +236,7 @@ impl From<FBXNode> for Node {
             name,
             transform,
             materials: _,
+            skin: _,
         } = fbx_node;
         Node {
             mesh,
@@ -255,7 +256,7 @@ impl From<Node> for FBXNode {
             children,
 
             name,
-            skin: _,
+            skin,
             transform,
         } = node;
 
@@ -266,6 +267,7 @@ impl From<Node> for FBXNode {
             name,
             // materials must be computed externally
             materials: vec![],
+            skin,
             transform: transform.to_decomposed(),
         }
     }

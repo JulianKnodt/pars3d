@@ -95,6 +95,10 @@ This library may allocate more than necessary when deserializing. For many appli
 deserialization is the final step, but if I/O is done in a long-living process this may be
 slower than necessary.
 
+For FBX parsing, my philosophy is if there's something I didn't expect it should crash.
+Immediately. This is great for figuring out exactly what is wrong, but if your input FBX file
+doesn't fit what is expected it will not work at all. Better than silently being wrong though.
+
 #### Why does this exist?
 
 I started this library primarily for parsing 3D models for geometry processing. Initially, it

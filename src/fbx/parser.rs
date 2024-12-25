@@ -1,4 +1,4 @@
-use super::{FBXMaterial, FBXMesh, FBXMeshMaterial, FBXNode, FBXScene};
+use super::{FBXMaterial, FBXMesh, FBXMeshMaterial, FBXNode, FBXScene, FBXSkin};
 use crate::{FaceKind, F};
 
 use std::ascii::Char;
@@ -360,7 +360,7 @@ impl KVs {
           },
         );
     }
-    fn parse_cluster(&self, cluster_id: i64, kvi: usize) {
+    fn parse_cluster(&self, fbx_skin: &mut FBXSkin, cluster_id: i64, kvi: usize) {
         assert!(cluster_id >= 0);
 
         match_children!(
@@ -368,10 +368,22 @@ impl KVs {
           "Version", &[Data::I32(_)] => |_| {},
           "UserData", &[Data::String(_), Data::String(_)] => |_| {},
           // Damn you FBX
-          "Indexes", &[Data::I32Arr(_)] => |_| {},
-          "Weights", &[Data::F64Arr(_)] => |_| {},
-          "Transform", &[Data::F64Arr(_)] => |_| {},
-          "TransformLink", &[Data::F64Arr(_)] => |_| {},
+          "Indexes", &[Data::I32Arr(_)] => |v: usize| {
+            let idxs = self.kvs[v].values[0].as_i32_arr().unwrap();
+            fbx_skin.indices.extend(idxs.into_iter().map(|&v| v as usize));
+          },
+          "Weights", &[Data::F64Arr(_)] => |v: usize| {
+            let ws = self.kvs[v].values[0].as_f64_arr().unwrap();
+            fbx_skin.weights.extend(ws.into_iter().map(|&v| v as F));
+          },
+          "Transform", &[Data::F64Arr(_)] => |v: usize| {
+            let tform = self.kvs[v].values[0].as_f64_arr().unwrap();
+            assert_eq!(tform.len(), 16);
+          },
+          "TransformLink", &[Data::F64Arr(_)] => |v: usize| {
+            let tform_link = self.kvs[v].values[0].as_f64_arr().unwrap();
+            assert_eq!(tform_link.len(), 16);
+          },
         );
     }
     fn parse_material(&self, out: &mut FBXMaterial, mat_id: i64, kvi: usize) {
@@ -810,16 +822,30 @@ impl KVs {
                     mat.name = String::from(name);
                 }
                 "Deformer" => match classtag {
-                  "Skin" => {
-                    self.parse_skin(id, id_to_kv[&id]);
-                  },
-                  _ => todo!("handle deformer {classtag}"),
+                    "Skin" => {
+                        self.parse_skin(id, id_to_kv[&id]);
+                        for &(src, _) in conns!(=> id) {
+                            assert_eq!("Geometry", self.kvs[id_to_kv[&src]].key);
+                        }
+                        for &(_, dst) in conns!(=> id) {
+                            assert_eq!("Deformer", self.kvs[id_to_kv[&dst]].key);
+                        }
+                    }
+                    _ => todo!("handle deformer {classtag}"),
                 },
                 "SubDeformer" => match classtag {
-                  "Cluster" => {
-                    self.parse_cluster(id, id_to_kv[&id]);
-                  },
-                  _ => todo!("handle subdeformer {classtag}"),
+                    "Cluster" => {
+                        let skin_idx = fbx_scene.skin_by_id_or_new(id as usize);
+                        self.parse_cluster(&mut fbx_scene.skins[skin_idx], id, id_to_kv[&id]);
+                        fbx_scene.skins[skin_idx].name = String::from(name);
+                        for &(src, _) in conns!(=> id) {
+                            assert_eq!("Deformer", self.kvs[id_to_kv[&src]].key);
+                        }
+                        for &(_, dst) in conns!(id =>) {
+                            assert_eq!("Node", self.kvs[id_to_kv[&dst]].key);
+                        }
+                    }
+                    _ => todo!("handle subdeformer {classtag}"),
                 },
                 "Implementation" => continue,
                 "BindingTable" => continue,
