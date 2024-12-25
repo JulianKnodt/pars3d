@@ -146,14 +146,15 @@ impl From<FBXMesh> for Mesh {
             vertex_colors: _,
             vertex_color_idx: _,
         } = fbx_mesh;
+        // TODO may need to dedup v here, as there is an 1-N mapping between vert position and
+        // attributes.
 
         let n = if vert_norm_idx.is_empty() {
-            assert_eq!(n.len(), v.len());
             n
         } else {
             vert_norm_idx
-                .into_iter()
-                .map(|ni| n[ni])
+                .iter()
+                .map(|&ni| n[ni])
                 .collect::<Vec<_>>()
         };
         let uv0 = uv_idx.into_iter().map(|uvi| uv[uvi]).collect::<Vec<_>>();

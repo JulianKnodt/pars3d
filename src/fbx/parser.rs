@@ -102,6 +102,23 @@ pub enum MappingKind {
     Uniform,
 }
 
+/// How to map some information to vertices
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RefInfoKind {
+    Direct,
+    IndexToDirect,
+}
+
+impl RefInfoKind {
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "Direct" => RefInfoKind::Direct,
+            "IndexToDirect" => RefInfoKind::IndexToDirect,
+            _ => todo!("Unknown ref info type {s}, please file a bug."),
+        }
+    }
+}
+
 /// How to map some information to a mesh
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VertexMappingKind {
@@ -498,6 +515,8 @@ impl KVs {
                 "Opacity" => {},
                 "TransparencyFactor" => {},
                 "Emissive" => {},
+                "EmissiveColor" => {},
+                "EmissiveFactor" => {},
 
                 // monopoly powers
                 "Maya" => {/*???*/},
@@ -565,19 +584,19 @@ impl KVs {
           },
           "Edges", &[Data::I32Arr(_)] => |_| { /* No idea what to do here */ },
           "LayerElementNormal", &[Data::I32(_/*index of normal*/)] => |c| {
-              let mut mapping_kind = VertexMappingKind::ByPolygonVertex;
+              let mut map_kind = VertexMappingKind::ByVertices;
+              let mut ref_kind = RefInfoKind::Direct;
               match_children!(
                 self, c,
                 "Version", &[Data::I32(_)] => |_| {},
                 "Name", &[Data::String(_)] => |_| {},
                 "MappingInformationType", &[Data::String(_)] => |c: usize| {
-                    mapping_kind = VertexMappingKind::from_str(
-                      self.kvs[c].values[0].as_str().unwrap()
-                    );
+                    let map_str = self.kvs[c].values[0].as_str().unwrap();
+                    map_kind = VertexMappingKind::from_str(map_str);
                 },
                 "ReferenceInformationType", &[Data::String(_)] => |c: usize| {
-                    let map_kind = self.kvs[c].values[0].as_str().unwrap();
-                    assert_matches!(map_kind, "Direct" | "IndexToDirect");
+                    let ref_str = self.kvs[c].values[0].as_str().unwrap();
+                    ref_kind = RefInfoKind::from_str(ref_str);
                 },
                 "Normals", &[Data::F64Arr(_)] => |c: usize| {
                     let gc = &self.kvs[c];
@@ -586,12 +605,16 @@ impl KVs {
                     };
                     assert_eq!(ns.len() % 3, 0);
                     out.n.reserve(out.v.len());
-                    match mapping_kind {
-                      VertexMappingKind::ByVertices => {
+                    use RefInfoKind::*;
+                    use VertexMappingKind::*;
+                    match (map_kind, ref_kind) {
+                      (ByPolygonVertex, IndexToDirect) |
+                      (ByVertices, Direct) => {
                         let iter = ns.array_chunks::<3>().map(|n| n.map(|v| v as F));
-                        out.n.extend(iter)
+                        out.n.extend(iter);
                       },
-                      VertexMappingKind::ByPolygonVertex => {
+                      // not entirely sure how to handle this case
+                      (ByPolygonVertex, Direct) => {
                         assert!(!out.f.is_empty());
                         out.n.resize(out.v.len(), [0.; 3]);
                         for f in out.f.iter() {
@@ -601,7 +624,9 @@ impl KVs {
                             out.n[vi] = n;
                           }
                         }
+                        assert!(out.n.iter().all(|&n| n != [0.; 3]));
                       },
+                      (ByVertices, IndexToDirect) => todo!("unhandled case"),
                     }
                 },
                 "NormalsIndex", &[Data::I32Arr(_)] => |c: usize| {
