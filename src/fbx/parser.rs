@@ -1,4 +1,4 @@
-use super::{FBXMaterial, FBXMesh, FBXMeshMaterial, FBXNode, FBXScene, FBXSkin};
+use super::{FBXAnim, FBXMaterial, FBXMesh, FBXMeshMaterial, FBXNode, FBXScene, FBXSkin};
 use crate::{FaceKind, F};
 
 use std::ascii::Char;
@@ -57,7 +57,7 @@ macro_rules! cast {
 impl Data {
     cast!(as_str, &str, String);
     cast!(as_f64_arr, &[f64], F64Arr);
-    //cast!(as_i64_arr, &[i64], I64Arr);
+    cast!(as_i64_arr, &[i64], I64Arr);
     cast!(as_i32_arr, &[i32], I32Arr);
 
     //cast!(as_i64, &i64, I64);
@@ -360,6 +360,73 @@ impl KVs {
           },
         );
     }
+    fn parse_anim_stack(&self, anim_stack_id: i64, kvi: usize) {
+        assert!(anim_stack_id >= 0);
+        match_children!(
+          self, kvi,
+          "Properties70", &[] => |c| match_children!(
+            self, c, "P",
+            &[
+              Data::String(_), Data::String(_), Data::String(_), Data::String(_),
+              Data::I64(_)
+            ] => |c: usize| {
+              let vals = &self.kvs[c].values;
+              match vals[0].as_str().unwrap() {
+                "LocalStart" => {},
+                "LocalStop" => {},
+                "ReferenceStart" => {},
+                "ReferenceStop" => {},
+                x => todo!("{x:?}"),
+              }
+            },
+          ),
+        );
+    }
+    fn parse_anim_layer(&self, anim_layer_id: i64, kvi: usize) {
+        assert!(anim_layer_id >= 0);
+        assert_eq!(self.kvs[kvi].key, "AnimationLayer");
+        match_children!(self, kvi);
+    }
+    fn parse_anim_curve(&self, anim: &mut FBXAnim, anim_curve_id: i64, kvi: usize) {
+        assert!(anim_curve_id >= 0);
+        assert_eq!(self.kvs[kvi].key, "AnimationCurve");
+        match_children!(
+          self, kvi,
+          "Default", &[Data::F64(_)] => |_| {},
+          "KeyVer", &[Data::I32(_)] => |_| {},
+          "KeyTime", &[Data::I64Arr(_)] => |v: usize| {
+            let val = self.kvs[v].values[0].as_i64_arr().unwrap();
+            anim.times.extend(val.into_iter().map(|&v| v as u32));
+          },
+          "KeyValueFloat", &[Data::F32Arr(_)] => |_| {},
+          "KeyAttrFlags", &[Data::I32Arr(_)] => |_| {},
+          "KeyAttrDataFloat", &[Data::F32Arr(_)] => |_| {},
+          "KeyAttrRefCount", &[Data::I32Arr(_)] => |_| {},
+        );
+    }
+    fn parse_anim_curve_node(&self, anim_curve_node_id: i64, kvi: usize) {
+        assert!(anim_curve_node_id >= 0);
+        assert_eq!(self.kvs[kvi].key, "AnimationCurveNode");
+        match_children!(
+          self, kvi,
+          "Properties70", &[] => |c| match_children!(
+            self, c, "P", &[
+              Data::String(_), Data::String(_), Data::String(_), Data::String(_),
+              Data::I16(_) | Data::I32(_) | Data::F64(_),
+            ] => |c: usize| {
+              let val = &self.kvs[c].values;
+              match val[0].as_str().unwrap() {
+                "d|filmboxTypeID" => {},
+                "d|lockInfluenceWeights" => {},
+                "d|X" => {},
+                "d|Y" => {},
+                "d|Z" => {},
+                x => todo!("{x:?}"),
+              }
+            },
+          ),
+        );
+    }
     fn parse_cluster(&self, fbx_skin: &mut FBXSkin, cluster_id: i64, kvi: usize) {
         assert!(cluster_id >= 0);
 
@@ -457,6 +524,9 @@ impl KVs {
                 "Maya|emissive_intensity" => {},
                 "Maya|use_ao_map" => {},
                 "Maya|TEX_ao_map" => {},
+
+                x if x.starts_with("Maya") => {},
+
                 x => todo!("Unknown material property {x:?}"),
               }
             },
@@ -464,6 +534,7 @@ impl KVs {
           "MultiLayer", &[Data::I32(_)] => |c| match_children!(self, c),
         );
     }
+
     fn parse_mesh(&self, out: &mut FBXMesh, mesh_id: i64, kvi: usize) {
         assert!(mesh_id >= 0);
         assert_eq!(out.id, mesh_id as usize);
@@ -505,18 +576,33 @@ impl KVs {
                     );
                 },
                 "ReferenceInformationType", &[Data::String(_)] => |c: usize| {
-                    assert_matches!(
-                      self.kvs[c].values[0].as_str().unwrap(),
-                      "Direct" | "IndexToDirect"
-                    );
+                    let map_kind = self.kvs[c].values[0].as_str().unwrap();
+                    assert_matches!(map_kind, "Direct" | "IndexToDirect");
                 },
                 "Normals", &[Data::F64Arr(_)] => |c: usize| {
                     let gc = &self.kvs[c];
-                    let Data::F64Arr(ref arr) = &gc.values[0] else {
+                    let Data::F64Arr(ref ns) = &gc.values[0] else {
                       unreachable!();
                     };
-                    out.n
-                        .extend(arr.array_chunks::<3>().map(|n| n.map(|v| v as F)));
+                    assert_eq!(ns.len() % 3, 0);
+                    out.n.reserve(out.v.len());
+                    match mapping_kind {
+                      VertexMappingKind::ByVertices => {
+                        let iter = ns.array_chunks::<3>().map(|n| n.map(|v| v as F));
+                        out.n.extend(iter)
+                      },
+                      VertexMappingKind::ByPolygonVertex => {
+                        assert!(!out.f.is_empty());
+                        out.n.resize(out.v.len(), [0.; 3]);
+                        for f in out.f.iter() {
+                          for &vi in f.as_slice() {
+                            let n = std::array::from_fn(|i| ns[vi * 3 + i] as F);
+                            assert!(out.n[vi] == [0.; 3] || out.n[vi] == n);
+                            out.n[vi] = n;
+                          }
+                        }
+                      },
+                    }
                 },
                 "NormalsIndex", &[Data::I32Arr(_)] => |c: usize| {
                     let gc = &self.kvs[c];
@@ -530,7 +616,7 @@ impl KVs {
                         .map(|v| v as usize);
                     out.vert_norm_idx.extend(idxs);
                 },
-                "NormalsW", &[Data::F64Arr(_)] => |_| { /*wtf is this*/ },
+                "NormalsW", &[Data::F64Arr(_)] => |_| { /*normals winding, not sure*/ },
             );
           },
           "LayerElementUV", &[Data::I32(_/*idx of uv*/)] => |c| match_children!(
@@ -698,6 +784,7 @@ impl KVs {
 
             assert!(!self.children.contains_key(&child));
         }
+
         // connections by source id or destination id
         macro_rules! conns {
             ($src: expr =>) => {{
@@ -805,7 +892,14 @@ impl KVs {
                             x => todo!("{x:?}"),
                         },
                         "LimbNode" => match classtag {
-                            "LimbNode" => {}
+                            "LimbNode" => {
+                                for (_, dst) in conns!(id =>) {
+                                    assert_matches!(
+                                        self.kvs[id_to_kv[dst]].key.as_str(),
+                                        "Model" | "Node" | "NodeAttribute"
+                                    );
+                                }
+                            }
                             x => todo!("{x:?}"),
                         },
                         "Light" => continue,
@@ -843,16 +937,34 @@ impl KVs {
                         }
                         for &(_, dst) in conns!(id =>) {
                             assert_eq!("Node", self.kvs[id_to_kv[&dst]].key);
+                            let node_idx = fbx_scene.node_by_id_or_new(dst as usize);
+                            fbx_scene.nodes[node_idx].skin = Some(skin_idx);
                         }
                     }
                     _ => todo!("handle subdeformer {classtag}"),
                 },
-                "Implementation" => continue,
+                "Implementation" => {
+                    assert_eq!(classtag, "");
+                }
                 "BindingTable" => continue,
-                "AnimStack" => continue,
-                "AnimLayer" => continue,
-                "AnimCurveNode" => continue,
-                "AnimCurve" => continue,
+                "AnimStack" => {
+                    assert_eq!(classtag, "");
+                    self.parse_anim_stack(id, id_to_kv[&id]);
+                }
+                "AnimLayer" => {
+                    assert_eq!(classtag, "");
+                    self.parse_anim_layer(id, id_to_kv[&id]);
+                }
+                "AnimCurveNode" => {
+                    assert_eq!(classtag, "");
+                    self.parse_anim_curve_node(id, id_to_kv[&id]);
+                }
+                "AnimCurve" => {
+                    assert_eq!(classtag, "");
+                    let anim_id = fbx_scene.anim_by_id_or_new(id as usize);
+                    let anim = &mut fbx_scene.anims[anim_id];
+                    self.parse_anim_curve(anim, id, id_to_kv[&id]);
+                }
                 // Don't handle these yet
                 "Texture" => continue,
                 "DisplayLayer" => continue,

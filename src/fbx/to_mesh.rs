@@ -148,6 +148,7 @@ impl From<FBXMesh> for Mesh {
         } = fbx_mesh;
 
         let n = if vert_norm_idx.is_empty() {
+            assert_eq!(n.len(), v.len());
             n
         } else {
             vert_norm_idx

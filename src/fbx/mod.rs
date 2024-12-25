@@ -17,6 +17,8 @@ pub struct FBXScene {
 
     skins: Vec<FBXSkin>,
 
+    anims: Vec<FBXAnim>,
+
     root_nodes: Vec<usize>,
 
     global_settings: FBXSettings,
@@ -47,6 +49,7 @@ impl FBXScene {
     by_id_or_new!(mesh_by_id_or_new, meshes);
     by_id_or_new!(node_by_id_or_new, nodes);
     by_id_or_new!(skin_by_id_or_new, skins);
+    by_id_or_new!(anim_by_id_or_new, anims);
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -119,6 +122,14 @@ pub struct FBXSkin {
     weights: Vec<F>,
 
     name: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct FBXAnim {
+    id: usize,
+
+    times: Vec<u32>,
+    values: Vec<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
