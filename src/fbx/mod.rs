@@ -10,6 +10,7 @@ pub mod to_mesh;
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FBXScene {
+    id: usize,
     pub meshes: Vec<FBXMesh>,
     pub nodes: Vec<FBXNode>,
 

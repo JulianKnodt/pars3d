@@ -78,7 +78,7 @@ impl FBXScene {
             "FBXHeaderExtension", &[] => |c| add_kvs!(
               kvs, c,
               "FBXVersion", &[Data::I32(7600)],
-              "FBXHeaderVersion", &[Data::I32(7600)],
+              "FBXHeaderVersion", &[Data::I32(1003)],
               "EncryptionType", &[Data::I32(0)],
               "Creator", &[Data::str("pars3d")],
               "CreationTimeStamp", &[] => |c| add_kvs!(
@@ -92,7 +92,22 @@ impl FBXScene {
                 "Second", &[Data::I32(1)],
                 "Millisecond", &[Data::I32(1)],
               ),
-              "SceneInfo", &[Data::str("GlobalInfo\x00\x01SceneInfo"), Data::str("UserData")],
+              "SceneInfo", &[Data::str("GlobalInfo\x00\x01SceneInfo"), Data::str("UserData")]
+              => |c| add_kvs!(
+                kvs, c,
+                "Type", &[Data::str("UserData")],
+                "Version", &[Data::I32(100)],
+                "MetaData", &[] => |c| add_kvs!(
+                  kvs, c,
+                  "Title", &[Data::str("")],
+                  "Subject", &[Data::str("")],
+                  "Author", &[Data::str("")],
+                  "Keywords", &[Data::str("")],
+                  "Revision", &[Data::str("")],
+                  "Comment", &[Data::str("")],
+                ),
+                "Properties70", &[] => |_| {},
+              ),
             ),
         );
         root_fields!(kvs, "FileId", &[Data::Binary(self.file_id.clone())]);
@@ -122,7 +137,7 @@ impl FBXScene {
           kvs,
           "GlobalSettings", &[] => |v| add_kvs!(
             kvs, v,
-            "Version", &[Data::I32(101)],
+            "Version", &[Data::I32(1000)],
             "Properties70", &[] => |v| add_kvs!(kvs, v,
               "P", int_p("UpAxis", settings.up_axis),
               "P", int_p("UpAxisSign", settings.up_axis_sign),
@@ -143,7 +158,12 @@ impl FBXScene {
           "Documents", &[] => |c| add_kvs!(
             kvs, c,
             "Count", &[Data::I32(1)],
-            "Document", &[Data::I64(id() as i64), Data::str("Scene"), Data::str("Scene")] => |c| add_kvs!(kvs, c, "RootNode", &[Data::I64(0)]),
+            "Document", &[Data::I64(self.id as i64), Data::str("Scene"), Data::str("Scene")]
+            => |c| add_kvs!(
+              kvs, c,
+              "RootNode", &[Data::I64(0)],
+              "Properties70", &[],
+            ),
           ),
         );
 

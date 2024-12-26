@@ -526,6 +526,7 @@ impl KVs {
     fn parse_mesh(&self, out: &mut FBXMesh, mesh_id: i64, kvi: usize) {
         assert!(mesh_id >= 0);
         assert_eq!(out.id, mesh_id as usize);
+
         match_children!(
           self, kvi,
           "Properties70", &[] => |c| match_children!(self, c),
@@ -978,7 +979,9 @@ impl KVs {
           "SceneInfo", &[Data::String(_), Data::String(_)] => |v: usize| {
             match_children!(
               self, v,
-              "Type", &[Data::String(_)] => |_| {},
+              "Type", &[Data::String(_)] => |c: usize| {
+                assert_eq!("UserData", self.kvs[c].values[0].as_str().unwrap());
+              },
               "Version", &[Data::I32(_)] => |_| {},
               "MetaData", &[] => |v| match_children!(
                 self, v,
@@ -1072,6 +1075,7 @@ impl KVs {
           "Count", &[Data::I32(1)] => |_| {},
           "Document", &[Data::I64(_), Data::String(_), Data::String(_)] => |v: usize| {
             let kv = &self.kvs[v];
+            fbx_scene.id = kv.values[0].as_int().unwrap() as usize;
             assert_matches!(kv.values[1].as_str().unwrap(), "Scene" |  "");
             assert_eq!(kv.values[2].as_str().unwrap(), "Scene", "{kv:?}");
             match_children!(
