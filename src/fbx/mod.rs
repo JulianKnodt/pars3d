@@ -10,8 +10,8 @@ pub mod to_mesh;
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FBXScene {
-    meshes: Vec<FBXMesh>,
-    nodes: Vec<FBXNode>,
+    pub meshes: Vec<FBXMesh>,
+    pub nodes: Vec<FBXNode>,
 
     materials: Vec<FBXMaterial>,
 
@@ -21,7 +21,7 @@ pub struct FBXScene {
 
     root_nodes: Vec<usize>,
 
-    global_settings: FBXSettings,
+    pub global_settings: FBXSettings,
 
     file_id: Vec<u8>,
 }
