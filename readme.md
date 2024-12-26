@@ -41,7 +41,7 @@ fbx::export::export_fbx(fbx_scene, std::io::BufWriter::new(out)).expect("Failed 
 
 | |obj|glb|fbx|off|stl|ply|
 |-|  -|  -|  -|  -|  -|  -|
-|import|Y|Y|Y|Y|Y|Y|
+|import|Y|Y|Y (no anim)|Y|Y|Y|
 |export|Y|Y|In progress|Y|Y|Y|
 |Unified Repr|Y|Y|Y|Y|Y|Y|
 |Allocations|Few, Large|Few, Large|Many, Small|?|?|?|
@@ -111,7 +111,14 @@ format has a number of shortcomings for geometry processing, so I bit the bullet
 FBX importer/exporter. I also added PLY because I wanted to be able to visualize values on
 edges/faces/vertices, and PLY has great support for vertex colors.
 
+Another benefit of this library is that the original polygon format will be preserved. For quad
+and triangle meshes, all faces will be stack allocated, meaning that traversal is efficient, and
+there are only a handful of larger allocations. If your mesh consists of many polygonal faces
+with more than 4 edges, they will be heap allocated. I haven't seen a mesh with mostly polygonal
+faces, so I think the trade-off is well worth it.
+
 ##### Comparison to Alternatives
 
 Assimp - C, I/O for FBX is a bit buggy, more feature complete than this library
+
 fbxcel - Rust, requires deep knowledge of the FBX file format, deprecated
