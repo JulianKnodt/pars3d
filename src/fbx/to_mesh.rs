@@ -1,13 +1,15 @@
 use super::{id, FBXMesh, FBXMeshMaterial, FBXNode, FBXScene, FBXSettings};
 use crate::mesh::{Axis, Mesh, Node, Scene, Settings, Transform};
-use crate::F;
+use crate::{FaceKind, F};
 
 use std::ops::Range;
 
-use std::collections::{btree_map::Entry, BTreeMap};
+use std::collections::HashMap;
 
+/*
 /// Converts per vertex values to unique values and idxs into it.
 fn to_idx_vecs<const N: usize>(vals: &[[F; N]]) -> (Vec<[F; N]>, Vec<usize>, bool) {
+    use std::collections::{btree_map::Entry, BTreeMap};
     let mut uniq = BTreeMap::new();
     let mut uniq_vals = vec![];
     let mut idxs = vec![];
@@ -29,6 +31,7 @@ fn to_idx_vecs<const N: usize>(vals: &[[F; N]]) -> (Vec<[F; N]>, Vec<usize>, boo
     assert_eq!(idxs.len(), vals.len());
     (uniq_vals, idxs, any_repeats)
 }
+*/
 
 fn condense_adjacent_values(v: &[usize]) -> Vec<(Range<usize>, usize)> {
     if v.is_empty() {
@@ -51,15 +54,9 @@ fn condense_adjacent_values(v: &[usize]) -> Vec<(Range<usize>, usize)> {
     out
 }
 
-fn decompress_values(vs: Vec<(Range<usize>, usize)>) -> Vec<usize> {
+fn decompress_values(vs: Vec<(Range<usize>, usize)>) -> impl Iterator<Item = usize> {
     // assumes the ranges are sorted
-    let mut out = vec![];
-    for (r, v) in vs {
-        for _ in r {
-            out.push(v);
-        }
-    }
-    out
+    vs.into_iter().flat_map(|(r, v)| r.map(move |_| v))
 }
 
 #[test]
@@ -138,33 +135,55 @@ impl From<FBXMesh> for Mesh {
             v,
             f,
             n,
-            vert_norm_idx,
             uv,
-            uv_idx,
             mat,
             // unused
-            vertex_colors: _,
-            vertex_color_idx: _,
+            color: _,
         } = fbx_mesh;
-        // TODO may need to dedup v here, as there is an 1-N mapping between vert position and
-        // attributes.
 
-        let n = if vert_norm_idx.is_empty() {
-            n
-        } else {
-            vert_norm_idx
-                .iter()
-                .map(|&ni| n[ni])
-                .collect::<Vec<_>>()
-        };
-        let uv0 = uv_idx.into_iter().map(|uvi| uv[uvi]).collect::<Vec<_>>();
-        let uv = [uv0, vec![], vec![], vec![]];
+        //let num_verts = f.iter().map(|f| f.len()).sum::<usize>();
         let num_faces = f.len();
+
+        macro_rules! key_i {
+            ($i: expr, $v: expr) => {
+                (
+                    $v.map(F::to_bits),
+                    n.v($i).map(F::to_bits),
+                    uv.v($i).map(F::to_bits),
+                )
+            };
+        }
+
+        let mut verts = HashMap::new();
+
+        let mut new_v = vec![];
+        let mut new_uv = vec![];
+        let mut new_n = vec![];
+        let mut new_fs = vec![];
+
+        let mut offset = 0;
+        for f in f {
+            let mut new_f = FaceKind::empty();
+            for (o, vi) in f.as_slice().iter().enumerate() {
+                let key = key_i!(offset + o, v[*vi]);
+                if !verts.contains_key(&key) {
+                    new_v.push(v[*vi]);
+                    new_uv.push(uv.v(offset + o));
+                    new_n.push(n.v(offset + 0));
+                    verts.insert(key, new_v.len() - 1);
+                }
+                new_f.insert(verts[&key]);
+            }
+            new_fs.push(new_f);
+            offset += f.len();
+        }
+
+        let new_uv = [new_uv, vec![], vec![], vec![]];
         Mesh {
-            v,
-            f,
-            n,
-            uv,
+            v: new_v,
+            f: new_fs,
+            n: new_n,
+            uv: new_uv,
             name,
             face_mesh_idx: vec![],
 
@@ -199,15 +218,15 @@ impl From<Mesh> for FBXMesh {
         } = mesh;
 
         // FIXME? can change the output format if there are no repeats
-        let (n, vert_norm_idx, _any_n_repeats) = to_idx_vecs(&n);
-        let (uv, uv_idx, _) = to_idx_vecs(&uv[0]);
+        //let (n, vert_norm_idx, _any_n_repeats) = to_idx_vecs(&n);
+        //let (uv, uv_idx, _) = to_idx_vecs(&uv[0]);
 
         let mat = if face_mat_idx.is_empty() {
             FBXMeshMaterial::None
         } else if face_mat_idx.len() == 1 {
             FBXMeshMaterial::Global(face_mat_idx[0].1)
         } else {
-            FBXMeshMaterial::PerFace(decompress_values(face_mat_idx))
+            FBXMeshMaterial::PerFace(decompress_values(face_mat_idx).collect::<Vec<_>>())
         };
 
         FBXMesh {
@@ -215,16 +234,12 @@ impl From<Mesh> for FBXMesh {
             name,
             v,
             f,
-            n,
-            vert_norm_idx,
-
-            uv,
-            uv_idx,
+            n: Default::default(),
+            uv: Default::default(),
 
             mat,
             // unused
-            vertex_colors: vec![],
-            vertex_color_idx: vec![],
+            color: Default::default(),
         }
     }
 }

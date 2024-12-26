@@ -16,16 +16,16 @@ macro_rules! push_kv {
 
 macro_rules! add_kvs {
   ($kvs: expr, $parent: expr
-    $(, $field: expr, $values: expr $( => $children_func: expr )? )* $(,)?
+    $(, $(if $cond: expr =>)? $field: literal, $values: expr $( => $children_func: expr )? )* $(,)?
   ) => {{
-    [$({
+    $($( if $cond )? {
       let c = push_kv!($kvs, KV {
         key: $field.to_string(),
         values: $values.to_vec(),
         parent: Some($parent),
       });
       $( $children_func(c); )?
-    },)*]
+    })*
   }}
 }
 
@@ -71,46 +71,7 @@ impl FBXScene {
     pub(crate) fn to_kvs(&self) -> Vec<KV> {
         let mut kvs = vec![];
 
-        let conn_idx = push_kv!(kvs, KV::new("Connections", &[], None));
-        // for each node add a connection from it to its parent
-        for ni in 0..self.nodes.len() {
-            let parent = self.parent_node(ni);
-            let id = match parent {
-                None => 0,
-                Some(p) => self.nodes[p].id,
-            };
-            let own_id = self.nodes[ni].id;
-            let vals = &[
-                Data::str("OO"),
-                Data::I64(own_id as i64),
-                Data::I64(id as i64),
-            ];
-            push_kv!(kvs, KV::new("C", vals, Some(conn_idx)));
-        }
-
-        // also add connections from nodes to their mesh
-        for node in &self.nodes {
-            let Some(mi) = node.mesh else {
-                continue;
-            };
-
-            let vals = &[
-                Data::str("OO"),
-                Data::I64(self.meshes[mi].id as i64),
-                Data::I64(node.id as i64),
-            ];
-            push_kv!(kvs, KV::new("C", vals, Some(conn_idx)));
-        }
-
-        let obj_kv = push_kv!(kvs, KV::new("Objects", &[], None));
-
-        for mesh in &self.meshes {
-            mesh.to_kvs(obj_kv, &mut kvs);
-        }
-
-        for node in &self.nodes {
-            node.to_kvs(obj_kv, &mut kvs);
-        }
+        // have ordered the root fields to match the order of input
 
         root_fields!(
             kvs,
@@ -120,14 +81,23 @@ impl FBXScene {
               "FBXHeaderVersion", &[Data::I32(7600)],
               "EncryptionType", &[Data::I32(0)],
               "Creator", &[Data::str("pars3d")],
+              "CreationTimeStamp", &[] => |c| add_kvs!(
+                kvs, c,
+                "Version", &[Data::I32(101)],
+                "Year", &[Data::I32(1970)],
+                "Month", &[Data::I32(1)],
+                "Day", &[Data::I32(1)],
+                "Hour", &[Data::I32(1)],
+                "Minute", &[Data::I32(1)],
+                "Second", &[Data::I32(1)],
+                "Millisecond", &[Data::I32(1)],
+              ),
               "SceneInfo", &[Data::str("GlobalInfo\x00\x01SceneInfo"), Data::str("UserData")],
             ),
         );
-        root_fields!(kvs, "FileId", &[Data::Binary(vec![0; 16])]);
-        root_fields!(kvs, "Takes", &[] => |c| add_kvs!(kvs, c, "Current", &[Data::str("")]));
+        root_fields!(kvs, "FileId", &[Data::Binary(self.file_id.clone())]);
         root_fields!(kvs, "CreationTime", &[Data::str("1970-01-01 10:00:00:000")]);
         root_fields!(kvs, "Creator", &[Data::str("pars3d")]);
-        root_fields!(kvs, "References", &[]);
 
         let int_p = |name, val| {
             [
@@ -168,26 +138,77 @@ impl FBXScene {
           ),
         );
 
-        root_fields!(kvs, "Definitions", &[] => |c| add_kvs!(kvs, c,
-          "Version", &[Data::I32(101)],
-          // This should repeat for multiple things
-          "Count", &[Data::I32(1 /* not sure what this is */)],
-          "ObjectType", &[Data::str("" /* not sure */)] => |c| add_kvs!(
-              kvs, c,
-              "Count", &[Data::I32(0)],
-              "PropertyTemplate", &[Data::str("FbxMesh")]),
-          ),
-        );
-
         root_fields!(
           kvs,
           "Documents", &[] => |c| add_kvs!(
             kvs, c,
             "Count", &[Data::I32(1)],
-            "Document", &[Data::I64(id() as i64), Data::str("Scene"), Data::str("Scene")] => |c| {
-              add_kvs!(kvs, c, "RootNode", &[Data::I64(0)]);
-            },
+            "Document", &[Data::I64(id() as i64), Data::str("Scene"), Data::str("Scene")] => |c| add_kvs!(kvs, c, "RootNode", &[Data::I64(0)]),
           ),
+        );
+
+        root_fields!(kvs, "References", &[]);
+
+        root_fields!(
+          kvs, "Definitions", &[] => |c| add_kvs!(kvs, c,
+          "Version", &[Data::I32(101)],
+          // This should repeat for multiple things
+          "Count", &[Data::I32(1 /* not sure what this is */)],
+          "ObjectType", &[Data::str("" /* not sure */)] => |c| add_kvs!(
+              kvs, c,
+              "Count", &[Data::I32(1)],
+              "PropertyTemplate", &[Data::str("FbxMesh")]),
+          ),
+        );
+
+        let obj_kv = push_kv!(kvs, KV::new("Objects", &[], None));
+
+        for mesh in &self.meshes {
+            mesh.to_kvs(obj_kv, &mut kvs);
+        }
+
+        for node in &self.nodes {
+            node.to_kvs(obj_kv, &mut kvs);
+        }
+
+
+
+        let conn_idx = push_kv!(kvs, KV::new("Connections", &[], None));
+        // for each node add a connection from it to its parent
+        for ni in 0..self.nodes.len() {
+            let parent = self.parent_node(ni);
+            let id = match parent {
+                None => 0,
+                Some(p) => self.nodes[p].id,
+            };
+            let own_id = self.nodes[ni].id;
+            let vals = &[
+                Data::str("OO"),
+                Data::I64(own_id as i64),
+                Data::I64(id as i64),
+            ];
+            push_kv!(kvs, KV::new("C", vals, Some(conn_idx)));
+        }
+
+        // also add connections from nodes to their mesh
+        for node in &self.nodes {
+            let Some(mi) = node.mesh else {
+                continue;
+            };
+
+            let vals = &[
+                Data::str("OO"),
+                Data::I64(self.meshes[mi].id as i64),
+                Data::I64(node.id as i64),
+            ];
+            push_kv!(kvs, KV::new("C", vals, Some(conn_idx)));
+        }
+
+        root_fields!(
+          kvs,
+          "Takes", &[] => |c| add_kvs!(
+            kvs, c, "Current", &[Data::str("")]
+          )
         );
 
         kvs
@@ -222,48 +243,39 @@ impl FBXMesh {
             .collect::<Vec<i32>>();
 
         add_kvs!(
-            kvs,
-            mesh_kv,
-            "Properties70",
-            &[],
+            kvs, mesh_kv,
+            "Properties70", &[],
             "GeometryVersion", &[Data::I32(101)],
             "Vertices", &[Data::F64Arr(vert_vals)],
             "PolygonVertexIndex", &[Data::I32Arr(faces)],
-
-            "LayerElementNormal", &[Data::I32(0)] => |c| add_kvs!(
+            if false && !self.n.is_empty() => "LayerElementNormal", &[Data::I32(0)] => |c| add_kvs!(
               kvs, c,
               "Version", &[Data::I32(101)],
               "Name", &[Data::str("Normal1")],
-              "MappingInformationType", &[Data::str("ByPolygonVertex")],
-              "ReferenceInformationType", &[Data::str(if self.vert_norm_idx.is_empty() {
-                "Direct"
-              } else {
-                "IndexToDirect"
-              })],
+              "MappingInformationType", &[Data::str(self.n.map_kind.to_str())],
+              "ReferenceInformationType", &[Data::str(self.n.ref_kind.to_str())],
               "Normals", &[Data::F64Arr(
-                self.n.iter().flat_map(|v| v.iter().map(to_f64)).collect::<Vec<f64>>()
+                self.n.values.iter().flat_map(|n| n.into_iter().map(to_f64)).collect::<Vec<_>>()
               )],
               "NormalsIndex", &[Data::I32Arr(
-                self.vert_norm_idx.iter().map(to_i32).collect::<Vec<i32>>()
+                self.n.indices.iter().map(to_i32).collect::<Vec<_>>()
               )],
             ),
 
-            "LayerElementUV", &[Data::I32(0)] => |c| add_kvs!(
+            if false && !self.uv.is_empty() => "LayerElementUV", &[Data::I32(0)] => |c| add_kvs!(
               kvs, c,
               "Version", &[Data::I32(101)],
               "Name", &[Data::str("UV0")],
-              "MappingInformationType", &[Data::str("ByPolygonVertex")],
-              "ReferenceInformationType", &[Data::str("IndexToDirect")],
+              "MappingInformationType", &[Data::str(self.uv.map_kind.to_str())],
+              "ReferenceInformationType", &[Data::str(self.uv.ref_kind.to_str())],
               "UV", &[Data::F64Arr(
-                self.uv.iter().flat_map(|uv| uv.iter().map(to_f64)).collect::<Vec<f64>>()
+                self.uv.values.iter().flat_map(|uv| uv.into_iter().map(to_f64)).collect::<Vec<_>>()
               )],
               "UVIndex", &[Data::I32Arr(
-                self.uv_idx.iter().map(to_i32).collect::<Vec<i32>>()
+                self.uv.indices.iter().map(to_i32).collect::<Vec<_>>()
               )],
             ),
         );
-
-        // TODO export UV and normals
     }
 }
 
@@ -277,12 +289,9 @@ impl FBXNode {
 
         let node_kv = push_kv!(kvs, KV::new("Model", &vals, Some(parent)));
         add_kvs!(
-            kvs,
-            node_kv,
-            "Version",
-            &[Data::I32(101)],
-            "Properties70",
-            &[], /* children properties */
+            kvs, node_kv,
+            "Version", &[Data::I32(101)],
+            "Properties70", &[] => |c| add_kvs!(kvs, c), /* children properties */
 
                  /* MultiTake */
                  /* Culling */

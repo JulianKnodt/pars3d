@@ -1,4 +1,7 @@
-use super::{FBXAnim, FBXMaterial, FBXMesh, FBXMeshMaterial, FBXNode, FBXScene, FBXSkin};
+use super::{
+    FBXAnim, FBXMaterial, FBXMesh, FBXMeshMaterial, FBXNode, FBXScene, FBXSkin, RefKind,
+    VertexMappingKind,
+};
 use crate::{FaceKind, F};
 
 use std::ascii::Char;
@@ -100,40 +103,6 @@ impl Data {
 pub enum MappingKind {
     PerPolygon,
     Uniform,
-}
-
-/// How to map some information to vertices
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RefInfoKind {
-    Direct,
-    IndexToDirect,
-}
-
-impl RefInfoKind {
-    pub fn from_str(s: &str) -> Self {
-        match s {
-            "Direct" => RefInfoKind::Direct,
-            "IndexToDirect" => RefInfoKind::IndexToDirect,
-            _ => todo!("Unknown ref info type {s}, please file a bug."),
-        }
-    }
-}
-
-/// How to map some information to a mesh
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum VertexMappingKind {
-    ByPolygonVertex,
-    ByVertices,
-}
-
-impl VertexMappingKind {
-    pub fn from_str(s: &str) -> Self {
-        match s {
-            "ByPolygonVertex" => VertexMappingKind::ByPolygonVertex,
-            "ByVertice" => VertexMappingKind::ByVertices,
-            _ => todo!("Unknown vertex mapping kind {s}, please file a bug."),
-        }
-    }
 }
 
 /// One token of a tokenized FBX file.
@@ -577,26 +546,26 @@ impl KVs {
                       curr_face.insert(vi as usize);
                   } else {
                       curr_face.insert(-(vi + 1) as usize);
+                      assert!(curr_face.len() >= 3);
                       let f = std::mem::replace(&mut curr_face, FaceKind::empty());
                       out.f.push(f);
                   }
               }
+              assert!(curr_face.is_empty());
           },
           "Edges", &[Data::I32Arr(_)] => |_| { /* No idea what to do here */ },
           "LayerElementNormal", &[Data::I32(_/*index of normal*/)] => |c| {
-              let mut map_kind = VertexMappingKind::ByVertices;
-              let mut ref_kind = RefInfoKind::Direct;
               match_children!(
                 self, c,
                 "Version", &[Data::I32(_)] => |_| {},
                 "Name", &[Data::String(_)] => |_| {},
                 "MappingInformationType", &[Data::String(_)] => |c: usize| {
                     let map_str = self.kvs[c].values[0].as_str().unwrap();
-                    map_kind = VertexMappingKind::from_str(map_str);
+                    out.n.map_kind = VertexMappingKind::from_str(map_str);
                 },
                 "ReferenceInformationType", &[Data::String(_)] => |c: usize| {
                     let ref_str = self.kvs[c].values[0].as_str().unwrap();
-                    ref_kind = RefInfoKind::from_str(ref_str);
+                    out.n.ref_kind = RefKind::from_str(ref_str);
                 },
                 "Normals", &[Data::F64Arr(_)] => |c: usize| {
                     let gc = &self.kvs[c];
@@ -604,30 +573,8 @@ impl KVs {
                       unreachable!();
                     };
                     assert_eq!(ns.len() % 3, 0);
-                    out.n.reserve(out.v.len());
-                    use RefInfoKind::*;
-                    use VertexMappingKind::*;
-                    match (map_kind, ref_kind) {
-                      (ByPolygonVertex, IndexToDirect) |
-                      (ByVertices, Direct) => {
-                        let iter = ns.array_chunks::<3>().map(|n| n.map(|v| v as F));
-                        out.n.extend(iter);
-                      },
-                      // not entirely sure how to handle this case
-                      (ByPolygonVertex, Direct) => {
-                        assert!(!out.f.is_empty());
-                        out.n.resize(out.v.len(), [0.; 3]);
-                        for f in out.f.iter() {
-                          for &vi in f.as_slice() {
-                            let n = std::array::from_fn(|i| ns[vi * 3 + i] as F);
-                            assert!(out.n[vi] == [0.; 3] || out.n[vi] == n);
-                            out.n[vi] = n;
-                          }
-                        }
-                        assert!(out.n.iter().all(|&n| n != [0.; 3]));
-                      },
-                      (ByVertices, IndexToDirect) => todo!("unhandled case"),
-                    }
+                    let iter = ns.array_chunks::<3>().map(|n| n.map(|v| v as F));
+                    out.n.values.extend(iter);
                 },
                 "NormalsIndex", &[Data::I32Arr(_)] => |c: usize| {
                     let gc = &self.kvs[c];
@@ -639,7 +586,7 @@ impl KVs {
                         .copied()
                         .inspect(|&idx| assert!(idx >= 0))
                         .map(|v| v as usize);
-                    out.vert_norm_idx.extend(idxs);
+                    out.n.indices.extend(idxs);
                 },
                 "NormalsW", &[Data::F64Arr(_)] => |_| { /*normals winding, not sure*/ },
             );
@@ -649,17 +596,20 @@ impl KVs {
               "Version", &[Data::I32(_)] => |_| {},
               "Name", &[Data::String(_)] => |_| {},
               "MappingInformationType", &[Data::String(_)] => |c: usize| {
-                  assert_eq!(self.kvs[c].values[0], Data::str("ByPolygonVertex"));
+                  let map_str = self.kvs[c].values[0].as_str().unwrap();
+                  out.uv.map_kind = VertexMappingKind::from_str(map_str);
               },
               "ReferenceInformationType", &[Data::String(_)] => |c: usize| {
-                  assert_eq!(self.kvs[c].values[0], Data::str("IndexToDirect"));
+                  let ref_str = self.kvs[c].values[0].as_str().unwrap();
+                  out.uv.ref_kind = RefKind::from_str(ref_str);
               },
               "UV", &[Data::F64Arr(_)] => |c: usize| {
                   let Data::F64Arr(ref arr) = &self.kvs[c].values[0] else {
                     todo!();
                   };
-                  out.uv
-                      .extend(arr.array_chunks::<2>().map(|uv| uv.map(|v| v as F)));
+                  assert_eq!(arr.len() % 2, 0);
+                  let uvs = arr.array_chunks::<2>().map(|uv| uv.map(|v| v as F));
+                  out.uv.values.extend(uvs);
               },
               "UVIndex", &[Data::I32Arr(_)] => |c: usize| {
                   let Data::I32Arr(ref arr) = self.kvs[c].values[0] else {
@@ -670,7 +620,7 @@ impl KVs {
                       .copied()
                       .inspect(|&idx| assert!(idx >= 0))
                       .map(|v| v as usize);
-                  out.uv_idx.extend(idxs);
+                  out.uv.indices.extend(idxs);
               }
           ),
           "LayerElementMaterial", &[Data::I32(_/*idx of mat*/)] => |c| {
@@ -737,7 +687,7 @@ impl KVs {
                       todo!();
                   };
                   let vc = v.array_chunks::<3>().map(|v| v.map(|v| v as F));
-                  out.vertex_colors.extend(vc);
+                  out.color.values.extend(vc);
               },
               "ColorIndex", &[Data::I32Arr(_)] => |c: usize| {
                   let Data::I32Arr(ref arr) = &self.kvs[c].values[0] else {
@@ -748,7 +698,7 @@ impl KVs {
                       .copied()
                       .inspect(|&idx| assert!(idx >= 0))
                       .map(|v| v as usize);
-                  out.vertex_color_idx.extend(idxs);
+                  out.color.indices.extend(idxs);
               },
           ),
           "Layer", &[Data::I32(_)] => |c| match_children!(
@@ -809,6 +759,12 @@ impl KVs {
 
             assert!(!self.children.contains_key(&child));
         }
+
+        /*
+        for &(src, dst) in &connections {
+          println!("{} -> {}", self.kvs[id_to_kv[&src]].key, self.kvs[id_to_kv[&dst]].key);
+        }
+        */
 
         // connections by source id or destination id
         macro_rules! conns {
@@ -1007,7 +963,17 @@ impl KVs {
           "FBXHeaderVersion", &[Data::I32(_)] => |_| {},
           "FBXVersion", &[Data::I32(_)] => |_| {},
           "EncryptionType", &[Data::I32(0)] => |_| {},
-          "CreationTimeStamp", &[] => |_| {},
+          "CreationTimeStamp", &[] => |c| match_children!(
+            self, c,
+            "Version", &[Data::I32(_)] => |_| {},
+            "Year", &[Data::I32(_)] => |_| {},
+            "Month", &[Data::I32(_)] => |_| {},
+            "Day", &[Data::I32(_)] => |_| {},
+            "Hour", &[Data::I32(_)] => |_| {},
+            "Minute", &[Data::I32(_)] => |_| {},
+            "Second", &[Data::I32(_)] => |_| {},
+            "Millisecond", &[Data::I32(_)] => |_| {},
+          ),
           "Creator", &[Data::String(_)] => |_| {},
           "SceneInfo", &[Data::String(_), Data::String(_)] => |v: usize| {
             match_children!(
@@ -1037,6 +1003,8 @@ impl KVs {
             };
             assert_eq!(b.len(), 16);
             fbx_scene.file_id.clone_from(b);
+        } else {
+          eprintln!("Missing File ID in FBX");
         }
 
         root_fields!(self, "CreationTime", &[Data::String(_)]);
@@ -1104,7 +1072,7 @@ impl KVs {
           "Count", &[Data::I32(1)] => |_| {},
           "Document", &[Data::I64(_), Data::String(_), Data::String(_)] => |v: usize| {
             let kv = &self.kvs[v];
-            //assert_eq!(kv.values[1].as_str().unwrap(), "Scene", "{kv:?}");
+            assert_matches!(kv.values[1].as_str().unwrap(), "Scene" |  "");
             assert_eq!(kv.values[2].as_str().unwrap(), "Scene", "{kv:?}");
             match_children!(
               self, v,
@@ -1146,12 +1114,10 @@ impl KVs {
           "Count", &[Data::I32(_)] => |_| {},
           "ObjectType", &[Data::String(_)] => |v| match_children!(self, v,
             "Count", &[Data::I32(_)] => |_| {},
-            "PropertyTemplate", &[Data::String(_)] => |v: usize| {
-              assert_matches!(
-                self.kvs[v].values[0].as_str().unwrap(),
-                "FbxVideo" | "FbxAnimCurveNode" | "FbxFileTexture" | "FbxBindingTable" | "FbxImplementation" | "FbxNull" | "FbxSurfaceLambert" | "FbxAnimLayer" | "FbxAnimStack" | "FbxCamera" | "FbxMesh" | "FbxNode" | "FbxSurfacePhong",
-              );
-            }
+            "PropertyTemplate", &[Data::String(_)] => |v: usize| assert_matches!(
+              self.kvs[v].values[0].as_str().unwrap(),
+              "FbxVideo" | "FbxAnimCurveNode" | "FbxFileTexture" | "FbxBindingTable" | "FbxImplementation" | "FbxNull" | "FbxSurfaceLambert" | "FbxAnimLayer" | "FbxAnimStack" | "FbxCamera" | "FbxMesh" | "FbxNode" | "FbxSurfacePhong",
+            ),
           ),
         );
 

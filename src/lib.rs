@@ -236,7 +236,6 @@ impl FaceKind {
         self.as_mut_slice().rotate_left(min_idx);
         false
     }
-    #[allow(unused)]
     pub(crate) fn insert(&mut self, v: usize) {
         use FaceKind::*;
         *self = match self {
@@ -252,7 +251,6 @@ impl FaceKind {
             },
         }
     }
-    #[allow(unused)]
     pub(crate) fn empty() -> Self {
         FaceKind::Poly(vec![])
     }

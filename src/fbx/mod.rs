@@ -137,21 +137,97 @@ pub struct FBXMesh {
     id: usize,
     name: String,
 
-    v: Vec<[F; 3]>,
-    f: Vec<FaceKind>,
+    pub v: Vec<[F; 3]>,
+    pub f: Vec<FaceKind>,
 
-    n: Vec<[F; 3]>,
-    // for each vertex, what is its normal
-    vert_norm_idx: Vec<usize>,
-
-    // TODO need to add multiple channels here
-    uv: Vec<[F; 2]>,
-    uv_idx: Vec<usize>,
-
-    vertex_colors: Vec<[F; 3]>,
-    vertex_color_idx: Vec<usize>,
+    pub n: VertexAttribute<3>,
+    pub uv: VertexAttribute<2>,
+    color: VertexAttribute<3>,
 
     mat: FBXMeshMaterial,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct VertexAttribute<const N: usize, T = F> {
+    values: Vec<[T; N]>,
+    indices: Vec<usize>,
+
+    ref_kind: RefKind,
+    map_kind: VertexMappingKind,
+}
+
+impl<T, const N: usize> VertexAttribute<N, T> {
+    pub fn len(&self) -> usize {
+        match self.ref_kind {
+            RefKind::Direct => self.values.len(),
+            RefKind::IndexToDirect => self.indices.len(),
+        }
+    }
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+    pub fn v(&self, vi: usize) -> [T; N]
+    where
+        T: Copy,
+    {
+        match self.ref_kind {
+            RefKind::Direct => self.values[vi],
+            RefKind::IndexToDirect => {
+                assert!(!self.indices.is_empty());
+                self.values[self.indices[vi]]
+            }
+        }
+    }
+}
+
+/// How to map some information to vertices
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RefKind {
+    #[default]
+    Direct,
+    IndexToDirect,
+}
+
+impl RefKind {
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "Direct" => Self::Direct,
+            "IndexToDirect" => Self::IndexToDirect,
+            _ => todo!("Unknown ref info type {s}, please file a bug."),
+        }
+    }
+    pub fn to_str(&self) -> &'static str {
+        match self {
+            Self::Direct => "Direct",
+            Self::IndexToDirect => "IndexToDirect",
+        }
+    }
+}
+
+/// How to map some information to a mesh
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum VertexMappingKind {
+    /// 1-1 mapping with vertices
+    #[default]
+    ByVertices,
+    /// Wedge (Per face has different values)
+    Wedge,
+}
+
+impl VertexMappingKind {
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "ByPolygonVertex" => VertexMappingKind::Wedge,
+            "ByVertice" => VertexMappingKind::ByVertices,
+            _ => todo!("Unknown vertex mapping kind {s}, please file a bug."),
+        }
+    }
+    pub fn to_str(&self) -> &'static str {
+        match self {
+            VertexMappingKind::Wedge => "ByPolygonVertex",
+            VertexMappingKind::ByVertices => "ByVertice",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
