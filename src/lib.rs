@@ -9,6 +9,7 @@
 #![feature(ascii_char)]
 #![feature(ascii_char_variants)]
 #![feature(assert_matches)]
+#![feature(generic_arg_infer)]
 
 #[cfg(not(feature = "f64"))]
 pub type U = u32;

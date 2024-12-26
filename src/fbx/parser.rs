@@ -139,16 +139,31 @@ impl KV {
 macro_rules! match_children {
   ($self: ident, $i: expr $(, $key:expr, $mtch: pat => $val:expr )* $(,)? ) => {{
     let kv = &$self.kvs[$i];
+    /* Debug
+    #[allow(unused)]
+    let mut matches: [(&'static str, bool); _] = [$(($key, false),)*];
+    */
+
     for &c in $self.children.get(&$i).map(Vec::as_slice).unwrap_or(&[]) {
       let c_kv = &$self.kvs[c];
+
       match c_kv.key.as_str() {
         $($key => {
           assert_matches!(c_kv.values.as_slice(), $mtch, "{} {}", $key, kv.key);
+          //matches.iter_mut().find(|v| v.0 == $key).unwrap().1 = true;
           $val(c)
         })*
         x => todo!("Unhandled key {x:?} in {} children", kv.key),
       }
     }
+
+    /*
+    for (k, did_match) in matches {
+      if !did_match {
+        println!("Could not find {k} in {} ({}:{})", kv.key, file!(), line!());
+      }
+    }
+    */
   }};
 }
 
@@ -242,12 +257,10 @@ impl KVs {
         out.id = node_id as usize;
 
         match_children!(
-          self,
-          kvi,
+          self, kvi,
           "Version", &[Data::I32(_)] => |_| {},
-          "Properties70", &[] => |v| match_children!(
-            self,
-            v,
+          "Properties70", &[] => |c| match_children!(
+            self, c,
             "P", &[
                 Data::String(_), Data::String(_), Data::String(_), Data::String(_),
                 Data::F64(_), Data::F64(_), Data::F64(_)
@@ -257,8 +270,8 @@ impl KVs {
             ] | &[
                 Data::String(_), Data::String(_), Data::String(_), Data::String(_),
                 Data::I16(_), Data::I16(_), Data::I16(_)
-            ] => |v: usize| {
-                let vals = &self.kvs[v].values;
+            ] => |c: usize| {
+                let vals = &self.kvs[c].values;
                 match vals[0].as_str().unwrap() {
                   "Lcl Rotation" => {
                     out.transform.rotation = [4,5,6].map(|i| vals[i].as_float().unwrap());
@@ -287,10 +300,12 @@ impl KVs {
              },
           ),
           "MultiLayer", &[Data::I32(_)] => |_| {},
-          "Culling", &[Data::String(_)] => |v: usize| {
-            assert_matches!(self.kvs[v].values[0].as_str(), Some("CullingOff" | "CullingOn"));
+          "Culling", &[Data::String(_)] => |c: usize| {
+            assert_matches!(self.kvs[c].values[0].as_str(), Some("CullingOff" | "CullingOn"));
           },
-          "MultiTake", &[Data::I32(_)] => |_| {},
+          "MultiTake", &[Data::I32(_)] => |c: usize| {
+            assert_matches!(self.kvs[c].values[0].as_int(), Some(0));
+          },
           "Shading", &[Data::Bool(_)] => |_| {},
         );
     }
@@ -380,8 +395,8 @@ impl KVs {
           self, kvi,
           "Default", &[Data::F64(_)] => |_| {},
           "KeyVer", &[Data::I32(_)] => |_| {},
-          "KeyTime", &[Data::I64Arr(_)] => |v: usize| {
-            let val = self.kvs[v].values[0].as_i64_arr().unwrap();
+          "KeyTime", &[Data::I64Arr(_)] => |c: usize| {
+            let val = self.kvs[c].values[0].as_i64_arr().unwrap();
             anim.times.extend(val.into_iter().map(|&v| v as u32));
           },
           "KeyValueFloat", &[Data::F32Arr(_)] => |_| {},
@@ -421,20 +436,20 @@ impl KVs {
           "Version", &[Data::I32(_)] => |_| {},
           "UserData", &[Data::String(_), Data::String(_)] => |_| {},
           // Damn you FBX
-          "Indexes", &[Data::I32Arr(_)] => |v: usize| {
-            let idxs = self.kvs[v].values[0].as_i32_arr().unwrap();
+          "Indexes", &[Data::I32Arr(_)] => |c: usize| {
+            let idxs = self.kvs[c].values[0].as_i32_arr().unwrap();
             fbx_skin.indices.extend(idxs.into_iter().map(|&v| v as usize));
           },
-          "Weights", &[Data::F64Arr(_)] => |v: usize| {
-            let ws = self.kvs[v].values[0].as_f64_arr().unwrap();
+          "Weights", &[Data::F64Arr(_)] => |c: usize| {
+            let ws = self.kvs[c].values[0].as_f64_arr().unwrap();
             fbx_skin.weights.extend(ws.into_iter().map(|&v| v as F));
           },
-          "Transform", &[Data::F64Arr(_)] => |v: usize| {
-            let tform = self.kvs[v].values[0].as_f64_arr().unwrap();
+          "Transform", &[Data::F64Arr(_)] => |c: usize| {
+            let tform = self.kvs[c].values[0].as_f64_arr().unwrap();
             assert_eq!(tform.len(), 16);
           },
-          "TransformLink", &[Data::F64Arr(_)] => |v: usize| {
-            let tform_link = self.kvs[v].values[0].as_f64_arr().unwrap();
+          "TransformLink", &[Data::F64Arr(_)] => |c: usize| {
+            let tform_link = self.kvs[c].values[0].as_f64_arr().unwrap();
             assert_eq!(tform_link.len(), 16);
           },
         );
@@ -537,6 +552,7 @@ impl KVs {
                   .array_chunks::<3>()
                   .map(|[a, b, c]| [*a as F, *b as F, *c as F]);
               out.v.extend(v);
+              match_children!(self, c);
           },
           "GeometryVersion", &[Data::I32(_)] => |c| match_children!(self, c),
           "PolygonVertexIndex", &[Data::I32Arr(_)] => |c: usize| {
@@ -702,13 +718,19 @@ impl KVs {
                   out.color.indices.extend(idxs);
               },
           ),
-          "Layer", &[Data::I32(_)] => |c| match_children!(
+          "Layer", &[Data::I32(0)] => |c| match_children!(
             self, c,
             "Version", &[Data::I32(_)] => |_| {},
-            "Name", &[Data::String(_)] => |_| { todo!() },
-            "MappingInformationType", &[Data::String(_)] => |_| {},
-            "ReferenceInformationType", &[Data::String(_)] => |_| {},
-            "LayerElement", &[] => |_| {},
+            "LayerElement", &[] => |c| match_children!(
+              self, c,
+              "Type", &[Data::String(_)] => |c: usize| {
+                assert_matches!(
+                  self.kvs[c].values[0].as_str().unwrap(),
+                  "LayerElementNormal" | "LayerElementUV" | "LayerElementMaterial"
+                );
+              },
+              "TypedIndex", &[Data::I32(0)] => |_| {},
+            ),
           ),
           // omit for now
           "LayerElementSmoothing", &[] | &[Data::I32(_)] => |_| {},
@@ -976,15 +998,15 @@ impl KVs {
             "Millisecond", &[Data::I32(_)] => |_| {},
           ),
           "Creator", &[Data::String(_)] => |_| {},
-          "SceneInfo", &[Data::String(_), Data::String(_)] => |v: usize| {
+          "SceneInfo", &[Data::String(_), Data::String(_)] => |c: usize| {
             match_children!(
-              self, v,
+              self, c,
               "Type", &[Data::String(_)] => |c: usize| {
                 assert_eq!("UserData", self.kvs[c].values[0].as_str().unwrap());
               },
               "Version", &[Data::I32(_)] => |_| {},
-              "MetaData", &[] => |v| match_children!(
-                self, v,
+              "MetaData", &[] => |c| match_children!(
+                self, c,
                 "Version", &[Data::I32(_)] => |_| {},
                 "Title", &[Data::String(_)] => |_| {},
                 "Subject", &[Data::String(_)] => |_| {},
@@ -1007,7 +1029,7 @@ impl KVs {
             assert_eq!(b.len(), 16);
             fbx_scene.file_id.clone_from(b);
         } else {
-          eprintln!("Missing File ID in FBX");
+            eprintln!("Missing File ID in FBX");
         }
 
         root_fields!(self, "CreationTime", &[Data::String(_)]);
@@ -1019,9 +1041,9 @@ impl KVs {
           self,
           "GlobalSettings", &[],
           "Version", &[Data::I32(_)] => |_| {},
-          "Properties70", &[] => |v| {
+          "Properties70", &[] => |c| {
             match_children!(
-              self, v,
+              self, c,
               "P",
               &[
                 Data::String(_), Data::String(_), Data::String(_), Data::String(_),
@@ -1031,8 +1053,8 @@ impl KVs {
                 Data::F64(_), Data::F64(_), Data::F64(_)
               ] | &[
                 Data::String(_), Data::String(_), Data::String(_), Data::String(_),
-              ] => |v: usize| {
-                let vals = &self.kvs[v].values;
+              ] => |c: usize| {
+                let vals = &self.kvs[c].values;
                 macro_rules! assign {
                   ($v: expr, $fn: ident) => {{
                     $v = *vals[4].$fn().unwrap_or(&$v);
@@ -1073,37 +1095,31 @@ impl KVs {
           "Documents", &[],
           // I think this is only ever 1 for 1 scene
           "Count", &[Data::I32(1)] => |_| {},
-          "Document", &[Data::I64(_), Data::String(_), Data::String(_)] => |v: usize| {
-            let kv = &self.kvs[v];
+          "Document", &[Data::I64(_), Data::String(_), Data::String(_)] => |c: usize| {
+            let kv = &self.kvs[c];
             fbx_scene.id = kv.values[0].as_int().unwrap() as usize;
             assert_matches!(kv.values[1].as_str().unwrap(), "Scene" |  "");
             assert_eq!(kv.values[2].as_str().unwrap(), "Scene", "{kv:?}");
             match_children!(
-              self, v,
-              "Properties70", &[] => |v| {
-                match_children!(self,v,
-
-                "P",
-                &[
+              self, c,
+              "Properties70", &[] => |c| match_children!(self,c,
+                "P", &[
                   Data::String(_), Data::String(_), Data::String(_),
                   Data::I32(_) | Data::String(_)
                 ] |
                 &[
                   Data::String(_), Data::String(_), Data::String(_),
                   Data::String(_), Data::String(_)
-                ]
-                => |v: usize| {
-                    let vals = &self.kvs[v].values;
-                    match vals[0].as_str().unwrap() {
-                      "SourceObject" => {},
-                      "ActiveAnimStackName" => {},
-                      x => todo!("{x}"),
-                    }
+                ] => |c: usize| {
+                  let vals = &self.kvs[c].values;
+                  match vals[0].as_str().unwrap() {
+                    "SourceObject" => {},
+                    "ActiveAnimStackName" => {},
+                    x => todo!("{x}"),
                   }
-                );
-              },
-
-              "RootNode", &[Data::I64(_)] => |v| assert!(!self.children.contains_key(&v)),
+                }
+              ),
+              "RootNode", &[Data::I64(_)] => |c| match_children!(self, c),
             );
           },
         );
@@ -1116,10 +1132,10 @@ impl KVs {
           "Definitions", &[],
           "Version", &[Data::I32(_)] => |_| {},
           "Count", &[Data::I32(_)] => |_| {},
-          "ObjectType", &[Data::String(_)] => |v| match_children!(self, v,
+          "ObjectType", &[Data::String(_)] => |c| match_children!(self, c,
             "Count", &[Data::I32(_)] => |_| {},
-            "PropertyTemplate", &[Data::String(_)] => |v: usize| assert_matches!(
-              self.kvs[v].values[0].as_str().unwrap(),
+            "PropertyTemplate", &[Data::String(_)] => |c: usize| assert_matches!(
+              self.kvs[c].values[0].as_str().unwrap(),
               "FbxVideo" | "FbxAnimCurveNode" | "FbxFileTexture" | "FbxBindingTable" | "FbxImplementation" | "FbxNull" | "FbxSurfaceLambert" | "FbxAnimLayer" | "FbxAnimStack" | "FbxCamera" | "FbxMesh" | "FbxNode" | "FbxSurfacePhong",
             ),
           ),
@@ -1284,14 +1300,19 @@ fn read_scope(
     let end_offset = read_word!();
 
     // this marks the end of the tokens of the tokens of the tokens of the tokens
-    if end_offset == 0 {
-        return Ok((false, read));
-    }
     let block_len = end_offset - (prev_read as u64);
 
     let prop_count = read_word!();
     let prop_len = read_word!();
+
     let scope_name = read_string!(false, false);
+
+    // while technically this could be right under where end_offset is read,
+    // some parsers expect all the above properties to be included.
+    // By having it here, it ensures that all the above are properly set.
+    if end_offset == 0 {
+        return Ok((false, read));
+    }
     assert_ne!(scope_name, "");
 
     output_tokens.push(Token::Key(scope_name.clone()));

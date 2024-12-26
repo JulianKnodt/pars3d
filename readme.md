@@ -44,6 +44,7 @@ fbx::export::export_fbx(fbx_scene, std::io::BufWriter::new(out)).expect("Failed 
 |import|Y|Y|Y|Y|Y|Y|
 |export|Y|Y|In progress|Y|Y|Y|
 |Unified Repr|Y|Y|Y|Y|Y|Y|
+|Allocations|Few, Large|Few, Large|Many, Small|?|?|?|
 
 Unified Repr indicates that there is a single struct which can be used to interchange between
 each format.

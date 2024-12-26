@@ -99,6 +99,7 @@ impl FBXScene {
                 "Version", &[Data::I32(100)],
                 "MetaData", &[] => |c| add_kvs!(
                   kvs, c,
+                  "Version", &[Data::I32(100)],
                   "Title", &[Data::str("")],
                   "Subject", &[Data::str("")],
                   "Author", &[Data::str("")],
@@ -171,13 +172,13 @@ impl FBXScene {
 
         root_fields!(
           kvs, "Definitions", &[] => |c| add_kvs!(kvs, c,
-          "Version", &[Data::I32(101)],
-          // This should repeat for multiple things
-          "Count", &[Data::I32(1 /* not sure what this is */)],
-          "ObjectType", &[Data::str("" /* not sure */)] => |c| add_kvs!(
-              kvs, c,
-              "Count", &[Data::I32(1)],
-              "PropertyTemplate", &[Data::str("FbxMesh")]),
+            "Version", &[Data::I32(101)],
+            "Count", &[Data::I32(1 /* not sure what this is */)],
+            "ObjectType", &[Data::str("" /* not sure */)] => |c| add_kvs!(
+                kvs, c,
+                "Count", &[Data::I32(1)],
+                "PropertyTemplate", &[Data::str("FbxMesh")]
+            ),
           ),
         );
 
@@ -190,8 +191,6 @@ impl FBXScene {
         for node in &self.nodes {
             node.to_kvs(obj_kv, &mut kvs);
         }
-
-
 
         let conn_idx = push_kv!(kvs, KV::new("Connections", &[], None));
         // for each node add a connection from it to its parent
@@ -263,11 +262,29 @@ impl FBXMesh {
             .collect::<Vec<i32>>();
 
         add_kvs!(
-            kvs, mesh_kv,
-            "Properties70", &[],
-            "GeometryVersion", &[Data::I32(101)],
-            "Vertices", &[Data::F64Arr(vert_vals)],
-            "PolygonVertexIndex", &[Data::I32Arr(faces)],
+            kvs,
+            mesh_kv,
+            "Properties70",
+            &[],
+            "GeometryVersion",
+            &[Data::I32(101)],
+            "Vertices",
+            &[Data::F64Arr(vert_vals)],
+            "PolygonVertexIndex",
+            &[Data::I32Arr(faces)],
+            /*
+            "Layer", &[Data::I32(0)] => |c| add_kvs!(
+              kvs, c,
+              "Version", &[Data::I32(100)],
+              "LayerElement", &[] => |c| add_kvs!(
+                kvs, c,
+                "Type", &[Data::str("LayerElementNormal")],
+                "TypedIndex", &[Data::I32(0)],
+              ),
+            ),
+            */
+
+            /*
             if false && !self.n.is_empty() => "LayerElementNormal", &[Data::I32(0)] => |c| add_kvs!(
               kvs, c,
               "Version", &[Data::I32(101)],
@@ -295,6 +312,7 @@ impl FBXMesh {
                 self.uv.indices.iter().map(to_i32).collect::<Vec<_>>()
               )],
             ),
+            */
         );
     }
 }
@@ -312,11 +330,10 @@ impl FBXNode {
             kvs, node_kv,
             "Version", &[Data::I32(101)],
             "Properties70", &[] => |c| add_kvs!(kvs, c), /* children properties */
-
-                 /* MultiTake */
-                 /* Culling */
-                 /* MultiLayer */
-                 /* Shading */
+            "Culling", &[Data::str("CullingOff")],
+            "MultiTake", &[Data::I32(0)],
+            "MultiLayer", &[Data::I32(0)],
+            "Shading", &[Data::Bool(false)],
         );
     }
 }
@@ -358,6 +375,9 @@ pub fn write_token_set(
     macro_rules! write_word {
         ($dst:expr, $word: expr) => {{
             write_word!($dst, u64, $word)
+        }};
+        ($dst:expr, bool, $w: expr) => {{
+            write_word!($dst, u8, if $w { 1 } else { 0 })
         }};
         ($dst:expr, $ty: ty, $w: expr) => {{
             $dst.write(&($w as $ty).to_le_bytes())?
@@ -407,6 +427,7 @@ pub fn write_token_set(
 
                 Data::Binary(_) => 'R',
                 Data::String(_) => 'S',
+                Data::Bool(_) => 'C',
                 x => todo!("{x:?}"),
             };
             let c = write_word!($dst, u8, c);
@@ -419,6 +440,7 @@ pub fn write_token_set(
                 Data::I32Arr(arr) => write_arr!($dst, i32, arr),
                 Data::F64Arr(arr) => write_arr!($dst, f64, arr),
                 Data::String(s) => write_string!($dst, s, true, true),
+                Data::Bool(b) => write_word!($dst, bool, *b),
                 Data::Binary(b) => {
                     let len = write_word!($dst, u32, b.len());
                     assert_eq!(len, 4);
@@ -497,7 +519,11 @@ pub fn write_tokens(token_sets: &[Vec<Token>], mut w: (impl Write + Seek)) -> io
         assert_eq!(tkns, t.len());
         offset += w;
     }
+    // write an empty prop to signify the end
     let _ = w.write(&(0u64).to_le_bytes())?;
+    let _ = w.write(&(0u64).to_le_bytes())?;
+    let _ = w.write(&(0u64).to_le_bytes())?;
+    let _ = w.write(&(0u8).to_le_bytes())?;
 
     Ok(())
 }

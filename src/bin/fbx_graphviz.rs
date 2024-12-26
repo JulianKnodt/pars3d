@@ -14,8 +14,8 @@ fn main() -> std::io::Result<()> {
         fbx_files.push(f);
     }
     if fbx_files.is_empty() {
-      eprintln!("Usage: <bin> <...fbx files>");
-      return Ok(());
+        eprintln!("Usage: <bin> <...fbx files>");
+        return Ok(());
     }
 
     for filename in fbx_files {
