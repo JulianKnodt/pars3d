@@ -54,6 +54,10 @@ Secondary formats are considered less important for maintenance.
 If you want another format supported, please feel free to file an issue and I'll do my best to
 add it.
 
+### Contributing is welcome!
+
+File an issue, submit a PR, anything would be fantastic.
+
 # Visualization
 
 In addition to parsing 3D file formats, there is minimal support for visualization with vertex

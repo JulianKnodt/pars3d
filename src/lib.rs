@@ -194,6 +194,10 @@ impl FaceKind {
             Poly(v) => v.is_empty(),
         }
     }
+
+    pub fn edges(&self) -> impl Iterator<Item=[usize; 2]> + '_ {
+      edges(self.as_slice())
+    }
     /// Iterate over triangles in this face rooted at the 0th index.
     pub fn as_triangle_fan(&self) -> impl Iterator<Item = [usize; 3]> + '_ {
         let (&v0, rest) = self.as_slice().split_first().unwrap();
