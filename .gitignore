@@ -13,3 +13,4 @@ tmp/
 *.dot
 *.svg
 *.png
+*.binary

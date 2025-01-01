@@ -1,5 +1,6 @@
 #![feature(str_split_whitespace_remainder)]
 #![feature(array_windows)]
+#![feature(array_try_map)]
 #![feature(iter_array_chunks)]
 #![feature(cfg_match)]
 #![feature(cmp_minmax)]
@@ -46,6 +47,9 @@ pub mod stl;
 
 /// PLY parsing
 pub mod ply;
+
+/// MERL dataset loading.
+pub mod merl;
 
 /// Fuse vertices of a mesh together by distance.
 pub mod fuse;
@@ -195,8 +199,8 @@ impl FaceKind {
         }
     }
 
-    pub fn edges(&self) -> impl Iterator<Item=[usize; 2]> + '_ {
-      edges(self.as_slice())
+    pub fn edges(&self) -> impl Iterator<Item = [usize; 2]> + '_ {
+        edges(self.as_slice())
     }
     /// Iterate over triangles in this face rooted at the 0th index.
     pub fn as_triangle_fan(&self) -> impl Iterator<Item = [usize; 3]> + '_ {

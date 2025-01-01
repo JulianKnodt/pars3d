@@ -239,7 +239,7 @@ pub fn save_obj(
 
 #[test]
 fn test_load_save_obj() {
-    let scene: super::mesh::Scene = parse("garlic.obj", false, false)
+    let scene: crate::mesh::Scene = super::parse("garlic.obj", false, false)
         .expect("Failed to parse obj")
         .into();
     save_obj(
