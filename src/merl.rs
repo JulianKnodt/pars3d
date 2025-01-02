@@ -56,14 +56,16 @@ fn theta_phi_to_vec(theta: F, phi: F) -> [F; 3] {
 
 const HALF_PI: F = std::f64::consts::FRAC_PI_2 as F;
 const PI: F = std::f64::consts::PI as F;
+
 fn theta_half_index(theta_half: F) -> usize {
     if theta_half <= 0.0 {
         return 0;
     }
     let theta_half_deg = (theta_half / HALF_PI) * BRDF_SAMPLING_RES_THETA_H as F;
-    let temp = theta_half_deg * BRDF_SAMPLING_RES_THETA_H as F;
-    let temp = temp.sqrt().max(0.) as usize;
-    temp.min(BRDF_SAMPLING_RES_THETA_H - 1)
+    let tmp = theta_half_deg * BRDF_SAMPLING_RES_THETA_H as F;
+    let tmp = tmp.sqrt();
+    assert!(tmp.is_finite() && tmp >= 0.);
+    (tmp as usize).min(BRDF_SAMPLING_RES_THETA_H - 1)
 }
 
 fn theta_diff_index(theta_diff: F) -> usize {
@@ -84,7 +86,7 @@ fn phi_diff_index(phi_diff: F) -> usize {
 
     // In: phi_diff in [0 .. pi]
     // Out: tmp in [0 .. 179]
-    let tmp = (phi_diff / HALF_PI * BRDF_SAMPLING_RES_PHI_D as F) as usize;
+    let tmp = (phi_diff / PI * (BRDF_SAMPLING_RES_PHI_D / 2) as F) as usize;
     tmp.min(BRDF_SAMPLING_RES_PHI_D / 2 - 1)
 }
 
@@ -113,8 +115,10 @@ impl MERL {
         let normal = [0., 0., 1.];
         let binormal = [0., 1., 0.];
 
-        let tmp = rotate_on_axis(v_in, normal, -phi_half.sin(), phi_half.cos());
-        let diff = rotate_on_axis(tmp, binormal, -theta_half.sin(), theta_half.cos());
+        let nph = -phi_half;
+        let tmp = rotate_on_axis(v_in, normal, nph.sin(), nph.cos());
+        let nth = -theta_half;
+        let diff = rotate_on_axis(tmp, binormal, nth.sin(), nth.cos());
 
         let theta_diff = diff[2].acos();
         let phi_diff = diff[1].atan2(diff[0]);
