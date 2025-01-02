@@ -169,7 +169,7 @@ impl From<FBXMesh> for Mesh {
                 if !verts.contains_key(&key) {
                     new_v.push(v[*vi]);
                     new_uv.push(uv.v(offset + o));
-                    new_n.push(n.v(offset + 0));
+                    new_n.push(n.v(offset + o));
                     verts.insert(key, new_v.len() - 1);
                 }
                 new_f.insert(verts[&key]);

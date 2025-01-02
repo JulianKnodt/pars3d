@@ -397,7 +397,7 @@ impl KVs {
           "KeyVer", &[Data::I32(_)] => |_| {},
           "KeyTime", &[Data::I64Arr(_)] => |c: usize| {
             let val = self.kvs[c].values[0].as_i64_arr().unwrap();
-            anim.times.extend(val.into_iter().map(|&v| v as u32));
+            anim.times.extend(val.iter().map(|&v| v as u32));
           },
           "KeyValueFloat", &[Data::F32Arr(_)] => |_| {},
           "KeyAttrFlags", &[Data::I32Arr(_)] => |_| {},
@@ -438,11 +438,11 @@ impl KVs {
           // Damn you FBX
           "Indexes", &[Data::I32Arr(_)] => |c: usize| {
             let idxs = self.kvs[c].values[0].as_i32_arr().unwrap();
-            fbx_skin.indices.extend(idxs.into_iter().map(|&v| v as usize));
+            fbx_skin.indices.extend(idxs.iter().map(|&v| v as usize));
           },
           "Weights", &[Data::F64Arr(_)] => |c: usize| {
             let ws = self.kvs[c].values[0].as_f64_arr().unwrap();
-            fbx_skin.weights.extend(ws.into_iter().map(|&v| v as F));
+            fbx_skin.weights.extend(ws.iter().map(|&v| v as F));
           },
           "Transform", &[Data::F64Arr(_)] => |c: usize| {
             let tform = self.kvs[c].values[0].as_f64_arr().unwrap();
