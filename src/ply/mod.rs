@@ -257,6 +257,11 @@ impl Ply {
         writeln!(out, "property float y")?;
         writeln!(out, "property float z")?;
         if has_vc {
+            assert_eq!(
+                self.vc.len(),
+                self.v.len(),
+                "Mismatch between number of vertices and vertex colors"
+            );
             writeln!(out, "property uchar red")?;
             writeln!(out, "property uchar green")?;
             writeln!(out, "property uchar blue")?;

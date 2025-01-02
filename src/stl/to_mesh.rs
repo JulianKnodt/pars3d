@@ -27,6 +27,7 @@ impl From<STL> for Mesh {
 
             uv: from_fn(|_| vec![]),
             face_mesh_idx: vec![],
+            vert_colors: vec![],
             face_mat_idx: vec![],
             joint_idxs: vec![],
             joint_weights: vec![],

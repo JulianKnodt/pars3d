@@ -57,6 +57,8 @@ impl From<ObjObject> for Mesh {
             n,
             uv: [uv, vec![], vec![], vec![]],
 
+            vert_colors: vec![],
+
             joint_idxs: vec![],
             joint_weights: vec![],
             name: String::new(),

@@ -120,7 +120,6 @@ impl MERL {
         let phi_diff = diff[1].atan2(diff[0]);
 
         self.eval_raw(theta_diff, phi_diff, theta_half)
-
     }
     /// Evaluate this material using an explicit rusinkiewicz parameterization.
     pub fn eval_raw(&self, theta_diff: F, phi_diff: F, theta_half: F) -> [f64; 3] {

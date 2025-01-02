@@ -26,7 +26,9 @@ impl From<GLTFMesh> for Mesh {
             joint_weights,
             face_mesh_idx,
             face_mat_idx,
+
             name: String::new(),
+            vert_colors: vec![],
         }
     }
 }

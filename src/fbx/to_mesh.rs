@@ -186,6 +186,7 @@ impl From<FBXMesh> for Mesh {
             uv: new_uv,
             name,
             face_mesh_idx: vec![],
+            vert_colors: vec![],
 
             face_mat_idx: match mat {
                 FBXMeshMaterial::None => vec![],
@@ -213,6 +214,7 @@ impl From<Mesh> for FBXMesh {
             face_mat_idx,
 
             joint_idxs: _,
+            vert_colors: _,
 
             joint_weights: _,
         } = mesh;

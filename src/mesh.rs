@@ -298,6 +298,9 @@ pub struct Mesh {
     /// Normals.
     pub n: Vec<[F; 3]>,
 
+    /// Vertex colors.
+    pub vert_colors: Vec<[F; 3]>,
+
     /// Faces.
     pub f: Vec<FaceKind>,
     /// Which mesh did this face come from?
