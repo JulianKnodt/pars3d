@@ -88,7 +88,20 @@ fn phi_diff_index(phi_diff: F) -> usize {
     tmp.min(BRDF_SAMPLING_RES_PHI_D / 2 - 1)
 }
 
+/// Converts XYZ to R, θ (theta), φ (phi)
+pub fn xyz_to_spherical([x, y, z]: [F; 3]) -> [F; 3] {
+    let r = (x * x + y * y + z * z).sqrt();
+    let phi = (z / r).acos();
+    let theta = y.atan2(x);
+    [r, theta, phi]
+}
+
 impl MERL {
+    pub fn eval_dirs(&self, l: [F; 3], v: [F; 3]) -> [f64; 3] {
+        let [_, theta_in, phi_in] = xyz_to_spherical(l);
+        let [_, theta_out, phi_out] = xyz_to_spherical(v);
+        self.eval(theta_in, phi_in, theta_out, phi_out)
+    }
     pub fn eval(&self, theta_in: F, phi_in: F, theta_out: F, phi_out: F) -> [f64; 3] {
         let v_in = theta_phi_to_vec(theta_in, phi_in);
         let v_out = theta_phi_to_vec(theta_out, phi_out);
@@ -106,6 +119,11 @@ impl MERL {
         let theta_diff = diff[2].acos();
         let phi_diff = diff[1].atan2(diff[0]);
 
+        self.eval_raw(theta_diff, phi_diff, theta_half)
+
+    }
+    /// Evaluate this material using an explicit rusinkiewicz parameterization.
+    pub fn eval_raw(&self, theta_diff: F, phi_diff: F, theta_half: F) -> [f64; 3] {
         let ind = phi_diff_index(phi_diff)
             + theta_diff_index(theta_diff) * BRDF_SAMPLING_RES_PHI_D / 2
             + theta_half_index(theta_half) * BRDF_SAMPLING_RES_PHI_D / 2
@@ -113,12 +131,12 @@ impl MERL {
 
         let brdf = &self.data;
         let r = brdf[ind] * RED_SCALE;
-        let g = brdf[ind
-            + BRDF_SAMPLING_RES_THETA_H * BRDF_SAMPLING_RES_THETA_D * BRDF_SAMPLING_RES_PHI_D / 2]
-            * GREEN_SCALE;
-        let b = brdf
-            [ind + BRDF_SAMPLING_RES_THETA_H * BRDF_SAMPLING_RES_THETA_D * BRDF_SAMPLING_RES_PHI_D]
-            * BLUE_SCALE;
+        let g_ind = ind
+            + BRDF_SAMPLING_RES_THETA_H * BRDF_SAMPLING_RES_THETA_D * BRDF_SAMPLING_RES_PHI_D / 2;
+        let g = brdf[g_ind] * GREEN_SCALE;
+        let b_ind =
+            ind + BRDF_SAMPLING_RES_THETA_H * BRDF_SAMPLING_RES_THETA_D * BRDF_SAMPLING_RES_PHI_D;
+        let b = brdf[b_ind] * BLUE_SCALE;
         [r, g, b]
     }
 }
@@ -126,5 +144,14 @@ impl MERL {
 #[test]
 pub fn test_load_merl() {
     let yellow_plastic = read_from_file("yellow-plastic.binary").unwrap();
-    yellow_plastic.eval(0., 0., 0., 0.);
+    for i in 0..90 {
+        for j in 0..90 {
+            yellow_plastic.eval(
+                (i as F).to_radians(),
+                (j as F).to_radians(),
+                (45. as F).to_radians(),
+                (45. as F).to_radians(),
+            );
+        }
+    }
 }

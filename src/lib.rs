@@ -338,6 +338,11 @@ pub fn normalize<const N: usize>(v: [F; N]) -> [F; N] {
     v.map(|v| v / s)
 }
 
+pub fn rotate_on_axis(v: [F; 3], axis: [F; 3], s: F, c: F) -> [F; 3] {
+    let r = add(kmul(c, v), kmul(dot(v, axis) * (1. - c), axis));
+    add(r, kmul(s, cross(axis, v)))
+}
+
 pub(crate) fn edges(vis: &[usize]) -> impl Iterator<Item = [usize; 2]> + '_ {
     (0..vis.len()).map(|vi| [vis[vi], vis[(vi + 1) % vis.len()]])
 }
