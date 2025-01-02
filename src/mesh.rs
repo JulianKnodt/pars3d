@@ -254,6 +254,7 @@ impl Scene {
                 out.uv[chan].extend(m.uv[chan].iter().copied());
             }
             out.n.extend(m.n.iter().copied());
+            out.vert_colors.extend(m.vert_colors.iter().copied());
             let curr_f = out.f.len();
             out.f.extend(m.f.iter().map(|f| {
                 let mut f = f.clone();
