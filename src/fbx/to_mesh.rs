@@ -34,7 +34,7 @@ fn uniq_vec_to_vertex_attribute<const N: usize>(
     }
 
     if !any_repeats {
-        assert_eq!(uniq_vals.len(), num_vertices);
+        assert_eq!(uniq_vals.len(), num_vertices, "{idxs:?}");
         // need to double check this is correct
         return VertexAttribute {
             values: uniq_vals,
@@ -197,11 +197,11 @@ impl From<FBXMesh> for Mesh {
         let num_faces = f.len();
 
         macro_rules! key_i {
-            ($i: expr, $v: expr) => {
+            ($w: expr, $vi: expr) => {
                 (
-                    $v.map(F::to_bits),
-                    n.v($i).map(|n| n.map(F::to_bits)),
-                    uv.v($i).map(|uv| uv.map(F::to_bits)),
+                    v[$vi].map(F::to_bits),
+                    n.v($w, $vi).map(|n| n.map(F::to_bits)),
+                    uv.v($w, $vi).map(|uv| uv.map(F::to_bits)),
                 )
             };
         }
@@ -217,11 +217,11 @@ impl From<FBXMesh> for Mesh {
         for f in f {
             let mut new_f = FaceKind::empty();
             for (o, vi) in f.as_slice().iter().enumerate() {
-                let key = key_i!(offset + o, v[*vi]);
+                let key = key_i!(offset + o, *vi);
                 if !verts.contains_key(&key) {
                     new_v.push(v[*vi]);
-                    new_uv.extend(uv.v(offset + o).into_iter());
-                    new_n.extend(n.v(offset + o).into_iter());
+                    new_uv.extend(uv.v(offset + o, *vi).into_iter());
+                    new_n.extend(n.v(offset + o, *vi).into_iter());
                     verts.insert(key, new_v.len() - 1);
                 }
                 new_f.insert(verts[&key]);
@@ -230,12 +230,11 @@ impl From<FBXMesh> for Mesh {
             offset += f.len();
         }
 
-        let new_uv = [new_uv, vec![], vec![], vec![]];
         Mesh {
             v: new_v,
             f: new_fs,
             n: new_n,
-            uv: new_uv,
+            uv: [new_uv, vec![], vec![], vec![]],
             name,
             face_mesh_idx: vec![],
             vert_colors: vec![],

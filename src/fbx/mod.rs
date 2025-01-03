@@ -167,15 +167,19 @@ impl<T, const N: usize> VertexAttribute<N, T> {
     pub fn is_empty(&self) -> bool {
         self.values.is_empty()
     }
-    pub fn v(&self, vi: usize) -> Option<[T; N]>
+    pub fn v(&self, wedge_idx: usize, vi: usize) -> Option<[T; N]>
     where
         T: Copy,
     {
+        let idx = match self.map_kind {
+            VertexMappingKind::ByVertices => vi,
+            VertexMappingKind::Wedge => wedge_idx,
+        };
         let v = match self.ref_kind {
-            RefKind::Direct => self.values.get(vi)?,
+            RefKind::Direct => self.values.get(idx)?,
             RefKind::IndexToDirect => {
                 assert!(!self.indices.is_empty());
-                self.values.get(*self.indices.get(vi)?)?
+                self.values.get(self.indices[idx])?
             }
         };
         Some(*v)
