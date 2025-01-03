@@ -1,4 +1,8 @@
 # temporary test makefile for testing that FBX exports fields corretly
+test_fbx:
+	cargo run --release -- cube.fbx tmp.fbx
+	cargo run -- tmp.fbx tmp2.fbx
+
 parse_fbx:
 	cargo run --release -- Spartan_Sketchfab.fbx tmp.fbx
 
@@ -12,8 +16,4 @@ cube_fbx_roundtrip:
 parse_fbx_to_obj:
 	cargo run --release -- cube.fbx tmp.obj
 
-
-test_fbx:
-	cargo run --release -- cube.fbx tmp.fbx
-	cargo run --release -- tmp.fbx tmp2.fbx
 

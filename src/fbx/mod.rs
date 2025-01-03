@@ -24,7 +24,7 @@ pub struct FBXScene {
 
     pub global_settings: FBXSettings,
 
-    file_id: Vec<u8>,
+    file_id: [u8; 16],
 }
 
 macro_rules! by_id_or_new {
@@ -167,17 +167,18 @@ impl<T, const N: usize> VertexAttribute<N, T> {
     pub fn is_empty(&self) -> bool {
         self.values.is_empty()
     }
-    pub fn v(&self, vi: usize) -> [T; N]
+    pub fn v(&self, vi: usize) -> Option<[T; N]>
     where
         T: Copy,
     {
-        match self.ref_kind {
-            RefKind::Direct => self.values[vi],
+        let v = match self.ref_kind {
+            RefKind::Direct => self.values.get(vi)?,
             RefKind::IndexToDirect => {
                 assert!(!self.indices.is_empty());
-                self.values[self.indices[vi]]
+                self.values.get(*self.indices.get(vi)?)?
             }
-        }
+        };
+        Some(*v)
     }
 }
 

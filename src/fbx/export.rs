@@ -111,7 +111,7 @@ impl FBXScene {
               ),
             ),
         );
-        root_fields!(kvs, "FileId", &[Data::Binary(self.file_id.clone())]);
+        root_fields!(kvs, "FileId", &[Data::Binary(self.file_id.to_vec())]);
         root_fields!(kvs, "CreationTime", &[Data::str("1970-01-01 10:00:00:000")]);
         root_fields!(kvs, "Creator", &[Data::str("pars3d")]);
 
@@ -284,8 +284,7 @@ impl FBXMesh {
             ),
             */
 
-            /*
-            if false && !self.n.is_empty() => "LayerElementNormal", &[Data::I32(0)] => |c| add_kvs!(
+            if !self.n.is_empty() => "LayerElementNormal", &[Data::I32(0)] => |c| add_kvs!(
               kvs, c,
               "Version", &[Data::I32(101)],
               "Name", &[Data::str("Normal1")],
@@ -299,7 +298,7 @@ impl FBXMesh {
               )],
             ),
 
-            if false && !self.uv.is_empty() => "LayerElementUV", &[Data::I32(0)] => |c| add_kvs!(
+            if !self.uv.is_empty() => "LayerElementUV", &[Data::I32(0)] => |c| add_kvs!(
               kvs, c,
               "Version", &[Data::I32(101)],
               "Name", &[Data::str("UV0")],
@@ -312,7 +311,6 @@ impl FBXMesh {
                 self.uv.indices.iter().map(to_i32).collect::<Vec<_>>()
               )],
             ),
-            */
         );
     }
 }

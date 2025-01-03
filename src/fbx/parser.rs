@@ -726,7 +726,8 @@ impl KVs {
               "Type", &[Data::String(_)] => |c: usize| {
                 assert_matches!(
                   self.kvs[c].values[0].as_str().unwrap(),
-                  "LayerElementNormal" | "LayerElementUV" | "LayerElementMaterial"
+                  "LayerElementNormal" | "LayerElementUV" | "LayerElementMaterial" |
+                  "LayerElementBinormal" | "LayerElementTangent" | "LayerElementSmoothing"
                 );
               },
               "TypedIndex", &[Data::I32(0)] => |_| {},
@@ -1027,7 +1028,7 @@ impl KVs {
                 unreachable!();
             };
             assert_eq!(b.len(), 16);
-            fbx_scene.file_id.clone_from(b);
+            fbx_scene.file_id[..].clone_from_slice(b);
         } else {
             eprintln!("Missing File ID in FBX");
         }
@@ -1300,7 +1301,7 @@ fn read_scope(
     let end_offset = read_word!();
 
     // this marks the end of the tokens of the tokens of the tokens of the tokens
-    let block_len = end_offset - (prev_read as u64);
+    let block_len = end_offset.saturating_sub(prev_read as u64);
 
     let prop_count = read_word!();
     let prop_len = read_word!();

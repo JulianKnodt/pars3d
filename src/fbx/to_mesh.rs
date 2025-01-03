@@ -1,10 +1,62 @@
-use super::{id, FBXMesh, FBXMeshMaterial, FBXNode, FBXScene, FBXSettings};
+use super::{id, FBXMesh, FBXMeshMaterial, FBXNode, FBXScene, FBXSettings, VertexAttribute};
 use crate::mesh::{Axis, Mesh, Node, Scene, Settings, Transform};
 use crate::{FaceKind, F};
 
 use std::ops::Range;
 
 use std::collections::HashMap;
+
+fn uniq_vec_to_vertex_attribute<const N: usize>(
+    v: &[[F; N]],
+    num_vertices: usize,
+) -> VertexAttribute<N> {
+    if v.is_empty() {
+        return Default::default();
+    }
+    use std::collections::{btree_map::Entry, BTreeMap};
+
+    let mut uniq = BTreeMap::new();
+    let mut uniq_vals = vec![];
+    let mut idxs = vec![];
+    let mut any_repeats = false;
+    for &val in v {
+        match uniq.entry(val.map(|v| v.to_bits())) {
+            Entry::Vacant(v) => {
+                v.insert(uniq_vals.len());
+                idxs.push(uniq_vals.len());
+                uniq_vals.push(val);
+            }
+            Entry::Occupied(o) => {
+                any_repeats = true;
+                idxs.push(*o.get())
+            }
+        }
+    }
+
+    if !any_repeats {
+        assert_eq!(uniq_vals.len(), num_vertices);
+        // need to double check this is correct
+        return VertexAttribute {
+            values: uniq_vals,
+            indices: vec![],
+
+            ref_kind: super::RefKind::Direct,
+            map_kind: super::VertexMappingKind::ByVertices,
+        };
+    }
+
+    VertexAttribute {
+        map_kind: if uniq_vals.len() == num_vertices {
+            super::VertexMappingKind::ByVertices
+        } else {
+            super::VertexMappingKind::Wedge
+        },
+        values: uniq_vals,
+        indices: idxs,
+
+        ref_kind: super::RefKind::IndexToDirect,
+    }
+}
 
 /*
 /// Converts per vertex values to unique values and idxs into it.
@@ -148,8 +200,8 @@ impl From<FBXMesh> for Mesh {
             ($i: expr, $v: expr) => {
                 (
                     $v.map(F::to_bits),
-                    n.v($i).map(F::to_bits),
-                    uv.v($i).map(F::to_bits),
+                    n.v($i).map(|n| n.map(F::to_bits)),
+                    uv.v($i).map(|uv| uv.map(F::to_bits)),
                 )
             };
         }
@@ -168,8 +220,8 @@ impl From<FBXMesh> for Mesh {
                 let key = key_i!(offset + o, v[*vi]);
                 if !verts.contains_key(&key) {
                     new_v.push(v[*vi]);
-                    new_uv.push(uv.v(offset + o));
-                    new_n.push(n.v(offset + o));
+                    new_uv.extend(uv.v(offset + o).into_iter());
+                    new_n.extend(n.v(offset + o).into_iter());
                     verts.insert(key, new_v.len() - 1);
                 }
                 new_f.insert(verts[&key]);
@@ -231,13 +283,17 @@ impl From<Mesh> for FBXMesh {
             FBXMeshMaterial::PerFace(decompress_values(face_mat_idx).collect::<Vec<_>>())
         };
 
+        let num_verts = v.len();
+        let n = uniq_vec_to_vertex_attribute(&n, num_verts);
+        let uv = uniq_vec_to_vertex_attribute(&uv[0], num_verts);
+
         FBXMesh {
             id: id(),
             name,
             v,
             f,
-            n: Default::default(),
-            uv: Default::default(),
+            n,
+            uv,
 
             mat,
             // unused
