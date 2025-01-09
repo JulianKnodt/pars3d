@@ -68,15 +68,21 @@ pub fn extension_to_format(s: impl AsRef<Path>) -> FileFormat {
     let Some(e) = e.to_str() else {
         return FileFormat::Unknown;
     };
-    match e {
-        "glb" => FileFormat::GLB,
-        "fbx" => FileFormat::FBX,
-        "obj" => FileFormat::OBJ,
-        "ply" => FileFormat::PLY,
-        "stl" => FileFormat::STL,
-        "off" => FileFormat::OFF,
-        _ => FileFormat::Unknown,
+
+    let matches = [
+        ("glb", FileFormat::GLB),
+        ("fbx", FileFormat::FBX),
+        ("obj", FileFormat::OBJ),
+        ("ply", FileFormat::PLY),
+        ("stl", FileFormat::STL),
+        ("off", FileFormat::OFF),
+    ];
+    for (ext, fmt) in matches {
+        if ext.eq_ignore_ascii_case(e) {
+            return fmt;
+        }
     }
+    FileFormat::Unknown
 }
 
 #[test]

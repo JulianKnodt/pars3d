@@ -295,6 +295,8 @@ impl KVs {
                   "currentUVSet" => {},
                   "filmboxTypeID" => {},
 
+                  "UDP3DSMAX" => {},
+                  "MaxHandle" => {},
                   x => todo!("{x:?}"),
                 }
              },
@@ -462,7 +464,7 @@ impl KVs {
           "Version", &[Data::I32(_)] => |_| {},
           "ShadingModel", &[Data::String(_)] => |c: usize| {
             let shading_model = self.kvs[c].values[0].as_str().unwrap();
-            assert_matches!(shading_model, "Phong" | "lambert" | "unknown");
+            assert_matches!(shading_model, "phong" | "Phong" | "lambert" | "unknown");
           },
           "Properties70", &[] => |c| match_children!(
             self, c,
@@ -492,15 +494,21 @@ impl KVs {
                   |i| *kv.values[i].as_f64().unwrap() as F
                 ),
                 "SpecularFactor" => {},
+                "Specular" => {},
+
                 "Shininess" => {},
                 "ShininessExponent" => {},
+                "Reflectivity" => {},
                 "ReflectionColor" => {},
                 "ReflectionFactor" => {},
                 "Opacity" => {},
+                "TransparentColor" => {},
                 "TransparencyFactor" => {},
                 "Emissive" => {},
                 "EmissiveColor" => {},
                 "EmissiveFactor" => {},
+
+                "ShadingModel" => {},
 
                 // monopoly powers
                 "Maya" => {/*???*/},
@@ -544,7 +552,18 @@ impl KVs {
 
         match_children!(
           self, kvi,
-          "Properties70", &[] => |c| match_children!(self, c),
+          "Properties70", &[] => |c| match_children!(self, c, "P",
+              &[
+                Data::String(_), Data::String(_), Data::String(_), Data::String(_),
+                Data::F64(_), Data::F64(_), Data::F64(_)
+              ] => |c:usize| {
+                let vals = &self.kvs[c].values;
+                match vals[0].as_str().unwrap() {
+                  "Color" => {},
+                  x => todo!("{x:?}"),
+                }
+              },
+          ),
           "Vertices", &[Data::F64Arr(_)] => |c: usize| {
               let v_arr: &[f64] = self.kvs[c].values[0].as_f64_arr().unwrap();
               let v = v_arr
@@ -686,14 +705,14 @@ impl KVs {
                   },
               );
           },
-          "LayerElementColor", &[] => |c| match_children!(
+          "LayerElementColor", &[] | &[Data::I32(_)] => |c| match_children!(
               self, c,
               "Version", &[Data::I32(_)] => |_| {},
               "Name", &[Data::String(_)] => |_| {},
               "MappingInformationType", &[Data::String(_)] => |c: usize| {
                   assert_eq!(self.kvs[c].values[0], Data::str("ByPolygonVertex"));
               },
-              "ReferenceInformationType", &[Data::String(_)] => |_| {
+              "ReferenceInformationType", &[Data::String(_)] => |c: usize| {
                   assert_matches!(
                     self.kvs[c].values[0].as_str().unwrap(),
                     "Direct" | "IndexToDirect"
@@ -718,7 +737,7 @@ impl KVs {
                   out.color.indices.extend(idxs);
               },
           ),
-          "Layer", &[Data::I32(0)] => |c| match_children!(
+          "Layer", &[Data::I32(_)] => |c| match_children!(
             self, c,
             "Version", &[Data::I32(_)] => |_| {},
             "LayerElement", &[] => |c| match_children!(
@@ -727,15 +746,16 @@ impl KVs {
                 assert_matches!(
                   self.kvs[c].values[0].as_str().unwrap(),
                   "LayerElementNormal" | "LayerElementUV" | "LayerElementMaterial" |
-                  "LayerElementBinormal" | "LayerElementTangent" | "LayerElementSmoothing"
+                  "LayerElementBinormal" | "LayerElementTangent" | "LayerElementSmoothing" |
+                  "LayerElementColor" | "LayerElementVisibility"
                 );
               },
-              "TypedIndex", &[Data::I32(0)] => |_| {},
+              "TypedIndex", &[Data::I32(_)] => |_| {},
             ),
           ),
           // omit for now
           "LayerElementSmoothing", &[] | &[Data::I32(_)] => |_| {},
-          "LayerElementVisibility", &[] => |_| {},
+          "LayerElementVisibility", &[] | &[Data::I32(_)] => |_| {},
           "LayerElementBinormal", &[Data::I32(_/*idx*/)] => |_| {},
           "LayerElementTangent", &[Data::I32(_/*idx*/)] => |_| {},
         );
@@ -1137,7 +1157,11 @@ impl KVs {
             "Count", &[Data::I32(_)] => |_| {},
             "PropertyTemplate", &[Data::String(_)] => |c: usize| assert_matches!(
               self.kvs[c].values[0].as_str().unwrap(),
-              "FbxVideo" | "FbxAnimCurveNode" | "FbxFileTexture" | "FbxBindingTable" | "FbxImplementation" | "FbxNull" | "FbxSurfaceLambert" | "FbxAnimLayer" | "FbxAnimStack" | "FbxCamera" | "FbxMesh" | "FbxNode" | "FbxSurfacePhong",
+              "FbxVideo" | "FbxAnimCurveNode" | "FbxFileTexture" | "FbxBindingTable" |
+              "FbxImplementation" | "FbxNull" | "FbxSurfaceLambert" | "FbxAnimLayer" |
+              "FbxAnimStack" | "FbxCamera" | "FbxMesh" | "FbxNode" | "FbxSurfacePhong" |
+              "FbxDisplayLayer"
+
             ),
           ),
         );
