@@ -56,6 +56,8 @@ pub struct ObjObject {
     pub f: Vec<PolyMeshFace>,
 
     /// # faces -> Material
+    /// May have repeat material idxs,
+    /// if usemtl is repeated with the same material
     pub mat: Vec<(Range<FaceIdx>, MatIdx)>,
 }
 
@@ -109,6 +111,10 @@ impl ObjObject {
     #[inline]
     pub fn mat_faces(&self) -> impl Iterator<Item = (&[PolyMeshFace], MatIdx)> + '_ {
         self.mat.iter().map(|(fs, mi)| (&self.f[fs.clone()], *mi))
+    }
+    /// Split this ObjObject into multiple sets of faces which each use single a material.
+    pub fn faces_by_mat(&self) -> impl Iterator<Item = (&[PolyMeshFace], MatIdx)> + '_ {
+        self.mat.iter().map(|(r, m)| (&self.f[r.clone()], *m))
     }
 }
 
@@ -286,7 +292,6 @@ pub fn parse(p: impl AsRef<Path>, split_by_object: bool, split_by_group: bool) -
     let mut curr_obj = ObjObject::default();
     let mut curr_mtl = None;
     let mut mtl_start_face = 0;
-    let mut curr_mtl_name = String::from("");
     let mut logged_no_mtl = false;
 
     let pf = |v: &str| v.parse::<F>().unwrap();
@@ -401,12 +406,7 @@ pub fn parse(p: impl AsRef<Path>, split_by_object: bool, split_by_group: bool) -
                 let Some(mtl_name) = iter.remainder() else {
                     panic!("Missing mtl name in {l}")
                 };
-                // if the previous mtl is the same, continue and don't do anything
-                if curr_mtl_name == mtl_name {
-                    continue;
-                }
 
-                curr_mtl_name = mtl_name.into();
                 let Some(mtl_idx) = obj.mtls.iter().position(|mtl| mtl.0 == mtl_name) else {
                     eprintln!(
                         "[WARN]: Could not find mtl {mtl_name}, have {:?}",
