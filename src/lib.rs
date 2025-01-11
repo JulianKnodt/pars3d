@@ -11,6 +11,7 @@
 #![feature(ascii_char_variants)]
 #![feature(assert_matches)]
 #![feature(generic_arg_infer)]
+#![feature(os_str_display)]
 
 #[cfg(not(feature = "f64"))]
 pub type U = u32;

@@ -634,7 +634,10 @@ impl Obj {
     /// Writes this set of obj objects and mtls to writers.
     pub fn write(&self, mut dst: impl Write, dst_dir: &str) -> io::Result<()> {
         for mtllib in &self.mtllibs {
-            writeln!(dst, "mtllib {mtllib}")?;
+            let mtl_file_name = Path::new(mtllib)
+                .file_name()
+                .expect("One mtllib did not have a file name");
+            writeln!(dst, "mtllib {}", mtl_file_name.display())?;
         }
         for object in &self.objects {
             object.write(&mut dst, &self.mtls)?;
@@ -642,7 +645,8 @@ impl Obj {
         // not sure if there is any way to figure out which mtl came from which mtllib
         // unless it's tracked from the beginning
         for mtllib in &self.mtllibs {
-            let mtl_path = Path::new(dst_dir).join(mtllib);
+            let mtl_file_name = Path::new(mtllib).file_name().unwrap();
+            let mtl_path = Path::new(dst_dir).join(mtl_file_name);
             let f = File::create(mtl_path)?;
             let mut f = BufWriter::new(f);
             for (name, mtl) in self.mtls.iter() {
