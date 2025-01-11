@@ -1049,7 +1049,7 @@ impl KVs {
                             );
                         }
                         for &(_, dst) in conns!(id =>) {
-                          assert_eq!("Geometry", self.kvs[id_to_kv[&dst]].key);
+                            assert_eq!("Geometry", self.kvs[id_to_kv[&dst]].key);
                         }
                     }
                     _ => todo!("handle subdeformer {classtag}"),
