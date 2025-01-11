@@ -59,6 +59,8 @@ pub struct ObjObject {
     /// May have repeat material idxs,
     /// if usemtl is repeated with the same material
     pub mat: Vec<(Range<FaceIdx>, MatIdx)>,
+
+    pub smoothing_groups: Vec<(Range<FaceIdx>, bool)>,
 }
 
 impl From<MeshFace> for PolyMeshFace {
@@ -291,6 +293,9 @@ pub fn parse(p: impl AsRef<Path>, split_by_object: bool, split_by_group: bool) -
     obj.input_file = p.to_str().unwrap().into();
     let mut curr_obj = ObjObject::default();
     let mut curr_mtl = None;
+    let mut smoothing_start_face = 0;
+    let mut curr_smoothing = None;
+
     let mut mtl_start_face = 0;
     let mut logged_no_mtl = false;
 
@@ -360,8 +365,21 @@ pub fn parse(p: impl AsRef<Path>, split_by_object: bool, split_by_group: bool) -
                     curr_obj.f.clear();
                 }
             }
-            // TODO not sure what to do for smoothing groups
-            "s" => {}
+            "s" => {
+                let Some(rem) = iter.remainder() else {
+                    panic!("Missing smoothing group number in smoothing group: s <missing>");
+                };
+
+                println!("{rem}");
+                let s = rem.trim() == "0";
+                let curr_f = curr_obj.f.len();
+                if let Some(prev) = curr_smoothing.replace(s) {
+                    curr_obj
+                        .smoothing_groups
+                        .push((smoothing_start_face..curr_f, prev));
+                }
+                smoothing_start_face = curr_f;
+            }
             "mtllib" => {
                 let Some(mtl_file) = iter.remainder() else {
                     panic!("Missing mtl file in {l}")
@@ -433,8 +451,14 @@ pub fn parse(p: impl AsRef<Path>, split_by_object: bool, split_by_group: bool) -
             k => eprintln!("[ERROR]: Unknown line in OBJ {l} with {k:?}"),
         };
     }
+    let f = curr_obj.f.len();
     if let Some(idx) = curr_mtl {
-        curr_obj.mat.push((mtl_start_face..curr_obj.f.len(), idx));
+        curr_obj.mat.push((mtl_start_face..f, idx));
+    }
+    if let Some(idx) = curr_smoothing {
+        curr_obj
+            .smoothing_groups
+            .push((smoothing_start_face..f, idx));
     }
 
     if !curr_obj.is_empty() {

@@ -4,7 +4,7 @@ test_fbx:
 	cargo run --release -- tmp.fbx tmp2.fbx
 
 parse_fbx:
-	cargo run --release -- MGS_Dio.FBX tmp.fbx
+	cargo run --release -- BusterDrone.fbx tmp.fbx
 
 cube_fbx_roundtrip:
 	cargo run --release --bin fbx_roundtrip -- cube.fbx tmp.fbx
