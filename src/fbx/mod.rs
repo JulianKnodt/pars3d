@@ -20,6 +20,8 @@ pub struct FBXScene {
 
     anims: Vec<FBXAnim>,
 
+    blendshapes: Vec<FBXBlendshape>,
+
     root_nodes: Vec<usize>,
 
     pub global_settings: FBXSettings,
@@ -51,6 +53,7 @@ impl FBXScene {
     by_id_or_new!(node_by_id_or_new, nodes);
     by_id_or_new!(skin_by_id_or_new, skins);
     by_id_or_new!(anim_by_id_or_new, anims);
+    by_id_or_new!(blendshape_by_id_or_new, blendshapes);
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -125,6 +128,16 @@ pub struct FBXSkin {
     name: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct FBXBlendshape {
+    id: usize,
+
+    name: String,
+    indices: Vec<usize>,
+    v: Vec<[F; 3]>,
+    n: Vec<[F; 3]>,
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct FBXAnim {
     id: usize,
@@ -144,6 +157,8 @@ pub struct FBXMesh {
     pub n: VertexAttribute<3>,
     pub uv: VertexAttribute<2>,
     color: VertexAttribute<3>,
+
+    blendshapes: Vec<usize>,
 
     mat: FBXMeshMaterial,
 }
