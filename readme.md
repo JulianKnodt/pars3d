@@ -2,7 +2,8 @@
 
 ![VRML](https://web.archive.org/web/20000929035521/http://www.geocities.com:80/SiliconValley/4944/VRML.gif)
 
-A 3D parsing library with minimal dependencie.
+A 3D parsing library with minimal dependencies.
+
 Currently supports the following formats:
 
 ### Basic Usage:
@@ -103,6 +104,9 @@ slower than necessary.
 For FBX parsing, my philosophy is if there's something I didn't expect it should crash.
 Immediately. This is great for figuring out exactly what is wrong, but if your input FBX file
 doesn't fit what is expected it will not work at all. Better than silently being wrong though.
+
+Furthermore, it doesn't currently do much for changing materials between formats, which I'll add
+in at some point.
 
 #### Why does this exist?
 
