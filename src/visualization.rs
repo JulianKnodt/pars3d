@@ -1,6 +1,9 @@
+use core::ops::Neg;
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
+
 use super::coloring::magma;
 use super::{add, cross, edges, kmul, normalize, sub, F};
-use core::ops::Neg;
 
 /// Returns a coherent vertex coloring for a mesh with joint influences.
 pub fn joint_influence_coloring(
@@ -18,6 +21,67 @@ pub fn joint_influence_coloring(
             .map(|i| kmul(jw[i], joint_colors[ji[i] as usize]))
             .fold([0.; 3], add)
     })
+}
+
+/// Constructs a coloring for each face, based on some classification function.
+pub fn face_coloring<'a>(face_group: impl Fn(usize) -> usize, num_fs: usize) -> Vec<[F; 3]> {
+    use crate::coloring::hue_to_rgb;
+    use crate::rand::quasi_rand;
+    (0..num_fs)
+        // also add num_fs to make it more random.
+        .map(|i| hue_to_rgb(quasi_rand(face_group(i) + num_fs)))
+        .collect()
+}
+
+impl super::mesh::Mesh {
+    /// Constructs a new mesh with a given face coloring.
+    /// Does not retain any information from the original mesh.
+    pub fn with_face_coloring(&self, fc: &[[F; 3]]) -> Self {
+        use super::FaceKind;
+        let mut new_v = vec![];
+        let mut new_fs = vec![];
+        let mut new_vc = vec![];
+        let mut created_pairs = HashMap::new();
+
+        fn to_key(v: [F; 3], c: [F; 3]) -> [super::U; 6] {
+            [
+                v[0].to_bits(),
+                v[1].to_bits(),
+                v[2].to_bits(),
+                c[0].to_bits(),
+                c[1].to_bits(),
+                c[2].to_bits(),
+            ]
+        }
+
+        for (fi, f) in self.f.iter().enumerate() {
+            let color = fc[fi];
+            let mut new_f = FaceKind::empty();
+            for &v in f.as_slice() {
+                let key = to_key(self.v[v], color);
+                match created_pairs.entry(key) {
+                    Entry::Occupied(o) => new_f.insert(*o.get()),
+                    Entry::Vacant(empty) => {
+                        let new_pos = new_v.len();
+                        new_v.push(self.v[v]);
+                        new_vc.push(color);
+                        empty.insert(new_pos);
+                        new_f.insert(new_pos);
+                    }
+                }
+            }
+
+            new_fs.push(new_f);
+        }
+
+        Self {
+            v: new_v,
+            f: new_fs,
+            vert_colors: new_vc,
+
+            ..Default::default()
+        }
+    }
 }
 
 /// Given a mesh with a per-edge scalar value in 0-1, output a new triangle mesh with vertex

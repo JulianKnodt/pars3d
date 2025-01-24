@@ -370,7 +370,6 @@ pub fn parse(p: impl AsRef<Path>, split_by_object: bool, split_by_group: bool) -
                     panic!("Missing smoothing group number in smoothing group: s <missing>");
                 };
 
-                println!("{rem}");
                 let s = rem.trim() == "0";
                 let curr_f = curr_obj.f.len();
                 if let Some(prev) = curr_smoothing.replace(s) {
