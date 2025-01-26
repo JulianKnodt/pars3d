@@ -1,7 +1,8 @@
 use super::anim::Animation;
-use super::{add, kmul, sub, FaceKind, F};
+use super::{add, kmul, sub, FaceKind, F, U};
 
 use std::array::from_fn;
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::ops::Range;
 
@@ -458,6 +459,41 @@ impl Mesh {
 
         for (mi, mesh) in scene.meshes.iter_mut().enumerate() {
             mesh.face_mat_idx = convert_opt_usize(&mat_map[mi]);
+        }
+    }
+
+    /// Strips all non-geometry attributes from this mesh, leaving only the geometry.
+    pub fn geometry_only(&mut self) {
+        let v = std::mem::take(&mut self.v);
+
+        let mut new_v = vec![];
+
+        // original vertex position to new vertex index
+        let mut new_map: HashMap<[U; 3], usize> = HashMap::new();
+
+        fn key(v: [F; 3]) -> [U; 3] {
+            v.map(F::to_bits)
+        }
+
+        for f in self.f.iter_mut() {
+            for vi in f.as_mut_slice() {
+                let k = key(v[*vi]);
+                *vi = match new_map.entry(k) {
+                    Entry::Occupied(o) => *o.get(),
+                    Entry::Vacant(vac) => {
+                        let new_idx = new_v.len();
+                        new_v.push(v[*vi]);
+                        vac.insert(new_idx);
+                        new_idx
+                    }
+                }
+            }
+        }
+
+        *self = Mesh {
+            v: new_v,
+            f: std::mem::take(&mut self.f),
+            ..Default::default()
         }
     }
 }
