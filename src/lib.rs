@@ -266,6 +266,16 @@ impl FaceKind {
     }
 }
 
+impl From<&[usize]> for FaceKind {
+    fn from(v: &[usize]) -> Self {
+        match v {
+            &[a, b, c] => Self::Tri([a, b, c]),
+            &[a, b, c, d] => Self::Quad([a, b, c, d]),
+            o => Self::Poly(o.to_vec()),
+        }
+    }
+}
+
 pub(crate) fn kmul<const N: usize>(k: F, v: [F; N]) -> [F; N] {
     v.map(|v| v * k)
 }
