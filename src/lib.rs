@@ -203,6 +203,24 @@ impl FaceKind {
     pub fn edges(&self) -> impl Iterator<Item = [usize; 2]> + '_ {
         edges(self.as_slice())
     }
+    /// Given a vertex `v` in this face, returns the next vertex.
+    /// Panics if `v` is not in this face.
+    pub fn next(&self, v: usize) -> usize {
+        let f = self.as_slice();
+        let pos_v = f.iter().position(|&p| p == v).unwrap();
+        f[(pos_v + 1) % f.len()]
+    }
+    /// Given a vertex `v` in this face, returns the previous vertex.
+    /// Panics if `v` is not in this face.
+    pub fn prev(&self, v: usize) -> usize {
+        let f = self.as_slice();
+        let pos_v = f.iter().position(|&p| p == v).unwrap();
+        if pos_v == 0 {
+            *f.last().unwrap()
+        } else {
+            f[pos_v - 1]
+        }
+    }
     /// Iterate over triangles in this face rooted at the 0th index.
     pub fn as_triangle_fan(&self) -> impl Iterator<Item = [usize; 3]> + '_ {
         let (&v0, rest) = self.as_slice().split_first().unwrap();
