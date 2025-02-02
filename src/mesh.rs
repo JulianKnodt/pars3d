@@ -362,6 +362,22 @@ impl Mesh {
     pub fn num_tris(&self) -> usize {
         self.f.iter().map(|f| f.num_tris()).sum::<usize>()
     }
+
+    /// Triangulates this mesh in an arbitrary order.
+    /// Will allocate if not all faces are triangles.
+    /// Order of faces may not be preserved.
+    pub fn triangulate(&mut self) {
+        let mut i = 0;
+        // nifty little method which doesn't require an extra buffer
+        while i < self.f.len() {
+            if self.f[i].len() <= 3 {
+                i += 1;
+                continue;
+            }
+            let f = self.f.swap_remove(i);
+            self.f.extend(f.as_triangle_fan().map(FaceKind::Tri));
+        }
+    }
     /// Normalize this mesh's geometry to lay within [-1, 1].
     /// Outputs scale and translation to reposition back to the original dimension.
     pub fn normalize(&mut self) -> (F, [F; 3]) {
