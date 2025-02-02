@@ -200,6 +200,14 @@ impl FaceKind {
         }
     }
 
+    #[inline]
+    pub fn as_tri(&self) -> Option<[usize; 3]> {
+        match self {
+            &Self::Tri(tri) => Some(tri),
+            _ => None,
+        }
+    }
+
     pub fn edges(&self) -> impl Iterator<Item = [usize; 2]> + '_ {
         edges(self.as_slice())
     }
