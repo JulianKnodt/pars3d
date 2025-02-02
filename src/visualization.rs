@@ -23,6 +23,43 @@ pub fn joint_influence_coloring(
     })
 }
 
+/// Normalize scalars defined at each vertex from [-min, max] to [0,1], apply a coloring and
+/// visualize isosurfaces at a fixed interval.
+/// `isolevel_freq` should be in the range [0, 1). If 0 or neg, will be ignored.
+/// Color fn should take [0, 1] to a color. One such function is `coloring::magma`.
+pub fn vertex_scalar_coloring(
+    scalars: &[F],
+    color_fn: impl Fn(F) -> [F; 3],
+    isolevel_freq: F,
+    isolevel_color: [F; 3],
+) -> Vec<[F; 3]> {
+    assert!(isolevel_freq < 1.);
+    if scalars.is_empty() {
+        return vec![];
+    }
+
+    let min = scalars.iter().copied().min_by(F::total_cmp).unwrap();
+    assert!(min.is_finite());
+
+    let max = scalars.iter().copied().max_by(F::total_cmp).unwrap();
+    assert!(max.is_finite());
+
+    let mut out = Vec::with_capacity(scalars.len());
+
+    let apply_iso = isolevel_freq > 0.;
+
+    for &s in scalars {
+        let new = (s - min) / (max - min);
+        if apply_iso && (new % isolevel_freq) < 1e-2 {
+            out.push(isolevel_color);
+            continue;
+        }
+
+        out.push(color_fn(new));
+    }
+    out
+}
+
 /// Constructs a coloring for each face, based on some classification function.
 pub fn face_coloring<'a>(face_group: impl Fn(usize) -> usize, num_fs: usize) -> Vec<[F; 3]> {
     use crate::coloring::hue_to_rgb;
