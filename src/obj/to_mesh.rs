@@ -7,6 +7,21 @@ use std::collections::HashMap;
 
 impl From<ObjObject> for Mesh {
     fn from(obj: ObjObject) -> Self {
+        if obj.vt.is_empty() && obj.vn.is_empty() {
+            let v = obj.v;
+            let f = obj
+                .f
+                .into_iter()
+                .map(|pmf| FaceKind::from(pmf.v))
+                .collect::<Vec<_>>();
+            return Self {
+                v,
+                face_mesh_idx: vec![0; f.len()],
+                f,
+                face_mat_idx: obj.mat,
+                ..Default::default()
+            };
+        }
         let mut fs = vec![];
 
         let mut verts = HashMap::new();
