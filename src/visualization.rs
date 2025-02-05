@@ -31,6 +31,7 @@ pub fn vertex_scalar_coloring(
     scalars: &[F],
     color_fn: impl Fn(F) -> [F; 3],
     isolevel_freq: F,
+    isolevel_width: F,
     isolevel_color: [F; 3],
 ) -> Vec<[F; 3]> {
     assert!(isolevel_freq < 1.);
@@ -50,7 +51,7 @@ pub fn vertex_scalar_coloring(
 
     for &s in scalars {
         let new = (s - min) / (max - min);
-        if apply_iso && (new % isolevel_freq) < 1e-2 {
+        if apply_iso && (new % isolevel_freq) < isolevel_width {
             out.push(isolevel_color);
             continue;
         }
