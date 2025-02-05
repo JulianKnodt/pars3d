@@ -51,12 +51,17 @@ pub fn vertex_scalar_coloring(
 
     for &s in scalars {
         let new = (s - min) / (max - min);
+        let c = color_fn(new);
         if apply_iso && (new % isolevel_freq) < isolevel_width {
-            out.push(isolevel_color);
+            let iso = (new % isolevel_freq) / isolevel_freq;
+            assert!((0.0..=1.0).contains(&iso));
+            let iso = iso.sqrt();
+            let interp = std::array::from_fn(|i| iso * isolevel_color[i] + (1. - iso) * c[i]);
+            out.push(interp);
             continue;
         }
 
-        out.push(color_fn(new));
+        out.push(c);
     }
     out
 }
