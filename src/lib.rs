@@ -208,8 +208,16 @@ impl FaceKind {
         }
     }
 
+    /// Returns each edge in this face: [vi0, vi1], [vi1, vi2]... [viN, vi0]
     pub fn edges(&self) -> impl Iterator<Item = [usize; 2]> + '_ {
         edges(self.as_slice())
+    }
+
+    /// Returns indices of each edge in this face:
+    /// [0, 1], [1, 2]... [N, 0]
+    pub fn edge_idxs(&self) -> impl Iterator<Item = [usize; 2]> + '_ {
+        let n = self.len();
+        (0..n).map(move |i| [i, (i + 1) % n])
     }
     /// Given a vertex `v` in this face, returns the next vertex.
     /// Panics if `v` is not in this face.
