@@ -1247,7 +1247,7 @@ impl KVs {
               "FbxVideo" | "FbxAnimCurveNode" | "FbxFileTexture" | "FbxBindingTable" |
               "FbxImplementation" | "FbxNull" | "FbxSurfaceLambert" | "FbxAnimLayer" |
               "FbxAnimStack" | "FbxCamera" | "FbxMesh" | "FbxNode" | "FbxSurfacePhong" |
-              "FbxDisplayLayer" | "FbxLayeredTexture"
+              "FbxDisplayLayer" | "FbxLayeredTexture" | "FbxLight"
 
             ),
           ),
