@@ -270,6 +270,9 @@ impl KVs {
             ] | &[
                 Data::String(_), Data::String(_), Data::String(_), Data::String(_),
                 Data::I16(_), Data::I16(_), Data::I16(_)
+            ] | &[
+                Data::String(_), Data::String(_), Data::String(_), Data::String(_),
+                Data::I32(_), Data::I32(_), Data::I32(_)
             ] => |c: usize| {
                 let vals = &self.kvs[c].values;
                 match vals[0].as_str().unwrap() {
@@ -297,7 +300,7 @@ impl KVs {
 
                   "UDP3DSMAX" => {},
                   "MaxHandle" => {},
-                  x => todo!("{x:?}"),
+                  x => eprintln!("Unhandled node key: {x:?}"),
                 }
              },
           ),

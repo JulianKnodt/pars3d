@@ -226,6 +226,7 @@ impl Scene {
             self.nodes[ri].traverse_with_parent(self, root_init(), visit);
         }
     }
+
     /// Mutable traversal of the node graph of a scene, with some state from the parent node.
     pub fn traverse_mut_with_parent<T>(
         &mut self,
@@ -241,6 +242,20 @@ impl Scene {
             self.nodes[ri] = node;
         }
     }
+
+    /// Converts the scale in global settings to some target value, while rescaling the vertices
+    /// in each corresponding mesh. Can be used to normalize different input formats which have
+    /// different scales.
+    pub fn convert_scale_to(&mut self, tgt: F) {
+        let mul = self.settings.scale / tgt;
+        for m in self.meshes.iter_mut() {
+            for v in m.v.iter_mut() {
+                *v = kmul(mul, *v);
+            }
+        }
+        self.settings.scale = tgt;
+    }
+
     /// Converts this scene into a flattened mesh which can then be repopulated back into a
     /// scene later.
     pub fn into_flattened_mesh(&self) -> Mesh {
@@ -378,6 +393,7 @@ impl Mesh {
             self.f.extend(f.as_triangle_fan().map(FaceKind::Tri));
         }
     }
+
     /// Normalize this mesh's geometry to lay within [-1, 1].
     /// Outputs scale and translation to reposition back to the original dimension.
     pub fn normalize(&mut self) -> (F, [F; 3]) {
