@@ -9,22 +9,6 @@ use std::ops::Range;
 /// Max number of supported UV channels
 pub const MAX_UV: usize = 4;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Axis {
-    /// +X
-    PosX,
-    /// +Y
-    PosY,
-    /// +Z
-    PosZ,
-    /// -X
-    NegX,
-    /// -Y
-    NegY,
-    /// -Z
-    NegZ,
-}
-
 /// Global settings that define the orientation of each scene.
 /// The settings depend on the input format.
 #[derive(Debug, Clone, PartialEq)]
@@ -47,6 +31,13 @@ impl Default for Settings {
             tan_axis: Axis::PosX,
             scale: 1.,
         }
+    }
+}
+
+impl Settings {
+    pub fn coord_system(&self) -> CoordSystem {
+        let axes = [self.fwd_axis, self.up_axis, self.tan_axis];
+        CoordSystem { axes }
     }
 }
 
@@ -254,6 +245,16 @@ impl Scene {
             }
         }
         self.settings.scale = tgt;
+    }
+
+    pub fn set_axis_to(&mut self, tgt_axes: &CoordSystem) {
+        let curr_axes = self.settings.coord_system();
+        for m in self.meshes.iter_mut() {
+            for v in m.v.iter_mut() {
+                *v = curr_axes.convert_to(tgt_axes, *v);
+            }
+            // TODO also handle vertex normals here.
+        }
     }
 
     /// Converts this scene into a flattened mesh which can then be repopulated back into a
@@ -550,4 +551,117 @@ fn convert_opt_usize(s: &[Option<usize>]) -> Vec<(Range<usize>, usize)> {
     }
 
     out
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Axis {
+    /// +X
+    PosX,
+    /// +Y
+    PosY,
+    /// +Z
+    PosZ,
+    /// -X
+    NegX,
+    /// -Y
+    NegY,
+    /// -Z
+    NegZ,
+}
+
+impl Axis {
+    pub fn is_parallel_to(&self, o: &Self) -> bool {
+        match (self, o) {
+            (Self::PosX | Self::NegX, Self::PosX | Self::NegX) => true,
+            (Self::PosY | Self::NegY, Self::PosY | Self::NegY) => true,
+            (Self::PosZ | Self::NegZ, Self::PosZ | Self::NegZ) => true,
+            _ => false,
+        }
+    }
+    pub fn cross(&self, o: &Self) -> Option<Axis> {
+        let v = match (self, o) {
+            (Self::PosX, Self::PosY) | (Self::NegX, Self::NegY) => Self::PosZ,
+            (Self::PosX, Self::NegY) | (Self::NegX, Self::PosY) => Self::NegZ,
+
+            (Self::PosY, Self::PosX) | (Self::NegY, Self::NegX) => Self::NegZ,
+            (Self::PosY, Self::NegX) | (Self::NegY, Self::PosX) => Self::PosZ,
+
+            //
+            (Self::PosX, Self::PosZ) | (Self::NegX, Self::NegZ) => Self::NegY,
+            (Self::PosX, Self::NegZ) | (Self::NegX, Self::PosZ) => Self::PosY,
+
+            (Self::PosZ, Self::PosX) | (Self::NegZ, Self::NegX) => Self::PosY,
+            (Self::PosZ, Self::NegX) | (Self::NegZ, Self::PosX) => Self::NegY,
+
+            //
+            (Self::PosY, Self::PosZ) | (Self::NegY, Self::NegZ) => Self::NegX,
+            (Self::PosY, Self::NegZ) | (Self::NegY, Self::PosZ) => Self::PosX,
+
+            (Self::PosZ, Self::PosY) | (Self::NegZ, Self::NegY) => Self::PosX,
+            (Self::PosZ, Self::NegY) | (Self::NegZ, Self::PosY) => Self::NegX,
+
+            _ => return None,
+        };
+        Some(v)
+    }
+    pub fn flip(&self) -> Axis {
+        match self {
+            Self::PosX => Self::NegX,
+            Self::NegX => Self::PosX,
+
+            Self::PosY => Self::NegY,
+            Self::NegY => Self::PosY,
+
+            Self::PosZ => Self::NegZ,
+            Self::NegZ => Self::PosZ,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CoordSystem {
+    axes: [Axis; 3],
+}
+
+impl CoordSystem {
+    pub fn new(fwd: Axis, up: Axis, rh: bool) -> Self {
+        assert!(
+            !fwd.is_parallel_to(&up),
+            "{fwd:?} {up:?} should not lie on the same axis."
+        );
+        let right = fwd.cross(&up).unwrap();
+        let tan = if rh { right } else { right.flip() };
+
+        Self {
+            axes: [fwd, up, tan],
+        }
+    }
+    pub fn standard() -> Self {
+        let fwd = Axis::PosX;
+        let up = Axis::PosY;
+        let tan = Axis::PosZ;
+        Self {
+            axes: [fwd, up, tan],
+        }
+    }
+
+    /// Converts a value in one coordinate system into another coordinate system.
+    pub fn convert_to(&self, tgt: &Self, v: [F; 3]) -> [F; 3] {
+        let mut out = [0.; 3];
+        for i in 0..3 {
+            let sa = self.axes[i];
+            for j in 0..3 {
+                let ta = tgt.axes[j];
+                if !sa.is_parallel_to(&ta) {
+                    continue;
+                }
+                if sa == ta.flip() {
+                    out[j] = -v[i];
+                } else {
+                    out[j] = v[i];
+                }
+            }
+        }
+        out
+    }
 }
