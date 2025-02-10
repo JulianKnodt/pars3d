@@ -532,7 +532,7 @@ impl Mesh {
 }
 
 // For converting optional material per face index to a range of faces.
-fn convert_opt_usize(s: &[Option<usize>]) -> Vec<(Range<usize>, usize)> {
+pub fn convert_opt_usize(s: &[Option<usize>]) -> Vec<(Range<usize>, usize)> {
     let mut out = vec![];
     for (i, mati) in s.iter().enumerate() {
         let &Some(mati) = mati else {
