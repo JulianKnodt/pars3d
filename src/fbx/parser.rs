@@ -273,6 +273,8 @@ impl KVs {
             ] | &[
                 Data::String(_), Data::String(_), Data::String(_), Data::String(_),
                 Data::I32(_), Data::I32(_), Data::I32(_)
+            ] | &[
+                Data::String(_), Data::String(_), Data::String(_), Data::String(_), Data::F64(_)
             ] => |c: usize| {
                 let vals = &self.kvs[c].values;
                 match vals[0].as_str().unwrap() {
@@ -805,7 +807,7 @@ impl KVs {
                   self.kvs[c].values[0].as_str().unwrap(),
                   "LayerElementNormal" | "LayerElementUV" | "LayerElementMaterial" |
                   "LayerElementBinormal" | "LayerElementTangent" | "LayerElementSmoothing" |
-                  "LayerElementColor" | "LayerElementVisibility"
+                  "LayerElementColor" | "LayerElementVisibility" | "LayerElementUserData"
                 );
               },
               "TypedIndex", &[Data::I32(_)] => |_| {},
@@ -816,6 +818,8 @@ impl KVs {
           "LayerElementVisibility", &[] | &[Data::I32(_)] => |_| {},
           "LayerElementBinormal", &[Data::I32(_/*idx*/)] => |_| {},
           "LayerElementTangent", &[Data::I32(_/*idx*/)] => |_| {},
+
+          "LayerElementUserData", &[Data::I32(_/*idx*/)] => |_| {},
         );
     }
 
@@ -1129,6 +1133,7 @@ impl KVs {
               "Properties70", &[] => |_| { /* match_children!(self, v) */ },
             );
           },
+          "OtherFlags", &[] => |_| {},
         );
 
         if let Some(file_id) = self.find_root("FileId") {
