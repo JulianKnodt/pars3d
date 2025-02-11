@@ -46,7 +46,7 @@ fn uniq_vec_to_vertex_attribute<const N: usize>(
     }
 
     VertexAttribute {
-        map_kind: if uniq_vals.len() == num_vertices {
+        map_kind: if uniq_vals.len() < num_vertices {
             super::VertexMappingKind::ByVertices
         } else {
             super::VertexMappingKind::Wedge
@@ -314,7 +314,9 @@ impl From<FBXNode> for Node {
             transform,
             materials: _,
             skin: _,
+            hidden,
         } = fbx_node;
+
         Node {
             mesh,
             children,
@@ -322,6 +324,7 @@ impl From<FBXNode> for Node {
             name,
             skin: None,
             transform: Transform::Decomposed(transform),
+            hidden,
         }
     }
 }
@@ -335,6 +338,7 @@ impl From<Node> for FBXNode {
             name,
             skin,
             transform,
+            hidden,
         } = node;
 
         FBXNode {
@@ -346,6 +350,7 @@ impl From<Node> for FBXNode {
             materials: vec![],
             skin,
             transform: transform.to_decomposed(),
+            hidden,
         }
     }
 }

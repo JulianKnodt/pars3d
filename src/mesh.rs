@@ -143,6 +143,8 @@ pub struct Node {
 
     pub skin: Option<usize>,
     pub name: String,
+
+    pub hidden: bool,
 }
 
 impl Node {

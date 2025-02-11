@@ -99,6 +99,7 @@ impl From<Obj> for Scene {
                 transform: Transform::ident_mat(),
                 skin: None,
                 name: String::new(),
+                hidden: false,
             });
         }
         out.mtllibs = obj.mtllibs;

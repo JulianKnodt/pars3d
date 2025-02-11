@@ -299,6 +299,7 @@ impl KVs {
 
                   "currentUVSet" => {},
                   "filmboxTypeID" => {},
+                  "Visibility" => out.hidden = vals[4].as_float() == Some(0.0),
 
                   "UDP3DSMAX" => {},
                   "MaxHandle" => {},
@@ -1133,6 +1134,7 @@ impl KVs {
               "Properties70", &[] => |_| { /* match_children!(self, v) */ },
             );
           },
+
           "OtherFlags", &[] => |_| {},
         );
 

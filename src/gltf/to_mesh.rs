@@ -69,6 +69,7 @@ impl From<GLTFScene> for Scene {
                 transform: Transform::Matrix(transform),
                 skin,
                 name,
+                hidden: false,
             }
         }));
         out.root_nodes = gltf_scene.root_nodes.clone();

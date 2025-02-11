@@ -68,6 +68,8 @@ pub struct FBXNode {
 
     transform: DecomposedTransform,
 
+    hidden: bool,
+
     skin: Option<usize>,
 }
 
@@ -223,6 +225,9 @@ impl RefKind {
             Self::IndexToDirect => "IndexToDirect",
         }
     }
+    pub fn is_direct(&self) -> bool {
+        *self == Self::Direct
+    }
 }
 
 /// How to map some information to a mesh
@@ -248,6 +253,9 @@ impl VertexMappingKind {
             VertexMappingKind::Wedge => "ByPolygonVertex",
             VertexMappingKind::ByVertices => "ByVertice",
         }
+    }
+    pub fn is_by_vertices(&self) -> bool {
+        *self == VertexMappingKind::ByVertices
     }
 }
 

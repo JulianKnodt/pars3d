@@ -2,6 +2,7 @@
 
 use super::parser::{Data, Token, KV};
 use super::{id, FBXMesh, FBXNode, FBXScene};
+use crate::F;
 use std::io::{self, Seek, SeekFrom, Write};
 
 use std::collections::{HashMap, HashSet};
@@ -284,7 +285,7 @@ impl FBXMesh {
             ),
             */
 
-            if !self.n.is_empty() => "LayerElementNormal", &[Data::I32(0)] => |c| add_kvs!(
+            if !self.n.is_empty() => "LayerElementNormal", &[Data::I32(0)].as_slice() => |c| add_kvs!(
               kvs, c,
               "Version", &[Data::I32(101)],
               "Name", &[Data::str("Normal1")],
@@ -293,9 +294,8 @@ impl FBXMesh {
               "Normals", &[Data::F64Arr(
                 self.n.values.iter().flat_map(|n| n.into_iter().map(to_f64)).collect::<Vec<_>>()
               )],
-              "NormalsIndex", &[Data::I32Arr(
-                self.n.indices.iter().map(to_i32).collect::<Vec<_>>()
-              )],
+              if !(self.n.map_kind.is_by_vertices() && self.n.ref_kind.is_direct()) =>
+                "NormalsIndex", &[Data::I32Arr(self.n.indices.iter().map(to_i32).collect::<Vec<_>>())],
             ),
 
             if !self.uv.is_empty() => "LayerElementUV", &[Data::I32(0)] => |c| add_kvs!(
@@ -307,9 +307,8 @@ impl FBXMesh {
               "UV", &[Data::F64Arr(
                 self.uv.values.iter().flat_map(|uv| uv.into_iter().map(to_f64)).collect::<Vec<_>>()
               )],
-              "UVIndex", &[Data::I32Arr(
-                self.uv.indices.iter().map(to_i32).collect::<Vec<_>>()
-              )],
+              if !(self.uv.map_kind.is_by_vertices() && self.uv.ref_kind.is_direct()) =>
+                "UVIndex", &[Data::I32Arr(self.uv.indices.iter().map(to_i32).collect::<Vec<_>>())],
             ),
         );
     }
@@ -323,11 +322,39 @@ impl FBXNode {
             Data::str("Mesh"),
         ];
 
+        let tform_part = |n, vs: [F; 3]| {
+            [
+                Data::str(n),
+                Data::str(n),
+                Data::str(""),
+                Data::str("A"),
+                Data::F64(vs[0] as f64),
+                Data::F64(vs[1] as f64),
+                Data::F64(vs[2] as f64),
+            ]
+        };
+        let f64_p = |name, val| {
+            [
+                Data::str(name),
+                Data::str("double"),
+                Data::str("Number"),
+                Data::str(""),
+                Data::F64(val),
+            ]
+        };
+
         let node_kv = push_kv!(kvs, KV::new("Model", &vals, Some(parent)));
         add_kvs!(
             kvs, node_kv,
             "Version", &[Data::I32(101)],
-            "Properties70", &[] => |c| add_kvs!(kvs, c), /* children properties */
+            "Properties70", &[] => |c| add_kvs!(kvs, c,
+              if self.transform.rotation != [0.; 3] => "P", tform_part("Lcl Rotation", self.transform.rotation),
+              if self.transform.scale != [1.; 3] => "P", tform_part("Lcl Scaling", self.transform.scale),
+              if self.transform.translation != [0.; 3] => "P", tform_part("Lcl Translation", self.transform.translation),
+              if self.hidden => "P", [
+                Data::str("Visibility"), Data::str("Visibility"), Data::str(""), Data::str("A"), Data::F64(0.0)
+              ],
+            ), /* children properties */
             "Culling", &[Data::str("CullingOff")],
             "MultiTake", &[Data::I32(0)],
             "MultiLayer", &[Data::I32(0)],
