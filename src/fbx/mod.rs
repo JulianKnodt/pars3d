@@ -15,6 +15,7 @@ pub struct FBXScene {
     pub nodes: Vec<FBXNode>,
 
     materials: Vec<FBXMaterial>,
+    textures: Vec<FBXTexture>,
 
     skins: Vec<FBXSkin>,
 
@@ -54,6 +55,7 @@ impl FBXScene {
     by_id_or_new!(skin_by_id_or_new, skins);
     by_id_or_new!(anim_by_id_or_new, anims);
     by_id_or_new!(blendshape_by_id_or_new, blendshapes);
+    by_id_or_new!(texture_by_id_or_new, textures);
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -85,6 +87,12 @@ pub struct FBXMaterial {
     name: String,
     diffuse_color: [F; 3],
     specular_color: [F; 3],
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct FBXTexture {
+    id: usize,
+    name: String,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]

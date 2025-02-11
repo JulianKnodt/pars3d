@@ -1,5 +1,7 @@
-use super::{id, FBXMesh, FBXMeshMaterial, FBXNode, FBXScene, FBXSettings, VertexAttribute};
-use crate::mesh::{Axis, Mesh, Node, Scene, Settings, Transform};
+use super::{
+    id, FBXMaterial, FBXMesh, FBXMeshMaterial, FBXNode, FBXScene, FBXSettings, VertexAttribute,
+};
+use crate::mesh::{Axis, Material, Mesh, Node, Scene, Settings, Texture, TextureKind, Transform};
 use crate::{FaceKind, F};
 
 use std::ops::Range;
@@ -356,25 +358,26 @@ impl From<Node> for FBXNode {
 }
 
 impl From<FBXMaterial> for Material {
-  pub fn from(mat: FBXMaterial) -> Self {
-    let mut textures = vec![];
-    if mat.diffuse_color != [0.; 3] {
-      let [dr, dg, db] = mat.diffuse_color
-      textures.push(Texture {
-        kind: TextureKind::Diffuse,
-        mul: [dr, dg, db, 1.],
-        image: None,
-        original_path: String::new(),
-      })
-    }
+    fn from(mat: FBXMaterial) -> Self {
+        let mut textures = vec![];
+        if mat.diffuse_color != [0.; 3] {
+            let [dr, dg, db] = mat.diffuse_color;
+            textures.push(Texture {
+                kind: TextureKind::Diffuse,
+                mul: [dr, dg, db, 1.],
+                image: None,
+                original_path: String::new(),
+            })
+        }
 
-    // TODO specular here?
+        // TODO specular here?
 
-    Self {
-      name: mat.name.clone(),
-      path: String::new(),
+        Self {
+            textures,
+            name: mat.name.clone(),
+            path: String::new(),
+        }
     }
-  }
 }
 
 impl From<FBXScene> for Scene {

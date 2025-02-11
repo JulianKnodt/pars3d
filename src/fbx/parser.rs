@@ -1,6 +1,6 @@
 use super::{
     FBXAnim, FBXBlendshape, FBXMaterial, FBXMesh, FBXMeshMaterial, FBXNode, FBXScene, FBXSkin,
-    RefKind, VertexMappingKind,
+    FBXTexture, RefKind, VertexMappingKind,
 };
 use crate::{FaceKind, F};
 
@@ -582,6 +582,14 @@ impl KVs {
           "MultiLayer", &[Data::I32(_)] => |c| match_children!(self, c),
         );
     }
+    fn parse_texture(&self, out: &mut FBXTexture, tex_id: i64, kvi: usize) {
+        assert!(tex_id >= 0);
+        out.id = tex_id as usize;
+        match_children!(
+          self, kvi,
+          "Version", &[Data::I32(_)] => |_| {},
+        );
+    }
 
     fn parse_mesh(&self, out: &mut FBXMesh, mesh_id: i64, kvi: usize) {
         assert!(mesh_id >= 0);
@@ -1060,7 +1068,11 @@ impl KVs {
                     self.parse_anim_curve(anim, id, id_to_kv[&id]);
                 }
                 // Don't handle these yet
-                "Texture" => continue,
+                "Texture" => {
+                    let tex_id = fbx_scene.texture_by_id_or_new(id as usize);
+                    let tex = &mut fbx_scene.textures[tex_id];
+                    self.parse_texture(tex, id, id_to_kv[&id]);
+                }
                 "DisplayLayer" => continue,
                 "Video" => continue,
                 "Light" => continue,
