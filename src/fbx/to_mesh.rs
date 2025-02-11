@@ -355,6 +355,28 @@ impl From<Node> for FBXNode {
     }
 }
 
+impl From<FBXMaterial> for Material {
+  pub fn from(mat: FBXMaterial) -> Self {
+    let mut textures = vec![];
+    if mat.diffuse_color != [0.; 3] {
+      let [dr, dg, db] = mat.diffuse_color
+      textures.push(Texture {
+        kind: TextureKind::Diffuse,
+        mul: [dr, dg, db, 1.],
+        image: None,
+        original_path: String::new(),
+      })
+    }
+
+    // TODO specular here?
+
+    Self {
+      name: mat.name.clone(),
+      path: String::new(),
+    }
+  }
+}
+
 impl From<FBXScene> for Scene {
     fn from(fbx_scene: FBXScene) -> Self {
         let mut out = Self::default();
