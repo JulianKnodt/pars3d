@@ -93,6 +93,7 @@ pub struct FBXMaterial {
 pub struct FBXTexture {
     id: usize,
     name: String,
+    file_name: String,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]

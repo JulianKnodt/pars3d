@@ -560,6 +560,7 @@ impl KVs {
 
                 "Shininess" => {},
                 "ShininessExponent" => {},
+                "ShininessFactor" => {},
                 "Reflectivity" => {},
                 "ReflectionColor" => {},
                 "ReflectionFactor" => {},
@@ -588,6 +589,36 @@ impl KVs {
         match_children!(
           self, kvi,
           "Version", &[Data::I32(_)] => |_| {},
+          "Type", &[Data::String(_)] => |_| {},
+          "TextureName", &[Data::String(_)] => |_| {},
+          "Properties70", &[] => |c: usize| match_children!(
+            self, c, "P", &[
+              Data::String(_), Data::String(_), Data::String(_), Data::String(_),
+              Data::I32(_) | Data::String(_)
+            ] | &[
+              Data::String(_), Data::String(_), Data::String(_), Data::String(_),
+              Data::F64(_), Data::F64(_), Data::F64(_)
+            ] => |c: usize| {
+              let vals = &self.kvs[c].values;
+              match vals[0].as_str().unwrap() {
+                "CurrentTextureBlendMode" => {},
+                "UVSet" => {},
+                "UseMaterial" => {},
+                "Translation" => {},
+                "Rotation" => {},
+                x => todo!("{x:?}"),
+              }
+            }
+          ),
+          "FileName", &[Data::String(_)] => |c: usize| {
+            out.file_name = String::from(self.kvs[c].values[0].as_str().unwrap());
+          },
+          "RelativeFilename", &[Data::String(_)] => |_| {},
+          "Media", &[Data::String(_)] => |_| {},
+          "ModelUVTranslation", &[Data::F64(_), Data::F64(_)] => |_| {},
+          "ModelUVScaling", &[Data::F64(_), Data::F64(_)] => |_| {},
+          "Texture_Alpha_Source", &[Data::String(_)] => |_| {},
+          "Cropping", &[Data::I32(_), Data::I32(_), Data::I32(_), Data::I32(_)] => |_| {},
         );
     }
 
@@ -633,6 +664,9 @@ impl KVs {
                   }
               }
               assert!(curr_face.is_empty());
+          },
+          "Smoothness", &[Data::I32(_)] => |c: usize| {
+            let _smoothness = self.kvs[c].values[0].as_i32().unwrap();
           },
           "Edges", &[Data::I32Arr(_)] => |_| { /* No idea what to do here */ },
           "LayerElementNormal", &[Data::I32(_/*index of normal*/)] => |c| {
@@ -699,7 +733,7 @@ impl KVs {
                   let idxs = arr
                       .iter()
                       .copied()
-                      .inspect(|&idx| assert!(idx >= 0))
+                      .inspect(|&idx| assert!(idx >= 0, "{arr:?}"))
                       .map(|v| v as usize);
                   out.uv.indices.extend(idxs);
               }
@@ -804,6 +838,14 @@ impl KVs {
           "LayerElementTangent", &[Data::I32(_/*idx*/)] => |_| {},
 
           "LayerElementUserData", &[Data::I32(_/*idx*/)] => |_| {},
+
+          "PreviewDivisionLevels", &[Data::I32(_)] => |_| {},
+          "RenderDivisionLevels", &[Data::I32(_)] => |_| {},
+          "DisplaySubdivisions", &[Data::I32(_)] => |_| {},
+          "BoundaryRule", &[Data::I32(_)] => |_| {},
+          "PreserveBorders", &[Data::I32(_)] => |_| {},
+          "PreserveHardEdges", &[Data::I32(_)] => |_| {},
+          "PropagateEdgeHardness", &[Data::I32(_)] => |_| {},
         );
     }
 
