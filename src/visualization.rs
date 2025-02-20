@@ -76,6 +76,66 @@ pub fn face_coloring<'a>(face_group: impl Fn(usize) -> usize, num_fs: usize) -> 
         .collect()
 }
 
+/// Uses a fixed set of high contrast colors to color each face group.
+/// Face group should be O(1).
+pub fn greedy_face_coloring(
+    face_group: impl Fn(usize) -> usize,
+    num_fs: usize,
+    group_adj: impl Fn(usize, usize) -> bool,
+) -> Vec<[F; 3]> {
+    const fn to_rgbf([r, g, b]: [u8; 3]) -> [F; 3] {
+        [r as F / 255., g as F / 255., b as F / 255.]
+    }
+    const COLORS: [[F; 3]; 5] = [
+        to_rgbf([246, 107, 110]),
+        to_rgbf([248, 148, 108]),
+        to_rgbf([248, 213, 108]),
+        to_rgbf([76, 176, 122]),
+        to_rgbf([83, 105, 168]),
+    ];
+    let mut uniq_groups = vec![];
+    for fi in 0..num_fs {
+        let g = face_group(fi);
+        if !uniq_groups.contains(&g) {
+            uniq_groups.push(g);
+        }
+    }
+
+    // graph coloring index
+    let mut coloring: Vec<usize> = vec![];
+
+    // greedy graph coloring
+    for i in 0..uniq_groups.len() {
+        let mut nbrs = vec![];
+        for j in 0..i {
+            if group_adj(uniq_groups[i], uniq_groups[j]) {
+                nbrs.push(coloring[j]);
+            }
+        }
+        let color = (0..).filter(|v| !nbrs.contains(v)).next().unwrap();
+        coloring.push(color);
+    }
+
+    assert_eq!(coloring.len(), uniq_groups.len());
+
+    const N: usize = COLORS.len();
+    (0..num_fs)
+        .map(|i| {
+            let g = face_group(i);
+            let uniq_group_idx = uniq_groups.iter().position(|&v| v == g).unwrap();
+            let i = coloring[uniq_group_idx];
+            // common case
+            if i < N {
+                return COLORS[i];
+            }
+
+            // dense meshes? Make the colors darker.
+            let pow = (i / N) as i32;
+            COLORS[i % N].map(|v| v.powi(pow))
+        })
+        .collect()
+}
+
 impl super::mesh::Mesh {
     /// Constructs a new mesh with a given face coloring.
     /// Does not retain any information from the original mesh.
