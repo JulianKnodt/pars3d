@@ -1,5 +1,15 @@
 use super::{add, kmul, F};
 
+// https://coolors.co/palettes/popular/simple
+pub const HIGH_CONTRAST: [[u8; 3]; 6] = [
+  [0x9d, 0xff, 0xa4],
+  [0x33, 0xb4, 0xff],
+  [0xf4, 0x00, 0x25],
+  [0xff, 0x98, 0x2a],
+  [0x00, 0x4f, 0xb6],
+  [0xff, 0xbf, 0x1f],
+];
+
 /// Converts a hue in \[0,1\] to RGB.
 pub fn hue_to_rgb(v: F) -> [F; 3] {
     assert!(

@@ -82,17 +82,11 @@ pub fn greedy_face_coloring(
     face_group: impl Fn(usize) -> usize,
     num_fs: usize,
     group_adj: impl Fn(usize, usize) -> bool,
+    palette: &[[u8; 3]],
 ) -> Vec<[F; 3]> {
     const fn to_rgbf([r, g, b]: [u8; 3]) -> [F; 3] {
         [r as F / 255., g as F / 255., b as F / 255.]
     }
-    const COLORS: [[F; 3]; 5] = [
-        to_rgbf([246, 107, 110]),
-        to_rgbf([248, 148, 108]),
-        to_rgbf([248, 213, 108]),
-        to_rgbf([76, 176, 122]),
-        to_rgbf([83, 105, 168]),
-    ];
     let mut uniq_groups = vec![];
     for fi in 0..num_fs {
         let g = face_group(fi);
@@ -118,20 +112,21 @@ pub fn greedy_face_coloring(
 
     assert_eq!(coloring.len(), uniq_groups.len());
 
-    const N: usize = COLORS.len();
+    let n = palette.len();
     (0..num_fs)
         .map(|i| {
             let g = face_group(i);
             let uniq_group_idx = uniq_groups.iter().position(|&v| v == g).unwrap();
             let i = coloring[uniq_group_idx];
+            let col = to_rgbf(palette[i % n]);
             // common case
-            if i < N {
-                return COLORS[i];
+            if i < n {
+                return col;
             }
 
             // dense meshes? Make the colors darker.
-            let pow = (i / N) as i32;
-            COLORS[i % N].map(|v| v.powi(pow))
+            let pow = (i / n) as i32;
+            col.map(|v| v.powi(pow))
         })
         .collect()
 }
