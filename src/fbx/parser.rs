@@ -291,9 +291,11 @@ impl KVs {
 
                   "DefaultAttributeIndex" => {},
                   "InheritType" => {},
+
                   /* Not sure how to handle these */
                   "RotationPivot" => {},
                   "ScalingPivot" => {},
+                  "RotationOrder" => {},
                   "RotationActive" => {},
                   "ScalingMax" => {},
 
@@ -825,7 +827,8 @@ impl KVs {
                   self.kvs[c].values[0].as_str().unwrap(),
                   "LayerElementNormal" | "LayerElementUV" | "LayerElementMaterial" |
                   "LayerElementBinormal" | "LayerElementTangent" | "LayerElementSmoothing" |
-                  "LayerElementColor" | "LayerElementVisibility" | "LayerElementUserData"
+                  "LayerElementColor" | "LayerElementVisibility" | "LayerElementUserData" |
+                  "LayerElementPolygonGroup"
                 );
               },
               "TypedIndex", &[Data::I32(_)] => |_| {},
