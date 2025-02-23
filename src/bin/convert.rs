@@ -21,6 +21,10 @@ fn main() {
         eprintln!("Usage: <bin> src dst");
         return;
     };
+    if src.starts_with("-") || dst.starts_with("-") {
+        eprintln!("Usage: <bin> src dst");
+        return;
+    }
     println!("[INFO]: {src} -> {dst}");
 
     let scene = load(&src).expect("Failed to load scene");

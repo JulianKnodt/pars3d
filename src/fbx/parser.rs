@@ -305,6 +305,9 @@ impl KVs {
 
                   "UDP3DSMAX" => {},
                   "MaxHandle" => {},
+
+                  x if x.starts_with("mr") => {},
+
                   x => eprintln!("Unhandled node key: {x:?}"),
                 }
              },
