@@ -88,7 +88,12 @@ pub fn load(v: impl AsRef<Path>) -> std::io::Result<mesh::Scene> {
     let scene = match util::extension_to_format(&v) {
         OBJ => obj::parse(v, false, false)?.into(),
         FBX => fbx::parser::load(v)?.into(),
+
+        #[cfg(feature = "gltf")]
         GLB => gltf::load(v).map_err(std::io::Error::other)?.into(),
+        #[cfg(not(feature = "gltf"))]
+        GLB => return Err(std::io::Error::other("Not compiled with GLTF support")),
+
         PLY => mesh::Mesh::from(ply::Ply::read_from_file(v)?).into_scene(),
         STL => mesh::Mesh::from(stl::read_from_file(v)?).into_scene(),
         OFF => mesh::Mesh::from(off::read_from_file(v)?).into_scene(),
@@ -113,11 +118,15 @@ pub fn save(v: impl AsRef<Path>, scene: &mesh::Scene) -> std::io::Result<()> {
             let buf = std::io::BufWriter::new(f);
             fbx::export::export_fbx(&fbx_scene, buf)
         }
+        #[cfg(feature = "gltf")]
         GLB => {
             let f = std::fs::File::create(v)?;
             let buf = std::io::BufWriter::new(f);
             gltf::save_glb(scene, buf)
         }
+        #[cfg(not(feature = "gltf"))]
+        GLB => Err(std::io::Error::other("Not compiled with GLTF support")),
+
         PLY => {
             let f = std::fs::File::create(v)?;
             let buf = std::io::BufWriter::new(f);

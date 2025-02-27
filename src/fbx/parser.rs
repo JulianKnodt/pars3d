@@ -18,6 +18,8 @@ pub(crate) const MAGIC_LEN: usize = 23;
 /// Magic binary.
 pub(crate) const MAGIC: &[u8; MAGIC_LEN] = b"Kaydara FBX Binary  \x00\x1a\x00";
 
+const STRICT: bool = cfg!(feature = "strict_fbx");
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Data {
     I8(i8),
@@ -136,6 +138,17 @@ impl KV {
     }
 }
 
+macro_rules! todo_if_strict {
+  ($( $x: tt )*) => {
+    if STRICT {
+      eprintln!("Found unexpected case when parsing FBX file");
+      eprintln!("Please file a bug to\n\nhttps://github.com/JulianKnodt/pars3d/issues/new?template=Blank+issue");
+      eprintln!("I'd appreciate if you also attached the mesh as well.");
+      todo!($($x)*);
+    }
+  }
+}
+
 macro_rules! match_children {
   ($self: ident, $i: expr $(, $key:expr, $mtch: pat => $val:expr )* $(,)? ) => {{
     let kv = &$self.kvs[$i];
@@ -153,7 +166,7 @@ macro_rules! match_children {
           //matches.iter_mut().find(|v| v.0 == $key).unwrap().1 = true;
           $val(c)
         })*
-        x => todo!("Unhandled key {x:?} in {} children", kv.key),
+        x => todo_if_strict!("Unhandled key {x:?} in {} children", kv.key),
       }
     }
 
@@ -180,11 +193,9 @@ macro_rules! root_fields {
             assert_matches!(c_kv.values.as_slice(), $mtch, "{} {}", $key, c_kv.key);
             $values_func(c);
           })*
-          x => todo!("Unhandled {x} in {}", $key),
+          x => todo_if_strict!("Unhandled {x} in {}", $key),
         }
       }
-    } else {
-      eprintln!("FBX missing root field {}", $key);
     }
   }}
 }
@@ -308,7 +319,7 @@ impl KVs {
 
                   x if x.starts_with("mr") => {},
 
-                  x => eprintln!("Unhandled node key: {x:?}"),
+                  x => todo_if_strict!("Unhandled node key: {x:?}"),
                 }
              },
           ),
@@ -340,7 +351,8 @@ impl KVs {
               let vals = &self.kvs[c].values;
               match vals[0].as_str().unwrap() {
                 "Look" => {},
-                x => todo!("Unhandled {x:?}"),
+                "Colors" => {},
+                x => todo_if_strict!("Unhandled {x:?}"),
               }
             }
           ),
@@ -410,7 +422,7 @@ impl KVs {
               let vals = &self.kvs[c].values;
               match vals[0].as_str().unwrap() {
                 "DeformPercent" => {},
-                x => todo!("{x}"),
+                x => todo_if_strict!("{x}"),
               }
             },
           ),
@@ -491,7 +503,7 @@ impl KVs {
                 "d|Y" => {},
                 "d|Z" => {},
                 "d|DeformPercent" => {},
-                x => todo!("{x:?}"),
+                x => todo_if_strict!("Unknown anim curve node P70 {x:?}"),
               }
             },
           ),
@@ -581,7 +593,7 @@ impl KVs {
                 // monopoly powers
                 x if x.starts_with("Maya") => {},
 
-                x => todo!("Unknown material property {x:?}"),
+                x => todo_if_strict!("Unknown material property {x:?}"),
               }
             },
           ),
@@ -611,7 +623,7 @@ impl KVs {
                 "UseMaterial" => {},
                 "Translation" => {},
                 "Rotation" => {},
-                x => todo!("{x:?}"),
+                x => todo_if_strict!("Unknown texture property {x:?}"),
               }
             }
           ),
@@ -641,7 +653,7 @@ impl KVs {
                 let vals = &self.kvs[c].values;
                 match vals[0].as_str().unwrap() {
                   "Color" => {},
-                  x => todo!("{x:?}"),
+                  x => todo_if_strict!("Unknown mesh property {x:?}"),
                 }
               },
           ),
@@ -725,7 +737,7 @@ impl KVs {
               },
               "UV", &[Data::F64Arr(_)] => |c: usize| {
                   let Data::F64Arr(ref arr) = &self.kvs[c].values[0] else {
-                    todo!();
+                    unreachable!();
                   };
                   assert_eq!(arr.len() % 2, 0);
                   let uvs = arr.array_chunks::<2>().map(|uv| uv.map(|v| v as F));
@@ -733,7 +745,7 @@ impl KVs {
               },
               "UVIndex", &[Data::I32Arr(_)] => |c: usize| {
                   let Data::I32Arr(ref arr) = self.kvs[c].values[0] else {
-                      todo!();
+                      unreachable!();
                   };
                   let idxs = arr
                       .iter()
@@ -783,7 +795,7 @@ impl KVs {
                               let mat_idxs = arr.iter().map(|&i| i as usize).collect::<Vec<_>>();
                               out.mat = FBXMeshMaterial::PerFace(mat_idxs);
                           }
-                          x => todo!("{x:?}"),
+                          x => todo!("Unknown material kind {x:?}"),
                       }
                   },
               );
@@ -803,14 +815,14 @@ impl KVs {
               },
               "Colors", &[Data::F64Arr(_)] => |c: usize| {
                   let Some(v) = self.kvs[c].values[0].as_f64_arr() else {
-                      todo!();
+                      unreachable!();
                   };
                   let vc = v.array_chunks::<3>().map(|v| v.map(|v| v as F));
                   out.color.values.extend(vc);
               },
               "ColorIndex", &[Data::I32Arr(_)] => |c: usize| {
                   let Data::I32Arr(ref arr) = &self.kvs[c].values[0] else {
-                      todo!();
+                      unreachable!();
                   };
                   let idxs = arr
                       .iter()
@@ -892,7 +904,7 @@ impl KVs {
                     let name = name.as_str().unwrap();
                     prop_connections.push((src, dst, name));
                 }
-                x => todo!("{x:?}"),
+                x => todo!("Unknown connection in FBX {x:?}"),
             }
 
             assert!(!self.children.contains_key(&child));
@@ -945,7 +957,7 @@ impl KVs {
                         self.parse_limb_node(id, id_to_kv[&id]);
                         assert_eq!(conns!(id =>).count(), 0);
                     }
-                    _ => todo!("NodeAttribute::{classtag} not handled"),
+                    _ => todo_if_strict!("NodeAttribute::{classtag} not handled"),
                 },
                 "Geometry" => match classtag {
                     "Mesh" => {
@@ -961,7 +973,7 @@ impl KVs {
                         self.parse_blendshape(blendshape, id, id_to_kv[&id]);
                         blendshape.name = String::from(name);
                     }
-                    _ => todo!("Geometry::{classtag} not handled"),
+                    _ => todo_if_strict!("Geometry::{classtag} not handled"),
                 },
                 // constructs nodes?
                 "Model" => {
@@ -988,7 +1000,7 @@ impl KVs {
                             }
                             "CollectionExclusive" => continue,
                             "Deformer" => continue,
-                            x => todo!("{x:?} {:?}", self.kvs[id_to_kv[&id]]),
+                            x => todo!("Unknown parent for model {x:?} {:?}", self.kvs[id_to_kv[&id]]),
                         }
                         num_parents += 1;
                     }
@@ -1019,7 +1031,7 @@ impl KVs {
                         // FIXME handle these?
                         "Null" => match classtag {
                             "Null" => {}
-                            x => todo!("{x:?}"),
+                            x => todo_if_strict!("Unknown Null child {x:?}"),
                         },
                         "LimbNode" => match classtag {
                             "LimbNode" => {
@@ -1030,11 +1042,11 @@ impl KVs {
                                     );
                                 }
                             }
-                            x => todo!("{x:?}"),
+                            x => todo_if_strict!("Unknown LimbNode child {x:?}"),
                         },
                         "Light" => continue,
                         "Camera" => continue,
-                        x => todo!("{x:?}"),
+                        x => todo_if_strict!("Unknown Model::classtag {x:?}"),
                     }
                 }
 
@@ -1061,7 +1073,7 @@ impl KVs {
                         self.parse_blendshape(blendshape, id, id_to_kv[&id]);
                         blendshape.name = String::from(name);
                     }
-                    _ => todo!("handle deformer {classtag}"),
+                    _ => todo_if_strict!("Unknown deformer {classtag}"),
                 },
                 "SubDeformer" => match classtag {
                     "Cluster" => {
@@ -1091,7 +1103,7 @@ impl KVs {
                             assert_eq!("Geometry", self.kvs[id_to_kv[&dst]].key);
                         }
                     }
-                    _ => todo!("handle subdeformer {classtag}"),
+                    _ => todo_if_strict!("Unknown subdeformer {classtag}"),
                 },
                 "Implementation" => {
                     assert_eq!(classtag, "");
@@ -1127,7 +1139,7 @@ impl KVs {
                 "Pose" => continue,
                 "LayeredTexture" => continue,
 
-                _ => todo!("{obj_type:?}"),
+                _ => todo_if_strict!("Unknown object type {obj_type:?}"),
             }
         }
 
@@ -1268,7 +1280,7 @@ impl KVs {
                   match vals[0].as_str().unwrap() {
                     "SourceObject" => {},
                     "ActiveAnimStackName" => {},
-                    x => todo!("{x}"),
+                    x => todo_if_strict!("Unknown document property {x}"),
                   }
                 }
               ),
