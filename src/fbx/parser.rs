@@ -1142,11 +1142,13 @@ impl KVs {
                         let cl_idx = fbx_scene.cluster_by_id_or_new(id as usize);
                         self.parse_cluster(&mut fbx_scene.clusters[cl_idx], id, id_to_kv[&id]);
                         fbx_scene.clusters[cl_idx].name = String::from(name);
-                        println!("{:?}", name);
                         for src in conns!(=> id) {
                             assert_eq!("Deformer", self.kvs[id_to_kv[&src]].key);
                             let skin_idx = fbx_scene.skin_by_id_or_new(src as usize);
                             fbx_scene.skins[skin_idx].clusters.push(cl_idx);
+
+                            assert_eq!(fbx_scene.clusters[cl_idx].skin, 0);
+                            fbx_scene.clusters[cl_idx].skin = skin_idx;
                         }
                         for dst in conns!(id =>) {
                             assert_eq!("Node", self.kvs[id_to_kv[&dst]].key);

@@ -186,6 +186,8 @@ pub struct FBXCluster {
 
     // Note that this is not nullable, every cluster should be associated with a node
     node: usize,
+    // This should be 1 Skin to N clusters.
+    skin: usize,
 
     name: String,
 }
