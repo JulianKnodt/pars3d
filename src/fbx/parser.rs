@@ -351,7 +351,7 @@ impl KVs {
               let vals = &self.kvs[c].values;
               match vals[0].as_str().unwrap() {
                 "Look" => {},
-                "Colors" => {},
+                "Color" => {},
                 x => todo_if_strict!("Unhandled {x:?}"),
               }
             }
