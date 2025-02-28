@@ -346,13 +346,14 @@ impl KVs {
               Data::F64(_), Data::F64(_), Data::F64(_),
             ] | &[
               Data::String(_), Data::String(_), Data::String(_), Data::String(_),
-              Data::I32(_)
+              Data::I32(_) | Data::F64(_)
             ] => |c: usize| {
               let vals = &self.kvs[c].values;
               match vals[0].as_str().unwrap() {
                 "Look" => {},
                 "Color" => {},
-                x => todo_if_strict!("Unhandled {x:?}"),
+                "Size" => {},
+                x => todo_if_strict!("Unhandled property on Null Node {x:?}"),
               }
             }
           ),
@@ -371,6 +372,18 @@ impl KVs {
             assert_matches!(self.kvs[c].values[0].as_str(), Some("Skeleton"));
             match_children!(self, c);
           },
+          "Properties70", &[] => |c| match_children!(
+            self, c, "P", &[
+              Data::String(_), Data::String(_), Data::String(_), Data::String(_),
+              Data::F64(_),
+            ] => |c: usize| {
+              let vals = &self.kvs[c].values;
+              match vals[0].as_str().unwrap() {
+                "Size" => {},
+                x => todo_if_strict!("Unhandled property on Limb Node {x:?}"),
+              }
+            }
+          ),
         );
     }
     fn parse_blendshape(&self, out: &mut FBXBlendshape, id: i64, kvi: usize) {
@@ -533,6 +546,7 @@ impl KVs {
             let tform_link = self.kvs[c].values[0].as_f64_arr().unwrap();
             assert_eq!(tform_link.len(), 16);
           },
+          "TransformAssociateModel", &[Data::F64Arr(_)] => |_| {},
         );
     }
     fn parse_material(&self, out: &mut FBXMaterial, mat_id: i64, kvi: usize) {
@@ -623,6 +637,8 @@ impl KVs {
                 "UseMaterial" => {},
                 "Translation" => {},
                 "Rotation" => {},
+                "WrapModeU" => {},
+                "WrapModeV" => {},
                 x => todo_if_strict!("Unknown texture property {x:?}"),
               }
             }
