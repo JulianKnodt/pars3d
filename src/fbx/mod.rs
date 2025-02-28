@@ -18,6 +18,7 @@ pub struct FBXScene {
     textures: Vec<FBXTexture>,
 
     skins: Vec<FBXSkin>,
+    clusters: Vec<FBXCluster>,
 
     anims: Vec<FBXAnim>,
 
@@ -54,11 +55,12 @@ impl FBXScene {
     by_id_or_new!(mat_by_id_or_new, materials);
     by_id_or_new!(mesh_by_id_or_new, meshes);
     by_id_or_new!(node_by_id_or_new, nodes);
-    by_id_or_new!(skin_by_id_or_new, skins);
+    by_id_or_new!(cluster_by_id_or_new, clusters);
     by_id_or_new!(anim_by_id_or_new, anims);
     by_id_or_new!(blendshape_by_id_or_new, blendshapes);
     by_id_or_new!(texture_by_id_or_new, textures);
     by_id_or_new!(pose_by_id_or_new, poses);
+    by_id_or_new!(skin_by_id_or_new, skins);
 
     pub fn id_kind(&self, id: usize) -> FieldKind {
         macro_rules! check {
@@ -73,11 +75,12 @@ impl FBXScene {
         check!(self.materials, FieldKind::Material);
         check!(self.meshes, FieldKind::Mesh);
         check!(self.nodes, FieldKind::Node);
-        check!(self.skins, FieldKind::Skin);
+        check!(self.clusters, FieldKind::Cluster);
         check!(self.anims, FieldKind::Anim);
         check!(self.blendshapes, FieldKind::Blendshape);
         check!(self.textures, FieldKind::Texture);
         check!(self.poses, FieldKind::Pose);
+        check!(self.skins, FieldKind::Skin);
 
         return FieldKind::Unknown;
     }
@@ -88,11 +91,12 @@ pub enum FieldKind {
     Material,
     Mesh,
     Node,
-    Skin,
+    Cluster,
     Anim,
     Blendshape,
     Texture,
     Pose,
+    Skin,
     Unknown,
 }
 
@@ -110,7 +114,7 @@ pub struct FBXNode {
 
     hidden: bool,
 
-    skin: Option<usize>,
+    cluster: Option<usize>,
 
     pub is_limb_node: bool,
     pub is_null_node: bool,
@@ -163,13 +167,25 @@ impl FBXMeshMaterial {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct FBXSkin {
+    id: usize,
+    clusters: Vec<usize>,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct FBXCluster {
     id: usize,
 
     // indices into what? (might be poses?)
     indices: Vec<usize>,
     weights: Vec<F>,
+
+    tform: [[F; 4]; 4],
+    tform_link: [[F; 4]; 4],
+
+    // Note that this is not nullable, every cluster should be associated with a node
+    node: usize,
 
     name: String,
 }

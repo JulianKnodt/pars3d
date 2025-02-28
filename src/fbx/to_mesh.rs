@@ -1,7 +1,10 @@
 use super::{
-    id, FBXMaterial, FBXMesh, FBXMeshMaterial, FBXNode, FBXScene, FBXSettings, VertexAttribute,
+    id, FBXCluster, FBXMaterial, FBXMesh, FBXMeshMaterial, FBXNode, FBXScene, FBXSettings, FBXSkin,
+    VertexAttribute,
 };
-use crate::mesh::{Axis, Material, Mesh, Node, Scene, Settings, Texture, TextureKind, Transform};
+use crate::mesh::{
+    Axis, Material, Mesh, Node, Scene, Settings, Skin, Texture, TextureKind, Transform,
+};
 use crate::{FaceKind, F};
 
 use std::ops::Range;
@@ -315,7 +318,7 @@ impl From<FBXNode> for Node {
             name,
             transform,
             materials: _,
-            skin: _,
+            cluster: _,
             hidden,
             is_limb_node: _,
             is_null_node: _,
@@ -352,12 +355,31 @@ impl From<Node> for FBXNode {
             name,
             // materials must be computed externally
             materials: vec![],
-            skin,
+            cluster: skin,
             transform: transform.to_decomposed(),
             hidden,
             is_limb_node: skin.is_some(),
             is_null_node: false,
         }
+    }
+}
+
+impl From<(FBXSkin, &[FBXCluster])> for Skin {
+    fn from((fbx_skin, fbx_clusters): (FBXSkin, &[FBXCluster])) -> Self {
+        let FBXSkin {
+            id: _,
+            clusters: cluster_idxs,
+        } = fbx_skin;
+
+        let mut skin = Self::default();
+        for &ci in &cluster_idxs {
+            skin.joints.push(fbx_clusters[ci].node);
+            // note sure if this is tform or tform link or tform link inverse?
+            skin.inv_bind_matrices.push(fbx_clusters[ci].tform);
+            // TODO need to figure out indices and weights, they are related to vertex weights.
+        }
+
+        skin
     }
 }
 
@@ -395,7 +417,9 @@ impl From<FBXScene> for Scene {
             let Some(mi) = node.mesh else {
                 continue;
             };
-            for fm in &mut out.meshes[mi].face_mat_idx {
+            let mesh = &mut out.meshes[mi];
+
+            for fm in &mut mesh.face_mat_idx {
                 fm.1 = node.materials[fm.1];
             }
         }
@@ -419,14 +443,15 @@ impl From<Scene> for FBXScene {
                 continue;
             };
 
-            for &mati in out.meshes[mi].mat.as_slice() {
+            let mesh = &mut out.meshes[mi];
+
+            for &mati in mesh.mat.as_slice() {
                 if !n.materials.contains(&mati) {
                     n.materials.push(mati)
                 }
             }
 
-            out.meshes[mi]
-                .mat
+            mesh.mat
                 .remap(|v| n.materials.iter().position(|&p| p == v).unwrap());
         }
 

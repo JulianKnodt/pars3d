@@ -72,10 +72,12 @@ pub struct Material {
     pub path: String,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Skin {
     pub inv_bind_matrices: Vec<[[F; 4]; 4]>,
+    // Node indices
     pub joints: Vec<usize>,
+    // Index of skeleton of whole mesh
     pub skeleton: Option<usize>,
     pub name: String,
 }

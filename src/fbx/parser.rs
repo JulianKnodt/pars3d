@@ -1,9 +1,10 @@
 use super::{
-    FBXAnim, FBXBlendshape, FBXMaterial, FBXMesh, FBXMeshMaterial, FBXNode, FBXScene, FBXSkin,
-    FBXTexture, RefKind, VertexMappingKind,
+    FBXAnim, FBXBlendshape, FBXCluster, FBXMaterial, FBXMesh, FBXMeshMaterial, FBXNode, FBXScene,
+    FBXSkin, FBXTexture, RefKind, VertexMappingKind,
 };
 use crate::{FaceKind, F};
 
+use std::array::from_fn;
 use std::ascii::Char;
 use std::collections::HashMap;
 use std::io::{self, BufRead, Seek, SeekFrom, Write};
@@ -442,7 +443,7 @@ impl KVs {
           ),
         );
     }
-    fn parse_skin(&self, skin_id: i64, kvi: usize) {
+    fn parse_skin(&self, _fbx_skin: &mut FBXSkin, skin_id: i64, kvi: usize) {
         assert!(skin_id >= 0);
         match_children!(
           self, kvi,
@@ -498,9 +499,7 @@ impl KVs {
             "Matrix", &[Data::F64Arr(_)] => |c: usize| {
               let mat = self.kvs[c].values[0].as_f64_arr().unwrap();
               assert_eq!(mat.len(), 16);
-              fbx_scene.poses[pose_idx].matrices.push(std::array::from_fn(|i|
-                std::array::from_fn(|j| mat[i * 4 + j] as F)
-              ));
+              fbx_scene.poses[pose_idx].matrices.push(from_fn(|i| from_fn(|j| mat[i * 4 + j] as F)));
             }
           ),
         );
@@ -556,7 +555,7 @@ impl KVs {
           ),
         );
     }
-    fn parse_cluster(&self, fbx_skin: &mut FBXSkin, cluster_id: i64, kvi: usize) {
+    fn parse_cluster(&self, fbx_cl: &mut FBXCluster, cluster_id: i64, kvi: usize) {
         assert!(cluster_id >= 0);
 
         match_children!(
@@ -566,21 +565,27 @@ impl KVs {
           // Damn you FBX
           "Indexes", &[Data::I32Arr(_)] => |c: usize| {
             let idxs = self.kvs[c].values[0].as_i32_arr().unwrap();
-            fbx_skin.indices.extend(idxs.iter().map(|&v| v as usize));
+            fbx_cl.indices.extend(idxs.iter().map(|&v| TryInto::<usize>::try_into(v).unwrap()));
           },
           "Weights", &[Data::F64Arr(_)] => |c: usize| {
             let ws = self.kvs[c].values[0].as_f64_arr().unwrap();
-            fbx_skin.weights.extend(ws.iter().map(|&v| v as F));
+            fbx_cl.weights.extend(ws.iter().map(|&v| v as F));
           },
           "Transform", &[Data::F64Arr(_)] => |c: usize| {
             let tform = self.kvs[c].values[0].as_f64_arr().unwrap();
             assert_eq!(tform.len(), 16);
+            fbx_cl.tform = from_fn(|i| from_fn(|j| tform[i * 4 + j] as F));
           },
           "TransformLink", &[Data::F64Arr(_)] => |c: usize| {
             let tform_link = self.kvs[c].values[0].as_f64_arr().unwrap();
             assert_eq!(tform_link.len(), 16);
+            fbx_cl.tform_link = from_fn(|i| from_fn(|j| tform_link[i * 4 + j] as F));
           },
-          "TransformAssociateModel", &[Data::F64Arr(_)] => |_| {},
+          // not sure what this is for
+          "TransformAssociateModel", &[Data::F64Arr(_)] => |c: usize| {
+            let tam = self.kvs[c].values[0].as_f64_arr().unwrap();
+            assert_eq!(tam.len(), 16);
+          },
         );
     }
     fn parse_material(&self, out: &mut FBXMaterial, mat_id: i64, kvi: usize) {
@@ -709,6 +714,7 @@ impl KVs {
           ),
           "Vertices", &[Data::F64Arr(_)] => |c: usize| {
               let v_arr: &[f64] = self.kvs[c].values[0].as_f64_arr().unwrap();
+              assert_eq!(v_arr.len() % 3, 0);
               let v = v_arr
                   .iter()
                   .array_chunks::<3>()
@@ -960,12 +966,6 @@ impl KVs {
             assert!(!self.children.contains_key(&child));
         }
 
-        /*
-        for &(src, dst) in &connections {
-          println!("{} -> {}", self.kvs[id_to_kv[&src]].key, self.kvs[id_to_kv[&dst]].key);
-        }
-        */
-
         // connections by source id or destination id
         macro_rules! conns {
             ($src: expr =>) => {{
@@ -1118,12 +1118,15 @@ impl KVs {
                 }
                 "Deformer" => match classtag {
                     "Skin" => {
-                        self.parse_skin(id, id_to_kv[&id]);
+                        let skin_idx = fbx_scene.skin_by_id_or_new(id as usize);
+                        let skin = &mut fbx_scene.skins[skin_idx];
+                        self.parse_skin(skin, id, id_to_kv[&id]);
                         for src in conns!(=> id) {
                             assert_eq!("Geometry", self.kvs[id_to_kv[&src]].key);
                         }
                         for dst in conns!(id =>) {
                             assert_eq!("Deformer", self.kvs[id_to_kv[&dst]].key);
+                            // these are added in the deformer.
                         }
                     }
                     "BlendShape" => {
@@ -1136,16 +1139,22 @@ impl KVs {
                 },
                 "SubDeformer" => match classtag {
                     "Cluster" => {
-                        let skin_idx = fbx_scene.skin_by_id_or_new(id as usize);
-                        self.parse_cluster(&mut fbx_scene.skins[skin_idx], id, id_to_kv[&id]);
-                        fbx_scene.skins[skin_idx].name = String::from(name);
+                        let cl_idx = fbx_scene.cluster_by_id_or_new(id as usize);
+                        self.parse_cluster(&mut fbx_scene.clusters[cl_idx], id, id_to_kv[&id]);
+                        fbx_scene.clusters[cl_idx].name = String::from(name);
+                        println!("{:?}", name);
                         for src in conns!(=> id) {
                             assert_eq!("Deformer", self.kvs[id_to_kv[&src]].key);
+                            let skin_idx = fbx_scene.skin_by_id_or_new(src as usize);
+                            fbx_scene.skins[skin_idx].clusters.push(cl_idx);
                         }
                         for dst in conns!(id =>) {
                             assert_eq!("Node", self.kvs[id_to_kv[&dst]].key);
                             let node_idx = fbx_scene.node_by_id_or_new(dst as usize);
-                            fbx_scene.nodes[node_idx].skin = Some(skin_idx);
+                            assert_eq!(fbx_scene.nodes[node_idx].cluster, None);
+                            fbx_scene.nodes[node_idx].cluster = Some(cl_idx);
+                            assert_eq!(fbx_scene.clusters[cl_idx].node, 0);
+                            fbx_scene.clusters[cl_idx].node = node_idx;
                         }
                     }
                     "BlendShapeChannel" => {
@@ -1207,8 +1216,14 @@ impl KVs {
         }
 
         /*
-        for (parent, child) in &connections {
-          match fbx_scene.
+        for &(parent, child) in &connections {
+            println!(
+                "{:?} {:?} = {:?} {:?}",
+                fbx_scene.id_kind(parent as usize),
+                fbx_scene.id_kind(child as usize),
+                self.kvs[id_to_kv[&parent]].key,
+                self.kvs[id_to_kv[&child]].key,
+            );
         }
         */
 
