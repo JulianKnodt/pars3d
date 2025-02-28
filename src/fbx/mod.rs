@@ -21,6 +21,8 @@ pub struct FBXScene {
 
     anims: Vec<FBXAnim>,
 
+    poses: Vec<FBXPose>,
+
     blendshapes: Vec<FBXBlendshape>,
 
     root_nodes: Vec<usize>,
@@ -56,6 +58,42 @@ impl FBXScene {
     by_id_or_new!(anim_by_id_or_new, anims);
     by_id_or_new!(blendshape_by_id_or_new, blendshapes);
     by_id_or_new!(texture_by_id_or_new, textures);
+    by_id_or_new!(pose_by_id_or_new, poses);
+
+    pub fn id_kind(&self, id: usize) -> FieldKind {
+        macro_rules! check {
+            ($items: expr, $kind: expr) => {
+                let has_id = $items.iter().find(|v| v.id == id).is_some();
+                if has_id {
+                    return $kind;
+                }
+            };
+        }
+
+        check!(self.materials, FieldKind::Material);
+        check!(self.meshes, FieldKind::Mesh);
+        check!(self.nodes, FieldKind::Node);
+        check!(self.skins, FieldKind::Skin);
+        check!(self.anims, FieldKind::Anim);
+        check!(self.blendshapes, FieldKind::Blendshape);
+        check!(self.textures, FieldKind::Texture);
+        check!(self.poses, FieldKind::Pose);
+
+        return FieldKind::Unknown;
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FieldKind {
+    Material,
+    Mesh,
+    Node,
+    Skin,
+    Anim,
+    Blendshape,
+    Texture,
+    Pose,
+    Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -73,12 +111,9 @@ pub struct FBXNode {
     hidden: bool,
 
     skin: Option<usize>,
-}
 
-impl FBXNode {
-    pub fn is_limb_node(&self) -> bool {
-        todo!();
-    }
+    pub is_limb_node: bool,
+    pub is_null_node: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -132,9 +167,19 @@ impl FBXMeshMaterial {
 pub struct FBXSkin {
     id: usize,
 
-    // indices into what?
+    // indices into what? (might be poses?)
     indices: Vec<usize>,
     weights: Vec<F>,
+
+    name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+struct FBXPose {
+    id: usize,
+    // id of node
+    nodes: Vec<usize>,
+    matrices: Vec<[[F; 4]; 4]>,
 
     name: String,
 }
@@ -153,8 +198,10 @@ pub struct FBXBlendshape {
 pub struct FBXAnim {
     id: usize,
 
+    default: F,
+
     times: Vec<u32>,
-    values: Vec<u32>,
+    values: Vec<F>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]

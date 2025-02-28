@@ -62,10 +62,11 @@ macro_rules! cast {
 impl Data {
     cast!(as_str, &str, String);
     cast!(as_f64_arr, &[f64], F64Arr);
+    cast!(as_f32_arr, &[f32], F32Arr);
     cast!(as_i64_arr, &[i64], I64Arr);
     cast!(as_i32_arr, &[i32], I32Arr);
 
-    //cast!(as_i64, &i64, I64);
+    cast!(as_i64, &i64, I64);
     cast!(as_i32, &i32, I32);
 
     cast!(as_f64, &f64, F64);
@@ -476,6 +477,34 @@ impl KVs {
           ),
         );
     }
+    fn parse_pose(&self, fbx_scene: &mut FBXScene, id: i64, kvi: usize) {
+        assert!(id >= 0);
+        assert_eq!(self.kvs[kvi].key, "Pose");
+        let pose_idx = fbx_scene.pose_by_id_or_new(id as usize);
+        match_children!(
+          self, kvi,
+          "Type", &[Data::String(_)] => |_| {},
+          "Version", &[Data::I32(_)] => |_| {},
+          // how many nodes are associated with this pose?
+          "NbPoseNodes", &[Data::I32(_)] => |_| {},
+          "PoseNode", &[] => |c| match_children!(
+            self, c,
+            "Node", &[Data::I64(_)] => |c: usize| {
+              let node_id = *self.kvs[c].values[0].as_i64().unwrap();
+              assert!(node_id >= 0);
+              let node_idx = fbx_scene.node_by_id_or_new(node_id as usize);
+              fbx_scene.poses[pose_idx].nodes.push(node_idx);
+            },
+            "Matrix", &[Data::F64Arr(_)] => |c: usize| {
+              let mat = self.kvs[c].values[0].as_f64_arr().unwrap();
+              assert_eq!(mat.len(), 16);
+              fbx_scene.poses[pose_idx].matrices.push(std::array::from_fn(|i|
+                std::array::from_fn(|j| mat[i * 4 + j] as F)
+              ));
+            }
+          ),
+        );
+    }
     fn parse_anim_layer(&self, anim_layer_id: i64, kvi: usize) {
         assert!(anim_layer_id >= 0);
         assert_eq!(self.kvs[kvi].key, "AnimationLayer");
@@ -486,13 +515,18 @@ impl KVs {
         assert_eq!(self.kvs[kvi].key, "AnimationCurve");
         match_children!(
           self, kvi,
-          "Default", &[Data::F64(_)] => |_| {},
+          "Default", &[Data::F64(_)] => |c: usize| {
+            anim.default = *self.kvs[c].values[0].as_f64().unwrap() as F;
+          },
           "KeyVer", &[Data::I32(_)] => |_| {},
           "KeyTime", &[Data::I64Arr(_)] => |c: usize| {
             let val = self.kvs[c].values[0].as_i64_arr().unwrap();
             anim.times.extend(val.iter().map(|&v| v as u32));
           },
-          "KeyValueFloat", &[Data::F32Arr(_)] => |_| {},
+          "KeyValueFloat", &[Data::F32Arr(_)] => |c: usize| {
+            let val = self.kvs[c].values[0].as_f32_arr().unwrap();
+            anim.values.extend(val.iter().map(|&v| v as F));
+          },
           "KeyAttrFlags", &[Data::I32Arr(_)] => |_| {},
           "KeyAttrDataFloat", &[Data::F32Arr(_)] => |_| {},
           "KeyAttrRefCount", &[Data::I32Arr(_)] => |_| {},
@@ -935,10 +969,16 @@ impl KVs {
         // connections by source id or destination id
         macro_rules! conns {
             ($src: expr =>) => {{
-                connections.iter().filter(|&&(src, _dst)| src == $src)
+                connections
+                    .iter()
+                    .filter(|&&(src, _dst)| src == $src)
+                    .map(|v| v.1)
             }};
             (=> $dst: expr) => {{
-                connections.iter().filter(|&&(_src, dst)| dst == $dst)
+                connections
+                    .iter()
+                    .filter(|&&(_src, dst)| dst == $dst)
+                    .map(|v| v.0)
             }};
         }
 
@@ -968,10 +1008,18 @@ impl KVs {
                     "Null" => {
                         self.parse_null(id, id_to_kv[&id]);
                         assert_eq!(conns!(id =>).count(), 0);
+                        for src in conns!(=> id) {
+                            let node_idx = fbx_scene.node_by_id_or_new(src as usize);
+                            fbx_scene.nodes[node_idx].is_null_node = true;
+                        }
                     }
                     "LimbNode" => {
                         self.parse_limb_node(id, id_to_kv[&id]);
                         assert_eq!(conns!(id =>).count(), 0);
+                        for src in conns!(=> id) {
+                            let node_idx = fbx_scene.node_by_id_or_new(src as usize);
+                            fbx_scene.nodes[node_idx].is_limb_node = true;
+                        }
                     }
                     _ => todo_if_strict!("NodeAttribute::{classtag} not handled"),
                 },
@@ -1006,7 +1054,7 @@ impl KVs {
                     node.name = String::from(name);
 
                     let mut num_parents = 0;
-                    for &(parent_id, _) in conns!(=> id) {
+                    for parent_id in conns!(=> id) {
                         let parent = &self.kvs[id_to_kv[&parent_id]];
                         match parent.key.as_str() {
                             "RootNode" => fbx_scene.root_nodes.push(node_idx),
@@ -1016,7 +1064,10 @@ impl KVs {
                             }
                             "CollectionExclusive" => continue,
                             "Deformer" => continue,
-                            x => todo!("Unknown parent for model {x:?} {:?}", self.kvs[id_to_kv[&id]]),
+                            x => todo!(
+                                "Unknown parent for model {x:?} {:?}",
+                                self.kvs[id_to_kv[&id]]
+                            ),
                         }
                         num_parents += 1;
                     }
@@ -1024,7 +1075,7 @@ impl KVs {
 
                     match classtag {
                         "Mesh" => {
-                            for &(_, c) in conns!(id =>) {
+                            for c in conns!(id =>) {
                                 let c_kv = &self.kvs[id_to_kv[&c]];
                                 match c_kv.key.as_str() {
                                     "Geometry" => {
@@ -1045,23 +1096,15 @@ impl KVs {
                             }
                         }
                         // FIXME handle these?
-                        "Null" => match classtag {
-                            "Null" => {}
-                            x => todo_if_strict!("Unknown Null child {x:?}"),
-                        },
-                        "LimbNode" => match classtag {
-                            "LimbNode" => {
-                                for (_, dst) in conns!(id =>) {
-                                    assert_matches!(
-                                        self.kvs[id_to_kv[dst]].key.as_str(),
-                                        "Model" | "Node" | "NodeAttribute"
-                                    );
-                                }
+                        "Null" => {}
+                        "LimbNode" => {
+                            for dst in conns!(id =>) {
+                                assert_matches!(
+                                    self.kvs[id_to_kv[&dst]].key.as_str(),
+                                    "Model" | "Node" | "NodeAttribute"
+                                );
                             }
-                            x => todo_if_strict!("Unknown LimbNode child {x:?}"),
-                        },
-                        "Light" => continue,
-                        "Camera" => continue,
+                        }
                         x => todo_if_strict!("Unknown Model::classtag {x:?}"),
                     }
                 }
@@ -1076,10 +1119,10 @@ impl KVs {
                 "Deformer" => match classtag {
                     "Skin" => {
                         self.parse_skin(id, id_to_kv[&id]);
-                        for &(src, _) in conns!(=> id) {
+                        for src in conns!(=> id) {
                             assert_eq!("Geometry", self.kvs[id_to_kv[&src]].key);
                         }
-                        for &(_, dst) in conns!(=> id) {
+                        for dst in conns!(id =>) {
                             assert_eq!("Deformer", self.kvs[id_to_kv[&dst]].key);
                         }
                     }
@@ -1096,10 +1139,10 @@ impl KVs {
                         let skin_idx = fbx_scene.skin_by_id_or_new(id as usize);
                         self.parse_cluster(&mut fbx_scene.skins[skin_idx], id, id_to_kv[&id]);
                         fbx_scene.skins[skin_idx].name = String::from(name);
-                        for &(src, _) in conns!(=> id) {
+                        for src in conns!(=> id) {
                             assert_eq!("Deformer", self.kvs[id_to_kv[&src]].key);
                         }
-                        for &(_, dst) in conns!(id =>) {
+                        for dst in conns!(id =>) {
                             assert_eq!("Node", self.kvs[id_to_kv[&dst]].key);
                             let node_idx = fbx_scene.node_by_id_or_new(dst as usize);
                             fbx_scene.nodes[node_idx].skin = Some(skin_idx);
@@ -1108,14 +1151,14 @@ impl KVs {
                     "BlendShapeChannel" => {
                         //let blendshape_idx = fbx_scene.blendshape_by_id_or_new(id as usize);
                         self.parse_blendshape_channel(id, id_to_kv[&id]);
-                        for &(src, _) in conns!(=> id) {
+                        for src in conns!(=> id) {
                             assert_eq!("Deformer", self.kvs[id_to_kv[&src]].key);
                             assert_eq!(
                                 Some("BlendShape"),
                                 self.kvs[id_to_kv[&src]].values[2].as_str()
                             );
                         }
-                        for &(_, dst) in conns!(id =>) {
+                        for dst in conns!(id =>) {
                             assert_eq!("Geometry", self.kvs[id_to_kv[&dst]].key);
                         }
                     }
@@ -1142,6 +1185,8 @@ impl KVs {
                     let anim_id = fbx_scene.anim_by_id_or_new(id as usize);
                     let anim = &mut fbx_scene.anims[anim_id];
                     self.parse_anim_curve(anim, id, id_to_kv[&id]);
+                    assert_eq!(conns!(id =>).count(), 0);
+                    assert_eq!(conns!(=> id).count(), 0);
                 }
                 // Don't handle these yet
                 "Texture" => {
@@ -1152,12 +1197,20 @@ impl KVs {
                 "DisplayLayer" => continue,
                 "Video" => continue,
                 "Light" => continue,
-                "Pose" => continue,
+                "Pose" => {
+                    self.parse_pose(&mut fbx_scene, id, id_to_kv[&id]);
+                }
                 "LayeredTexture" => continue,
 
                 _ => todo_if_strict!("Unknown object type {obj_type:?}"),
             }
         }
+
+        /*
+        for (parent, child) in &connections {
+          match fbx_scene.
+        }
+        */
 
         root_fields!(
           self,

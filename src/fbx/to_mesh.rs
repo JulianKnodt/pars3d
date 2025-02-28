@@ -317,6 +317,8 @@ impl From<FBXNode> for Node {
             materials: _,
             skin: _,
             hidden,
+            is_limb_node: _,
+            is_null_node: _,
         } = fbx_node;
 
         Node {
@@ -353,6 +355,8 @@ impl From<Node> for FBXNode {
             skin,
             transform: transform.to_decomposed(),
             hidden,
+            is_limb_node: skin.is_some(),
+            is_null_node: false,
         }
     }
 }
