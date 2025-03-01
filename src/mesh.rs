@@ -533,6 +533,15 @@ impl Mesh {
             ..Default::default()
         }
     }
+    pub fn normalize_joint_weights(&mut self) {
+        for ws in &mut self.joint_weights {
+            let sum = ws.iter().sum::<F>();
+            if sum <= 0. {
+                continue;
+            }
+            *ws = ws.map(|v| v / sum);
+        }
+    }
 }
 
 // For converting optional material per face index to a range of faces.
