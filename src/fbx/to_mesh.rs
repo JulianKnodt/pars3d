@@ -418,13 +418,14 @@ impl From<FBXScene> for Scene {
         let mut out = Self::default();
         out.meshes
             .extend(fbx_scene.meshes.into_iter().map(Into::into));
-        out.skins.extend(
-            fbx_scene
-                .skins
-                .into_iter()
-                .map(|skin| (skin, fbx_scene.clusters.as_slice()))
-                .map(Into::into),
-        );
+        for skin in &fbx_scene.skins {
+            let _mesh = skin.mesh;
+            // here we need to be careful about reordering vertices. May need to keep a map from
+            // new vertices to original indices and then use that to give boneweights.
+            for _cl in &skin.clusters {
+                // ... TODO
+            }
+        }
         // Materials for FBX meshes are stored with two levels of indirection
         // mesh has an index into node's material list, which indexes into scene's materials
         for node in &fbx_scene.nodes {
@@ -441,6 +442,14 @@ impl From<FBXScene> for Scene {
         }
         out.nodes
             .extend(fbx_scene.nodes.into_iter().map(Into::into));
+
+        out.skins.extend(
+            fbx_scene
+                .skins
+                .into_iter()
+                .map(|skin| (skin, fbx_scene.clusters.as_slice()))
+                .map(Into::into),
+        );
 
         out.root_nodes.extend_from_slice(&fbx_scene.root_nodes);
         out.settings = fbx_scene.global_settings.into();
