@@ -319,6 +319,7 @@ impl From<FBXNode> for Node {
             transform,
             materials: _,
             cluster: _,
+            parent: _,
             hidden,
             is_limb_node: _,
             is_null_node: _,
@@ -352,13 +353,14 @@ impl From<Node> for FBXNode {
             id: id(),
             mesh,
             children,
+            parent: None,
             name,
             // materials must be computed externally
             materials: vec![],
             cluster: skin,
             transform: transform.to_decomposed(),
             hidden,
-            is_limb_node: skin.is_some(),
+            is_limb_node: skin.is_some() && mesh.is_none(),
             is_null_node: false,
         }
     }
@@ -376,6 +378,7 @@ impl From<(FBXSkin, &[FBXCluster])> for Skin {
             skin.joints.push(fbx_clusters[ci].node);
             // note sure if this is tform or tform link or tform link inverse?
             skin.inv_bind_matrices.push(fbx_clusters[ci].tform);
+
             // TODO need to figure out indices and weights, they are related to vertex weights.
         }
 
@@ -411,6 +414,13 @@ impl From<FBXScene> for Scene {
         let mut out = Self::default();
         out.meshes
             .extend(fbx_scene.meshes.into_iter().map(Into::into));
+        out.skins.extend(
+            fbx_scene
+                .skins
+                .into_iter()
+                .map(|skin| (skin, fbx_scene.clusters.as_slice()))
+                .map(Into::into),
+        );
         // Materials for FBX meshes are stored with two levels of indirection
         // mesh has an index into node's material list, which indexes into scene's materials
         for node in &fbx_scene.nodes {
@@ -422,6 +432,8 @@ impl From<FBXScene> for Scene {
             for fm in &mut mesh.face_mat_idx {
                 fm.1 = node.materials[fm.1];
             }
+
+            // traverse up parent nodes, and get contributing index
         }
         out.nodes
             .extend(fbx_scene.nodes.into_iter().map(Into::into));
@@ -438,7 +450,15 @@ impl From<Scene> for FBXScene {
         out.meshes.extend(scene.meshes.into_iter().map(Into::into));
         out.nodes.extend(scene.nodes.into_iter().map(Into::into));
 
-        for n in &mut out.nodes {
+        for ni in 0..out.nodes.len() {
+            // need to fix parent nodes
+            let children = std::mem::take(&mut out.nodes[ni].children);
+            for &cn in &children {
+                out.nodes[cn].parent = Some(ni);
+            }
+            let n = &mut out.nodes[ni];
+            n.children = children;
+
             let Some(mi) = n.mesh else {
                 continue;
             };

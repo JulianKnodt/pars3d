@@ -1060,7 +1060,10 @@ impl KVs {
                             "RootNode" => fbx_scene.root_nodes.push(node_idx),
                             "Model" | "Node" => {
                                 let parent_idx = fbx_scene.node_by_id_or_new(parent_id as usize);
-                                fbx_scene.nodes[parent_idx].children.push(node_idx)
+                                fbx_scene.nodes[parent_idx].children.push(node_idx);
+                                let node = &mut fbx_scene.nodes[node_idx];
+                                assert_eq!(node.parent, None);
+                                node.parent = Some(parent_idx);
                             }
                             "CollectionExclusive" => continue,
                             "Deformer" => continue,

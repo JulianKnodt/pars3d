@@ -108,6 +108,7 @@ pub struct FBXNode {
     materials: Vec<usize>,
 
     children: Vec<usize>,
+    parent: Option<usize>,
     name: String,
 
     transform: DecomposedTransform,
