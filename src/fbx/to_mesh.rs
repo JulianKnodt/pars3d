@@ -378,6 +378,7 @@ impl From<(FBXSkin, &[FBXCluster])> for Skin {
             id: _,
             clusters: cluster_idxs,
             mesh: _,
+            name: _,
         } = fbx_skin;
 
         let mut skin = Self::default();

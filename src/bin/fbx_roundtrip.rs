@@ -17,10 +17,18 @@ fn main() {
         eprintln!("Usage: <bin> src dst");
         return;
     };
+    if matches!(src.as_str(), "-h" | "--h") {
+        eprintln!("Usage: <bin> src dst");
+        return;
+    }
     let Some(dst) = dst else {
         eprintln!("Usage: <bin> src dst");
         return;
     };
+    if matches!(dst.as_str(), "-h" | "--h") {
+        eprintln!("Usage: <bin> src dst");
+        return;
+    }
     println!("[INFO]: {src} -> {dst}");
 
     let scene = fbx::parser::load(&src).expect("Failed to load FBX scene");

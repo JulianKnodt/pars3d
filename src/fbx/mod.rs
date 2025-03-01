@@ -183,6 +183,7 @@ pub struct FBXSkin {
     id: usize,
     clusters: Vec<usize>,
     mesh: usize,
+    name: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]

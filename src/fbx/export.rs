@@ -1,7 +1,7 @@
 #![allow(unused)]
 
 use super::parser::{Data, Token, KV};
-use super::{id, FBXMesh, FBXNode, FBXScene};
+use super::{id, FBXMesh, FBXNode, FBXScene, FBXSkin};
 use crate::F;
 use std::io::{self, Seek, SeekFrom, Write};
 
@@ -39,6 +39,18 @@ macro_rules! root_fields {
       parent:None
     });
     $( $children_func(_root_id); )?
+  }}
+}
+
+macro_rules! object_to_kv {
+  ($parent: expr, $kind: expr, $id: expr, $name: expr, $obj_type: expr, $classtag: expr) => {{
+    let vals = [
+      Data::I64($id as i64),
+      Data::String(format!("{}\x00\x01{}", $name, $obj_type)),
+      Data::str($classtag),
+    ];
+
+    KV::new($kind, &vals, $parent)
   }}
 }
 
@@ -193,6 +205,12 @@ impl FBXScene {
             node.to_kvs(obj_kv, &mut kvs);
         }
 
+        /*
+        for skin in &self.skins {
+            skin.to_kvs(obj_kv, &mut kvs);
+        }
+        */
+
         let conn_idx = push_kv!(kvs, KV::new("Connections", &[], None));
         // for each node add a connection from it to its parent
         for ni in 0..self.nodes.len() {
@@ -316,11 +334,6 @@ impl FBXMesh {
 
 impl FBXNode {
     fn to_kvs(&self, parent: usize, kvs: &mut Vec<KV>) {
-        let vals = [
-            Data::I64(self.id as i64),
-            Data::String(format!("{}\x00\x01Model", self.name)),
-            Data::str("Mesh"),
-        ];
 
         let tform_part = |n, vs: [F; 3]| {
             [
@@ -343,7 +356,8 @@ impl FBXNode {
             ]
         };
 
-        let node_kv = push_kv!(kvs, KV::new("Model", &vals, Some(parent)));
+        let node_kv = object_to_kv!(Some(parent), "Model", self.id, self.name, "Model", "Mesh");
+        let node_kv = push_kv!(kvs, node_kv);
         add_kvs!(
             kvs, node_kv,
             "Version", &[Data::I32(101)],
@@ -360,6 +374,15 @@ impl FBXNode {
             "MultiLayer", &[Data::I32(0)],
             "Shading", &[Data::Bool(false)],
         );
+    }
+}
+
+impl FBXSkin {
+    fn to_kvs(&self, parent: usize, kvs: &mut Vec<KV>) {
+        let skin_kv = object_to_kv!(Some(parent), "Deformer", self.id, self.name, "Deformer", "Skin");
+        let skin_kv = push_kv!(kvs, skin_kv);
+
+        todo!();
     }
 }
 

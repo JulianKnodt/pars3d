@@ -1126,6 +1126,7 @@ impl KVs {
                         let skin_idx = fbx_scene.skin_by_id_or_new(id as usize);
                         let skin = &mut fbx_scene.skins[skin_idx];
                         self.parse_skin(skin, id, id_to_kv[&id]);
+                        skin.name = String::from(name);
                         for src in conns!(=> id) {
                             assert_eq!("Geometry", self.kvs[id_to_kv[&src]].key);
                             let mesh_idx = fbx_scene.mesh_by_id_or_new(src as usize);
