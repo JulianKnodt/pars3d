@@ -25,6 +25,7 @@ pub struct FBXScene {
     poses: Vec<FBXPose>,
 
     blendshapes: Vec<FBXBlendshape>,
+    blendshape_channels: Vec<FBXBlendshapeChannel>,
 
     root_nodes: Vec<usize>,
 
@@ -61,6 +62,7 @@ impl FBXScene {
     by_id_or_new!(texture_by_id_or_new, textures);
     by_id_or_new!(pose_by_id_or_new, poses);
     by_id_or_new!(skin_by_id_or_new, skins);
+    by_id_or_new!(blendshape_channel_by_id_or_new, blendshape_channels);
 
     pub fn id_kind(&self, id: usize) -> FieldKind {
         macro_rules! check {
@@ -81,6 +83,7 @@ impl FBXScene {
         check!(self.textures, FieldKind::Texture);
         check!(self.poses, FieldKind::Pose);
         check!(self.skins, FieldKind::Skin);
+        check!(self.blendshape_channels, FieldKind::BlendshapeChannel);
 
         return FieldKind::Unknown;
     }
@@ -97,6 +100,7 @@ pub enum FieldKind {
     Texture,
     Pose,
     Skin,
+    BlendshapeChannel,
     Unknown,
 }
 
@@ -218,6 +222,17 @@ pub struct FBXBlendshape {
     indices: Vec<usize>,
     v: Vec<[F; 3]>,
     n: Vec<[F; 3]>,
+
+    channels: Vec<usize>,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct FBXBlendshapeChannel {
+    id: usize,
+
+    deform_percent: F,
+    full_weights: Vec<F>,
+    mesh: usize,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -243,7 +258,6 @@ pub struct FBXMesh {
     color: VertexAttribute<3>,
 
     skin: Option<usize>,
-    blendshapes: Vec<usize>,
 
     mat: FBXMeshMaterial,
 }

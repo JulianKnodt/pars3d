@@ -195,7 +195,6 @@ impl From<FBXMesh> for (Mesh, Vec<usize>) {
             n,
             uv,
             mat,
-            blendshapes: _,
             // unused
             color: _,
             skin: _,
@@ -312,8 +311,6 @@ impl From<Mesh> for FBXMesh {
             // unused
             color: Default::default(),
             skin: None,
-
-            blendshapes: vec![],
         }
     }
 }

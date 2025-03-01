@@ -1,6 +1,6 @@
 use super::{
-    FBXAnim, FBXBlendshape, FBXCluster, FBXMaterial, FBXMesh, FBXMeshMaterial, FBXNode, FBXScene,
-    FBXSkin, FBXTexture, RefKind, VertexMappingKind,
+    FBXAnim, FBXBlendshape, FBXBlendshapeChannel, FBXCluster, FBXMaterial, FBXMesh,
+    FBXMeshMaterial, FBXNode, FBXScene, FBXSkin, FBXTexture, RefKind, VertexMappingKind,
 };
 use crate::{FaceKind, F};
 
@@ -420,13 +420,15 @@ impl KVs {
           },
         );
     }
-    fn parse_blendshape_channel(&self, id: i64, kvi: usize) {
+    fn parse_blendshape_channel(&self, bs_chan: &mut FBXBlendshapeChannel, id: i64, kvi: usize) {
         assert!(id >= 0);
 
         match_children!(
           self, kvi,
           "Version", &[Data::I32(_)] => |_| {},
-          "DeformPercent", &[Data::F64(_)] => |_| {},
+          "DeformPercent", &[Data::F64(_)] => |c: usize| {
+            bs_chan.deform_percent = *self.kvs[c].values[0].as_f64().unwrap() as F;
+          },
           "FullWeights", &[Data::F64Arr(_)] => |_| {},
           "Properties70", &[] => |c| match_children!(
             self, c,
@@ -1167,17 +1169,23 @@ impl KVs {
                         }
                     }
                     "BlendShapeChannel" => {
-                        //let blendshape_idx = fbx_scene.blendshape_by_id_or_new(id as usize);
-                        self.parse_blendshape_channel(id, id_to_kv[&id]);
+                        let bs_ch_idx = fbx_scene.blendshape_channel_by_id_or_new(id as usize);
+                        let bs_ch = &mut fbx_scene.blendshape_channels[bs_ch_idx];
+                        self.parse_blendshape_channel(bs_ch, id, id_to_kv[&id]);
                         for src in conns!(=> id) {
                             assert_eq!("Deformer", self.kvs[id_to_kv[&src]].key);
                             assert_eq!(
                                 Some("BlendShape"),
                                 self.kvs[id_to_kv[&src]].values[2].as_str()
                             );
+                            let bs_idx = fbx_scene.blendshape_by_id_or_new(src as usize);
+                            fbx_scene.blendshapes[bs_idx].channels.push(bs_ch_idx);
                         }
                         for dst in conns!(id =>) {
                             assert_eq!("Geometry", self.kvs[id_to_kv[&dst]].key);
+                            let mesh_idx = fbx_scene.mesh_by_id_or_new(dst as usize);
+                            assert_eq!(fbx_scene.blendshape_channels[bs_ch_idx].mesh, 0);
+                            fbx_scene.blendshape_channels[bs_ch_idx].mesh = mesh_idx;
                         }
                     }
                     _ => todo_if_strict!("Unknown subdeformer {classtag}"),
@@ -1185,7 +1193,6 @@ impl KVs {
                 "Implementation" => {
                     assert_eq!(classtag, "");
                 }
-                "BindingTable" => continue,
                 "AnimStack" => {
                     assert_eq!(classtag, "");
                     self.parse_anim_stack(id, id_to_kv[&id]);
@@ -1215,6 +1222,8 @@ impl KVs {
                 "DisplayLayer" => continue,
                 "Video" => continue,
                 "Light" => continue,
+                "BindingTable" => continue,
+
                 "Pose" => {
                     self.parse_pose(&mut fbx_scene, id, id_to_kv[&id]);
                 }
