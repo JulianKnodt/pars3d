@@ -43,15 +43,26 @@ macro_rules! root_fields {
 }
 
 macro_rules! object_to_kv {
-  ($parent: expr, $kind: expr, $id: expr, $name: expr, $obj_type: expr, $classtag: expr) => {{
-    let vals = [
-      Data::I64($id as i64),
-      Data::String(format!("{}\x00\x01{}", $name, $obj_type)),
-      Data::str($classtag),
-    ];
+    ($parent: expr, $kind: expr, $id: expr, $name: expr, $obj_type: expr, $classtag: expr) => {{
+        let vals = [
+            Data::I64($id as i64),
+            Data::String(format!("{}\x00\x01{}", $name, $obj_type)),
+            Data::str($classtag),
+        ];
 
-    KV::new($kind, &vals, $parent)
-  }}
+        KV::new($kind, &vals, $parent)
+    }};
+}
+
+macro_rules! conn_oo {
+    ($conn_idx: expr, $src: expr, $dst: expr) => {{
+        let vals = &[
+            Data::str("OO"),
+            Data::I64($src as i64),
+            Data::I64($dst as i64),
+        ];
+        KV::new("C", vals, Some($conn_idx))
+    }};
 }
 
 // 1. convert scene to KVs
@@ -195,6 +206,7 @@ impl FBXScene {
           ),
         );
 
+        let conn_idx = push_kv!(kvs, KV::new("Connections", &[], None));
         let obj_kv = push_kv!(kvs, KV::new("Objects", &[], None));
 
         for mesh in &self.meshes {
@@ -205,13 +217,12 @@ impl FBXScene {
             node.to_kvs(obj_kv, &mut kvs);
         }
 
-        /*
         for skin in &self.skins {
             skin.to_kvs(obj_kv, &mut kvs);
-        }
-        */
 
-        let conn_idx = push_kv!(kvs, KV::new("Connections", &[], None));
+            push_kv!(kvs, conn_oo!(conn_idx, skin.id, self.meshes[skin.mesh].id));
+        }
+
         // for each node add a connection from it to its parent
         for ni in 0..self.nodes.len() {
             let parent = self.parent_node(ni);
@@ -220,12 +231,7 @@ impl FBXScene {
                 Some(p) => self.nodes[p].id,
             };
             let own_id = self.nodes[ni].id;
-            let vals = &[
-                Data::str("OO"),
-                Data::I64(own_id as i64),
-                Data::I64(id as i64),
-            ];
-            push_kv!(kvs, KV::new("C", vals, Some(conn_idx)));
+            push_kv!(kvs, conn_oo!(conn_idx, own_id, id));
         }
 
         // also add connections from nodes to their mesh
@@ -234,12 +240,10 @@ impl FBXScene {
                 continue;
             };
 
-            let vals = &[
-                Data::str("OO"),
-                Data::I64(self.meshes[mi].id as i64),
-                Data::I64(node.id as i64),
-            ];
-            push_kv!(kvs, KV::new("C", vals, Some(conn_idx)));
+            push_kv!(kvs, conn_oo!(conn_idx, self.meshes[mi].id, node.id));
+            if node.is_limb_node {
+              // TODO here make node attribute
+            }
         }
 
         root_fields!(
@@ -255,12 +259,15 @@ impl FBXScene {
 
 impl FBXMesh {
     fn to_kvs(&self, parent: usize, kvs: &mut Vec<KV>) {
-        let vals = [
-            Data::I64(self.id as i64),
-            Data::String(format!("{}\x00\x01Geometry", self.name)),
-            Data::str("Mesh"),
-        ];
-        let mesh_kv = push_kv!(kvs, KV::new("Geometry", &vals, Some(parent)));
+        let mesh_kv = object_to_kv!(
+            Some(parent),
+            "Geometry",
+            self.id,
+            self.name,
+            "Geometry",
+            "Mesh"
+        );
+        let mesh_kv = push_kv!(kvs, mesh_kv);
 
         let to_f64 = |&v| v as f64;
         let to_i32 = |&v| v as i32;
@@ -334,7 +341,6 @@ impl FBXMesh {
 
 impl FBXNode {
     fn to_kvs(&self, parent: usize, kvs: &mut Vec<KV>) {
-
         let tform_part = |n, vs: [F; 3]| {
             [
                 Data::str(n),
@@ -379,10 +385,23 @@ impl FBXNode {
 
 impl FBXSkin {
     fn to_kvs(&self, parent: usize, kvs: &mut Vec<KV>) {
-        let skin_kv = object_to_kv!(Some(parent), "Deformer", self.id, self.name, "Deformer", "Skin");
+        let skin_kv = object_to_kv!(
+            Some(parent),
+            "Deformer",
+            self.id,
+            self.name,
+            "Deformer",
+            "Skin"
+        );
         let skin_kv = push_kv!(kvs, skin_kv);
-
-        todo!();
+        add_kvs!(
+            kvs,
+            skin_kv,
+            "Version",
+            &[Data::I32(101)],
+            "SkinningType",
+            &[Data::str("Linear")],
+        );
     }
 }
 

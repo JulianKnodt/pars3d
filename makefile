@@ -1,7 +1,7 @@
 # temporary test makefile for testing that FBX exports fields corretly
 test_fbx:
 	cargo run --release --bin fbx_roundtrip -- BerserkArmor.fbx tmp.fbx
-	#cargo run --release --bin fbx_roundtrip -- tmp.fbx tmp2.fbx
+	cargo run --release --bin fbx_roundtrip -- tmp.fbx tmp2.fbx
 
 parse_fbx:
 	cargo run --release -- BusterDrone.fbx tmp.fbx
