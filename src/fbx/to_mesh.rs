@@ -184,7 +184,8 @@ impl From<Settings> for FBXSettings {
     }
 }
 
-impl From<FBXMesh> for Mesh {
+/// Constructs a generic mesh from an FBXMesh, along with a vertex remapping.
+impl From<FBXMesh> for (Mesh, Vec<usize>) {
     fn from(fbx_mesh: FBXMesh) -> Self {
         let FBXMesh {
             id: _,
@@ -214,6 +215,7 @@ impl From<FBXMesh> for Mesh {
         }
 
         let mut verts = HashMap::new();
+        let mut remapping = vec![];
 
         let mut new_v = vec![];
         let mut new_uv = vec![];
@@ -223,12 +225,15 @@ impl From<FBXMesh> for Mesh {
         let mut offset = 0;
         for f in f {
             let mut new_f = FaceKind::empty();
-            for (o, vi) in f.as_slice().iter().enumerate() {
-                let key = key_i!(offset + o, *vi);
+            for (o, &vi) in f.as_slice().iter().enumerate() {
+                let key = key_i!(offset + o, vi);
                 if !verts.contains_key(&key) {
-                    new_v.push(v[*vi]);
-                    new_uv.extend(uv.v(offset + o, *vi).into_iter());
-                    new_n.extend(n.v(offset + o, *vi).into_iter());
+                    new_v.push(v[vi]);
+                    new_uv.extend(uv.v(offset + o, vi).into_iter());
+                    new_n.extend(n.v(offset + o, vi).into_iter());
+
+                    // store remapped vertex index
+                    remapping.push(vi);
                     verts.insert(key, new_v.len() - 1);
                 }
                 new_f.insert(verts[&key]);
@@ -237,7 +242,7 @@ impl From<FBXMesh> for Mesh {
             offset += f.len();
         }
 
-        Mesh {
+        let mesh = Mesh {
             v: new_v,
             f: new_fs,
             n: new_n,
@@ -255,7 +260,8 @@ impl From<FBXMesh> for Mesh {
             joint_idxs: vec![],
 
             joint_weights: vec![],
-        }
+        };
+        (mesh, remapping)
     }
 }
 
@@ -416,16 +422,51 @@ impl From<FBXMaterial> for Material {
 impl From<FBXScene> for Scene {
     fn from(fbx_scene: FBXScene) -> Self {
         let mut out = Self::default();
-        out.meshes
-            .extend(fbx_scene.meshes.into_iter().map(Into::into));
-        for skin in &fbx_scene.skins {
-            let _mesh = skin.mesh;
-            // here we need to be careful about reordering vertices. May need to keep a map from
-            // new vertices to original indices and then use that to give boneweights.
-            for _cl in &skin.clusters {
-                // ... TODO
-            }
+
+        // construct empty joint weights and apply them later
+        let jiws = fbx_scene
+            .skins
+            .iter()
+            .map(|skin| {
+                let mesh = &fbx_scene.meshes[skin.mesh];
+                let mut joint_idxs = vec![[0; 4]; mesh.v.len()];
+                let mut joint_ws = vec![[0.; 4]; mesh.v.len()];
+
+                for &cl in &skin.clusters {
+                    let cl = &fbx_scene.clusters[cl];
+                    assert_eq!(cl.indices.len(), cl.weights.len());
+                    for (&vi, &w) in cl.indices.iter().zip(cl.weights.iter()) {
+                        let Some(slot) = joint_ws[vi].iter().position(|&v| v == 0.) else {
+                            eprintln!("More than 4 joint weights for a single vertex {vi}");
+                            continue;
+                        };
+                        //.expect("INTERNAL ERROR: More than 4 joint weights");
+                        joint_idxs[vi][slot] = cl.node as u16;
+                        joint_ws[vi][slot] = w;
+                    }
+                }
+
+                (joint_idxs, joint_ws)
+            })
+            .collect::<Vec<_>>();
+
+        let (meshes, remappings): (Vec<_>, Vec<_>) =
+            fbx_scene.meshes.into_iter().map(Into::into).unzip();
+        out.meshes = meshes;
+
+        for (skin, (jis, jws)) in fbx_scene.skins.iter().zip(jiws.into_iter()) {
+            let mesh = &mut out.meshes[skin.mesh];
+            let remap = &remappings[skin.mesh];
+            mesh.joint_idxs
+                .extend(remap.iter().map(|&og_vi| jis[og_vi]));
+            mesh.joint_weights
+                .extend(remap.iter().map(|&og_vi| jws[og_vi]));
+            // may also need to renormalize weights here
+
+            assert_eq!(mesh.joint_idxs.len(), mesh.v.len());
+            assert_eq!(mesh.joint_weights.len(), mesh.v.len());
         }
+
         // Materials for FBX meshes are stored with two levels of indirection
         // mesh has an index into node's material list, which indexes into scene's materials
         for node in &fbx_scene.nodes {
