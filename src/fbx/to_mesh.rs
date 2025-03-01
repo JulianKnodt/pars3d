@@ -197,6 +197,7 @@ impl From<FBXMesh> for Mesh {
             blendshapes: _,
             // unused
             color: _,
+            skin: _,
         } = fbx_mesh;
 
         //let num_verts = f.iter().map(|f| f.len()).sum::<usize>();
@@ -301,8 +302,10 @@ impl From<Mesh> for FBXMesh {
             uv,
 
             mat,
+
             // unused
             color: Default::default(),
+            skin: None,
 
             blendshapes: vec![],
         }
@@ -371,6 +374,7 @@ impl From<(FBXSkin, &[FBXCluster])> for Skin {
         let FBXSkin {
             id: _,
             clusters: cluster_idxs,
+            mesh: _,
         } = fbx_skin;
 
         let mut skin = Self::default();

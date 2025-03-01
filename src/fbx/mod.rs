@@ -172,6 +172,7 @@ impl FBXMeshMaterial {
 pub struct FBXSkin {
     id: usize,
     clusters: Vec<usize>,
+    mesh: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -235,6 +236,7 @@ pub struct FBXMesh {
     pub uv: VertexAttribute<2>,
     color: VertexAttribute<3>,
 
+    skin: Option<usize>,
     blendshapes: Vec<usize>,
 
     mat: FBXMeshMaterial,

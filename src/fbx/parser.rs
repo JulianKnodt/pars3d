@@ -1126,6 +1126,10 @@ impl KVs {
                         self.parse_skin(skin, id, id_to_kv[&id]);
                         for src in conns!(=> id) {
                             assert_eq!("Geometry", self.kvs[id_to_kv[&src]].key);
+                            let mesh_idx = fbx_scene.mesh_by_id_or_new(src as usize);
+                            fbx_scene.skins[skin_idx].mesh = mesh_idx;
+                            assert_eq!(fbx_scene.meshes[mesh_idx].skin, None);
+                            fbx_scene.meshes[mesh_idx].skin = Some(skin_idx);
                         }
                         for dst in conns!(id =>) {
                             assert_eq!("Deformer", self.kvs[id_to_kv[&dst]].key);
