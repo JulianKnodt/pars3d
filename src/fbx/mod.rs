@@ -121,6 +121,12 @@ pub struct FBXNode {
     pub is_null_node: bool,
 }
 
+impl FBXNode {
+    pub fn is_limb_node(&self) -> bool {
+        self.mesh.is_none() && self.cluster.is_some()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FBXMaterial {
     id: usize,
