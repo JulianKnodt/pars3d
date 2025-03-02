@@ -1,7 +1,7 @@
 #![allow(unused)]
 
 use super::parser::{Data, Token, KV};
-use super::{id, FBXMesh, FBXNode, FBXScene, FBXSkin};
+use super::{id, FBXCluster, FBXMesh, FBXNode, FBXScene, FBXSkin};
 use crate::F;
 use std::io::{self, Seek, SeekFrom, Write};
 
@@ -43,7 +43,7 @@ macro_rules! root_fields {
 }
 
 macro_rules! object_to_kv {
-    ($parent: expr, $kind: expr, $id: expr, $name: expr, $obj_type: expr, $classtag: expr) => {{
+    ($parent: expr, $kind: expr, $id: expr, $name: expr, $obj_type: expr, $classtag: expr $(,)?) => {{
         let vals = [
             Data::I64($id as i64),
             Data::String(format!("{}\x00\x01{}", $name, $obj_type)),
@@ -89,6 +89,25 @@ pub fn export_fbx(scene: &FBXScene, w: (impl Write + Seek)) -> io::Result<()> {
     }
 
     write_tokens(&token_sets, w)
+}
+
+pub fn i32_p(name: &str, val: i32) -> [Data; 5] {
+    [
+        Data::str(name),
+        Data::str("int"),
+        Data::str("Integer"),
+        Data::str(""),
+        Data::I32(val),
+    ]
+}
+pub fn f64_p(name: &str, val: f64) -> [Data; 5] {
+    [
+        Data::str(name),
+        Data::str("double"),
+        Data::str("Number"),
+        Data::str(""),
+        Data::F64(val),
+    ]
 }
 
 impl FBXScene {
@@ -139,24 +158,6 @@ impl FBXScene {
         root_fields!(kvs, "CreationTime", &[Data::str("1970-01-01 10:00:00:000")]);
         root_fields!(kvs, "Creator", &[Data::str("pars3d")]);
 
-        let int_p = |name, val| {
-            [
-                Data::str(name),
-                Data::str("int"),
-                Data::str("Integer"),
-                Data::str(""),
-                Data::I32(val),
-            ]
-        };
-        let f64_p = |name, val| {
-            [
-                Data::str(name),
-                Data::str("double"),
-                Data::str("Number"),
-                Data::str(""),
-                Data::F64(val),
-            ]
-        };
         let settings = &self.global_settings;
         root_fields!(
           kvs,
@@ -164,14 +165,14 @@ impl FBXScene {
             kvs, v,
             "Version", &[Data::I32(1000)],
             "Properties70", &[] => |v| add_kvs!(kvs, v,
-              "P", int_p("UpAxis", settings.up_axis),
-              "P", int_p("UpAxisSign", settings.up_axis_sign),
-              "P", int_p("FrontAxis", settings.front_axis),
-              "P", int_p("FrontAxisSign", settings.front_axis_sign),
-              "P", int_p("CoordAxis", settings.coord_axis),
-              "P", int_p("CoordAxisSign", settings.coord_axis_sign),
-              "P", int_p("OriginalUpAxis", settings.og_up_axis),
-              "P", int_p("OriginalUpAxisSign", settings.og_up_axis_sign),
+              "P", i32_p("UpAxis", settings.up_axis),
+              "P", i32_p("UpAxisSign", settings.up_axis_sign),
+              "P", i32_p("FrontAxis", settings.front_axis),
+              "P", i32_p("FrontAxisSign", settings.front_axis_sign),
+              "P", i32_p("CoordAxis", settings.coord_axis),
+              "P", i32_p("CoordAxisSign", settings.coord_axis_sign),
+              "P", i32_p("OriginalUpAxis", settings.og_up_axis),
+              "P", i32_p("OriginalUpAxisSign", settings.og_up_axis_sign),
               "P", f64_p("UnitScaleFactor", settings.unit_scale_factor),
               "P", f64_p("OriginalUnitScaleFactor", settings.og_unit_scale_factor),
             ),
@@ -186,7 +187,7 @@ impl FBXScene {
             "Document", &[Data::I64(self.id as i64), Data::str("Scene"), Data::str("Scene")]
             => |c| add_kvs!(
               kvs, c,
-              "RootNode", &[Data::I64(0)],
+              "RootNode", &[Data::I64(0)], /* TODO this should read from something else */
               "Properties70", &[],
             ),
           ),
@@ -206,7 +207,6 @@ impl FBXScene {
           ),
         );
 
-        let conn_idx = push_kv!(kvs, KV::new("Connections", &[], None));
         let obj_kv = push_kv!(kvs, KV::new("Objects", &[], None));
 
         for mesh in &self.meshes {
@@ -215,13 +215,30 @@ impl FBXScene {
 
         for node in &self.nodes {
             node.to_kvs(obj_kv, &mut kvs);
+
+            /*
+            if let Some(ln) = node.limb_node(obj_kv, &mut kvs) {
+                push_kv!(kvs, conn_oo!(conn_idx, ln, node.id));
+            }
+            */
         }
 
+        /*
         for skin in &self.skins {
             skin.to_kvs(obj_kv, &mut kvs);
 
             push_kv!(kvs, conn_oo!(conn_idx, skin.id, self.meshes[skin.mesh].id));
         }
+
+        for cl in &self.clusters {
+            cl.to_kvs(obj_kv, &mut kvs);
+
+            let node = &self.nodes[cl.node];
+            push_kv!(kvs, conn_oo!(conn_idx, node.id, cl.id));
+            push_kv!(kvs, conn_oo!(conn_idx, cl.id, self.skins[cl.skin].id));
+        }
+        */
+        let conn_idx = push_kv!(kvs, KV::new("Connections", &[], None));
 
         // for each node add a connection from it to its parent
         for ni in 0..self.nodes.len() {
@@ -241,9 +258,6 @@ impl FBXScene {
             };
 
             push_kv!(kvs, conn_oo!(conn_idx, self.meshes[mi].id, node.id));
-            if node.is_limb_node {
-              // TODO here make node attribute
-            }
         }
 
         root_fields!(
@@ -352,17 +366,21 @@ impl FBXNode {
                 Data::F64(vs[2] as f64),
             ]
         };
-        let f64_p = |name, val| {
-            [
-                Data::str(name),
-                Data::str("double"),
-                Data::str("Number"),
-                Data::str(""),
-                Data::F64(val),
-            ]
-        };
 
-        let node_kv = object_to_kv!(Some(parent), "Model", self.id, self.name, "Model", "Mesh");
+        let node_kv = object_to_kv!(
+            Some(parent),
+            if self.mesh.is_some() { "Model" } else { "Node" },
+            self.id,
+            self.name,
+            "Model",
+            if self.mesh.is_some() {
+                "Mesh"
+            } else if self.limb_node_id.is_some() {
+                "LimbNode"
+            } else {
+                "Null"
+            }
+        );
         let node_kv = push_kv!(kvs, node_kv);
         add_kvs!(
             kvs, node_kv,
@@ -380,6 +398,24 @@ impl FBXNode {
             "MultiLayer", &[Data::I32(0)],
             "Shading", &[Data::Bool(false)],
         );
+    }
+
+    fn limb_node(&self, parent: usize, kvs: &mut Vec<KV>) -> Option<usize> {
+        let Some(limb_node_id) = self.limb_node_id else {
+            return None;
+        };
+        let limb_node_kv = object_to_kv!(
+            Some(parent),
+            "NodeAttribute",
+            limb_node_id,
+            self.name,
+            "NodeAttribute",
+            "LimbNode"
+        );
+        let limb_node_kv = push_kv!(kvs, limb_node_kv);
+        add_kvs!(kvs, limb_node_kv, "Version", &[Data::I32(101)],);
+
+        Some(limb_node_id)
     }
 }
 
@@ -401,6 +437,53 @@ impl FBXSkin {
             &[Data::I32(101)],
             "SkinningType",
             &[Data::str("Linear")],
+        );
+    }
+}
+
+impl FBXCluster {
+    fn to_kvs(&self, parent: usize, kvs: &mut Vec<KV>) {
+        let cl_kv = object_to_kv!(
+            Some(parent),
+            "Deformer",
+            self.id,
+            self.name,
+            "SubDeformer",
+            "Cluster"
+        );
+        let cl_kv = push_kv!(kvs, cl_kv);
+        add_kvs!(
+            kvs,
+            cl_kv,
+            "Version",
+            &[Data::I32(101)],
+            "Indexes",
+            &[Data::I32Arr(
+                self.indices
+                    .iter()
+                    .map(|&idx| idx as i32)
+                    .collect::<Vec<_>>()
+            )],
+            "Weights",
+            &[Data::F64Arr(
+                self.weights.iter().map(|&w| w as f64).collect::<Vec<_>>()
+            )],
+            "Transform",
+            &[Data::F64Arr(
+                self.tform
+                    .iter()
+                    .flat_map(|&v| v.into_iter())
+                    .map(|v| v as f64)
+                    .collect::<Vec<_>>()
+            )],
+            "TransformLink",
+            &[Data::F64Arr(
+                self.tform_link
+                    .iter()
+                    .flat_map(|&v| v.into_iter())
+                    .map(|v| v as f64)
+                    .collect::<Vec<_>>()
+            )],
         );
     }
 }

@@ -107,7 +107,7 @@ pub enum FieldKind {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FBXNode {
     id: usize,
-    mesh: Option<usize>,
+    pub mesh: Option<usize>,
     // also store materials used in each node
     materials: Vec<usize>,
 
@@ -121,13 +121,13 @@ pub struct FBXNode {
 
     cluster: Option<usize>,
 
-    pub is_limb_node: bool,
+    pub limb_node_id: Option<usize>,
     pub is_null_node: bool,
 }
 
 impl FBXNode {
     pub fn is_limb_node(&self) -> bool {
-        self.mesh.is_none() && self.cluster.is_some()
+        self.limb_node_id.is_some()
     }
 }
 

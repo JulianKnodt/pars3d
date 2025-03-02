@@ -327,7 +327,7 @@ impl From<FBXNode> for Node {
             cluster: _,
             parent: _,
             hidden,
-            is_limb_node: _,
+            limb_node_id: _,
             is_null_node: _,
         } = fbx_node;
 
@@ -366,7 +366,11 @@ impl From<Node> for FBXNode {
             cluster: skin,
             transform: transform.to_decomposed(),
             hidden,
-            is_limb_node: skin.is_some() && mesh.is_none(),
+            limb_node_id: if skin.is_some() && mesh.is_none() {
+                Some(id())
+            } else {
+                None
+            },
             is_null_node: false,
         }
     }

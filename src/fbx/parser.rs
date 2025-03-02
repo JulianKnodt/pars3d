@@ -563,7 +563,9 @@ impl KVs {
         match_children!(
           self, kvi,
           "Version", &[Data::I32(_)] => |_| {},
-          "UserData", &[Data::String(_), Data::String(_)] => |_| {},
+          "UserData", &[Data::String(_), Data::String(_)] => |c| {
+            match_children!(self, c);
+          },
           // Damn you FBX
           "Indexes", &[Data::I32Arr(_)] => |c: usize| {
             let idxs = self.kvs[c].values[0].as_i32_arr().unwrap();
@@ -1020,7 +1022,8 @@ impl KVs {
                         assert_eq!(conns!(id =>).count(), 0);
                         for src in conns!(=> id) {
                             let node_idx = fbx_scene.node_by_id_or_new(src as usize);
-                            fbx_scene.nodes[node_idx].is_limb_node = true;
+                            assert_eq!(fbx_scene.nodes[node_idx].limb_node_id, None);
+                            fbx_scene.nodes[node_idx].limb_node_id = Some(id as usize);
                         }
                     }
                     _ => todo_if_strict!("NodeAttribute::{classtag} not handled"),
@@ -1047,7 +1050,6 @@ impl KVs {
                         continue;
                     }
 
-                    let kv = &self.kvs[id_to_kv[&id]];
                     assert_matches!(kv.key.as_str(), "Node" | "Model");
 
                     let node_idx = fbx_scene.node_by_id_or_new(id as usize);
@@ -1096,7 +1098,7 @@ impl KVs {
                                         let n = fbx_scene.node_by_id_or_new(c as usize);
                                         fbx_scene.nodes[n].children.push(n);
                                     }
-                                    x => todo!("{x:?}"),
+                                    x => todo!("{x:?}: {kv:?}"),
                                 }
                             }
                         }
@@ -1136,7 +1138,6 @@ impl KVs {
                         }
                         for dst in conns!(id =>) {
                             assert_eq!("Deformer", self.kvs[id_to_kv[&dst]].key);
-                            // these are added in the deformer.
                         }
                     }
                     "BlendShape" => {
@@ -1149,6 +1150,7 @@ impl KVs {
                 },
                 "SubDeformer" => match classtag {
                     "Cluster" => {
+                        assert_eq!(kv.key, "Deformer");
                         let cl_idx = fbx_scene.cluster_by_id_or_new(id as usize);
                         self.parse_cluster(&mut fbx_scene.clusters[cl_idx], id, id_to_kv[&id]);
                         fbx_scene.clusters[cl_idx].name = String::from(name);
