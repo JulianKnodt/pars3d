@@ -208,6 +208,7 @@ impl FBXScene {
         );
 
         let obj_kv = push_kv!(kvs, KV::new("Objects", &[], None));
+        let conn_idx = push_kv!(kvs, KV::new("Connections", &[], None));
 
         for mesh in &self.meshes {
             mesh.to_kvs(obj_kv, &mut kvs);
@@ -216,14 +217,11 @@ impl FBXScene {
         for node in &self.nodes {
             node.to_kvs(obj_kv, &mut kvs);
 
-            /*
             if let Some(ln) = node.limb_node(obj_kv, &mut kvs) {
                 push_kv!(kvs, conn_oo!(conn_idx, ln, node.id));
             }
-            */
         }
 
-        /*
         for skin in &self.skins {
             skin.to_kvs(obj_kv, &mut kvs);
 
@@ -234,11 +232,10 @@ impl FBXScene {
             cl.to_kvs(obj_kv, &mut kvs);
 
             let node = &self.nodes[cl.node];
-            push_kv!(kvs, conn_oo!(conn_idx, node.id, cl.id));
             push_kv!(kvs, conn_oo!(conn_idx, cl.id, self.skins[cl.skin].id));
+            // not sure what ID this is going to
+            push_kv!(kvs, conn_oo!(conn_idx, node.id, cl.id));
         }
-        */
-        let conn_idx = push_kv!(kvs, KV::new("Connections", &[], None));
 
         // for each node add a connection from it to its parent
         for ni in 0..self.nodes.len() {

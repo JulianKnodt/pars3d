@@ -17,12 +17,11 @@ pub struct FBXScene {
     materials: Vec<FBXMaterial>,
     textures: Vec<FBXTexture>,
 
-    skins: Vec<FBXSkin>,
-    clusters: Vec<FBXCluster>,
+    pub skins: Vec<FBXSkin>,
+    pub clusters: Vec<FBXCluster>,
+    pub poses: Vec<FBXPose>,
 
     anims: Vec<FBXAnim>,
-
-    poses: Vec<FBXPose>,
 
     blendshapes: Vec<FBXBlendshape>,
     blendshape_channels: Vec<FBXBlendshapeChannel>,
@@ -206,7 +205,7 @@ pub struct FBXCluster {
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
-struct FBXPose {
+pub struct FBXPose {
     id: usize,
     // id of node
     nodes: Vec<usize>,
@@ -249,7 +248,7 @@ pub struct FBXAnim {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FBXMesh {
     id: usize,
-    name: String,
+    pub name: String,
 
     pub v: Vec<[F; 3]>,
     pub f: Vec<FaceKind>,

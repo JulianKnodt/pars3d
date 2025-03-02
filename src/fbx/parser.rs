@@ -1077,6 +1077,7 @@ impl KVs {
                         }
                         num_parents += 1;
                     }
+
                     assert_eq!(num_parents, 1);
 
                     match classtag {
@@ -1109,10 +1110,11 @@ impl KVs {
                         "LimbNode" => {
                             assert_eq!(kv.key, "Model");
                             for dst in conns!(id =>) {
-                                assert_matches!(
-                                    self.kvs[id_to_kv[&dst]].key.as_str(),
-                                    "Model" | "Node" | "NodeAttribute"
-                                );
+                                let dst = &self.kvs[id_to_kv[&dst]];
+                                assert_matches!(dst.key.as_str(), "Model" | "Node" | "NodeAttribute");
+                                if dst.key == "Node" {
+                                  println!("{:?}", dst);
+                                }
                             }
                         }
                         x => todo_if_strict!("Unknown Model::classtag {x:?}"),
