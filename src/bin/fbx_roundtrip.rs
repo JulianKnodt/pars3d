@@ -34,12 +34,12 @@ fn main() {
     let scene = fbx::parser::load(&src).expect("Failed to load FBX scene");
     println!("# Meshes {:?}", scene.meshes.len());
     for m in &scene.meshes {
-      println!("\t#V = {}", m.v.len());
-      println!("\t#F = {}", m.f.len());
+        println!("\t#V = {}", m.v.len());
+        println!("\t#F = {}", m.f.len());
     }
     println!("# Nodes {:?}", scene.nodes.len());
     for n in &scene.nodes {
-      println!("\tMesh = {:?}", n.mesh);
+        println!("\tMesh = {:?}", n.mesh);
     }
     let out = std::fs::File::create(dst).expect("Failed to create file");
     fbx::export::export_fbx(&scene, std::io::BufWriter::new(out)).expect("Failed to save scene");

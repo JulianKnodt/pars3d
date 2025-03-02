@@ -1003,8 +1003,8 @@ impl KVs {
 
             let classtag = classtag.as_str().unwrap();
 
-            match obj_type {
-                "NodeAttribute" => match classtag {
+            match (kv.key.as_str(), obj_type) {
+                ("NodeAttribute", "NodeAttribute") => match classtag {
                     "Light" => continue,
                     "Camera" => continue,
                     // I believe these are attributes for nodes, so they're not actual nodes.
@@ -1028,7 +1028,7 @@ impl KVs {
                     }
                     _ => todo_if_strict!("NodeAttribute::{classtag} not handled"),
                 },
-                "Geometry" => match classtag {
+                ("Geometry", "Geometry") => match classtag {
                     "Mesh" => {
                         let mi = fbx_scene.mesh_by_id_or_new(id as usize);
                         let fbx_mesh = &mut fbx_scene.meshes[mi];
@@ -1044,13 +1044,12 @@ impl KVs {
                     }
                     _ => todo_if_strict!("Geometry::{classtag} not handled"),
                 },
-                // constructs nodes?
-                "Model" => {
+                // Not entirely sure when this is what, need to check more thoroughly
+                ("Node" | "Model", "Model") => {
                     if matches!(classtag, "Light" | "Camera") {
                         continue;
                     }
-
-                    assert_matches!(kv.key.as_str(), "Node" | "Model");
+                    assert_eq!(kv.key, "Model");
 
                     let node_idx = fbx_scene.node_by_id_or_new(id as usize);
                     let node = &mut fbx_scene.nodes[node_idx];
@@ -1082,6 +1081,7 @@ impl KVs {
 
                     match classtag {
                         "Mesh" => {
+                            assert_eq!(kv.key, "Model");
                             for c in conns!(id =>) {
                                 let c_kv = &self.kvs[id_to_kv[&c]];
                                 match c_kv.key.as_str() {
@@ -1103,8 +1103,11 @@ impl KVs {
                             }
                         }
                         // FIXME handle these?
-                        "Null" => {}
+                        "Null" => {
+                            assert_eq!(kv.key, "Model");
+                        }
                         "LimbNode" => {
+                            assert_eq!(kv.key, "Model");
                             for dst in conns!(id =>) {
                                 assert_matches!(
                                     self.kvs[id_to_kv[&dst]].key.as_str(),
@@ -1116,14 +1119,14 @@ impl KVs {
                     }
                 }
 
-                "Material" => {
+                ("Material", "Material") => {
                     assert_eq!(classtag, "");
                     let mati = fbx_scene.mat_by_id_or_new(id as usize);
                     let mat = &mut fbx_scene.materials[mati];
                     self.parse_material(mat, id, id_to_kv[&id]);
                     mat.name = String::from(name);
                 }
-                "Deformer" => match classtag {
+                ("Deformer", "Deformer") => match classtag {
                     "Skin" => {
                         let skin_idx = fbx_scene.skin_by_id_or_new(id as usize);
                         let skin = &mut fbx_scene.skins[skin_idx];
@@ -1148,9 +1151,8 @@ impl KVs {
                     }
                     _ => todo_if_strict!("Unknown deformer {classtag}"),
                 },
-                "SubDeformer" => match classtag {
+                ("Deformer", "SubDeformer") => match classtag {
                     "Cluster" => {
-                        assert_eq!(kv.key, "Deformer");
                         let cl_idx = fbx_scene.cluster_by_id_or_new(id as usize);
                         self.parse_cluster(&mut fbx_scene.clusters[cl_idx], id, id_to_kv[&id]);
                         fbx_scene.clusters[cl_idx].name = String::from(name);
@@ -1193,22 +1195,22 @@ impl KVs {
                     }
                     _ => todo_if_strict!("Unknown subdeformer {classtag}"),
                 },
-                "Implementation" => {
+                ("Implementation", "Implementation") => {
                     assert_eq!(classtag, "");
                 }
-                "AnimStack" => {
+                ("AnimationStack", "AnimStack") => {
                     assert_eq!(classtag, "");
                     self.parse_anim_stack(id, id_to_kv[&id]);
                 }
-                "AnimLayer" => {
+                ("AnimationLayer", "AnimLayer") => {
                     assert_eq!(classtag, "");
                     self.parse_anim_layer(id, id_to_kv[&id]);
                 }
-                "AnimCurveNode" => {
+                ("AnimationCurveNode", "AnimCurveNode") => {
                     assert_eq!(classtag, "");
                     self.parse_anim_curve_node(id, id_to_kv[&id]);
                 }
-                "AnimCurve" => {
+                ("AnimationCurve", "AnimCurve") => {
                     assert_eq!(classtag, "");
                     let anim_id = fbx_scene.anim_by_id_or_new(id as usize);
                     let anim = &mut fbx_scene.anims[anim_id];
@@ -1217,22 +1219,22 @@ impl KVs {
                     assert_eq!(conns!(=> id).count(), 0);
                 }
                 // Don't handle these yet
-                "Texture" => {
+                ("Texture", "Texture") => {
                     let tex_id = fbx_scene.texture_by_id_or_new(id as usize);
                     let tex = &mut fbx_scene.textures[tex_id];
                     self.parse_texture(tex, id, id_to_kv[&id]);
                 }
-                "DisplayLayer" => continue,
-                "Video" => continue,
-                "Light" => continue,
-                "BindingTable" => continue,
+                ("DisplayLayer", "DisplayLayer") => continue,
+                ("Video", "Video") => continue,
+                ("Light", "Light") => continue,
+                ("BindingTable", "BindingTable") => continue,
 
-                "Pose" => {
+                ("Pose", "Pose") => {
                     self.parse_pose(&mut fbx_scene, id, id_to_kv[&id]);
                 }
-                "LayeredTexture" => continue,
+                ("LayeredTexture", "LayeredTexture") => continue,
 
-                _ => todo_if_strict!("Unknown object type {obj_type:?}"),
+                (key, ty) => todo_if_strict!("Unknown key object type {key} {ty}"),
             }
         }
 

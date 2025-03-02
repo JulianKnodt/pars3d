@@ -369,7 +369,7 @@ impl FBXNode {
 
         let node_kv = object_to_kv!(
             Some(parent),
-            if self.mesh.is_some() { "Model" } else { "Node" },
+            "Model",
             self.id,
             self.name,
             "Model",
