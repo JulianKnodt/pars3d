@@ -90,7 +90,7 @@ impl FBXScene {
         check!(self.anim_layers, FieldKind::AnimLayer);
         check!(self.anim_curve_nodes, FieldKind::AnimCurveNode);
 
-        return FieldKind::Unknown;
+        FieldKind::Unknown
     }
 }
 

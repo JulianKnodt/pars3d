@@ -324,7 +324,7 @@ impl FBXMesh {
               "MappingInformationType", &[Data::str(self.n.map_kind.to_str())],
               "ReferenceInformationType", &[Data::str(self.n.ref_kind.to_str())],
               "Normals", &[Data::F64Arr(
-                self.n.values.iter().flat_map(|n| n.into_iter().map(to_f64)).collect::<Vec<_>>()
+                self.n.values.iter().flat_map(|n| n.iter().map(to_f64)).collect::<Vec<_>>()
               )],
               if !(self.n.map_kind.is_by_vertices() && self.n.ref_kind.is_direct()) =>
                 "NormalsIndex", &[Data::I32Arr(self.n.indices.iter().map(to_i32).collect::<Vec<_>>())],
@@ -337,7 +337,7 @@ impl FBXMesh {
               "MappingInformationType", &[Data::str(self.uv.map_kind.to_str())],
               "ReferenceInformationType", &[Data::str(self.uv.ref_kind.to_str())],
               "UV", &[Data::F64Arr(
-                self.uv.values.iter().flat_map(|uv| uv.into_iter().map(to_f64)).collect::<Vec<_>>()
+                self.uv.values.iter().flat_map(|uv| uv.iter().map(to_f64)).collect::<Vec<_>>()
               )],
               if !(self.uv.map_kind.is_by_vertices() && self.uv.ref_kind.is_direct()) =>
                 "UVIndex", &[Data::I32Arr(self.uv.indices.iter().map(to_i32).collect::<Vec<_>>())],
@@ -394,9 +394,7 @@ impl FBXNode {
     }
 
     fn limb_node(&self, parent: usize, kvs: &mut Vec<KV>) -> Option<usize> {
-        let Some(limb_node_id) = self.limb_node_id else {
-            return None;
-        };
+        let limb_node_id = self.limb_node_id?;
         let limb_node_kv = object_to_kv!(
             Some(parent),
             "NodeAttribute",

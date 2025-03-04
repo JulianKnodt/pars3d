@@ -321,9 +321,9 @@ impl From<&[usize]> for FaceKind {
 
 impl From<Vec<usize>> for FaceKind {
     fn from(v: Vec<usize>) -> Self {
-        match v.as_slice() {
-            &[a, b, c] => Self::Tri([a, b, c]),
-            &[a, b, c, d] => Self::Quad([a, b, c, d]),
+        match *v.as_slice() {
+            [a, b, c] => Self::Tri([a, b, c]),
+            [a, b, c, d] => Self::Quad([a, b, c, d]),
             _ => Self::Poly(v),
         }
     }
