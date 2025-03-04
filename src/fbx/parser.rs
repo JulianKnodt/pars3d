@@ -1,7 +1,7 @@
 use super::{
-    FBXAnimCurve, FBXAnimCurveNode, FBXAnimLayer, FBXBlendshape, FBXBlendshapeChannel, FBXCluster,
-    FBXMaterial, FBXMesh, FBXMeshMaterial, FBXNode, FBXScene, FBXSkin, FBXTexture, RefKind,
-    VertexMappingKind,
+    FBXAnimCurve, FBXAnimCurveNode, FBXAnimLayer, FBXAnimStack, FBXBlendshape,
+    FBXBlendshapeChannel, FBXCluster, FBXMaterial, FBXMesh, FBXMeshMaterial, FBXNode, FBXScene,
+    FBXSkin, FBXTexture, RefKind, VertexMappingKind,
 };
 use crate::{FaceKind, F};
 
@@ -459,7 +459,7 @@ impl KVs {
           },
         );
     }
-    fn parse_anim_stack(&self, anim_stack_id: i64, kvi: usize) {
+    fn parse_anim_stack(&self, anim_stack: &mut FBXAnimStack, anim_stack_id: i64, kvi: usize) {
         assert!(anim_stack_id >= 0);
         match_children!(
           self, kvi,
@@ -471,10 +471,18 @@ impl KVs {
             ] => |c: usize| {
               let vals = &self.kvs[c].values;
               match vals[0].as_str().unwrap() {
-                "LocalStart" => {},
-                "LocalStop" => {},
-                "ReferenceStart" => {},
-                "ReferenceStop" => {},
+                "LocalStart" => {
+                  anim_stack.local_start = *vals[4].as_i64().unwrap();
+                },
+                "LocalStop" => {
+                  anim_stack.local_stop = *vals[4].as_i64().unwrap();
+                },
+                "ReferenceStart" => {
+                  anim_stack.ref_start = *vals[4].as_i64().unwrap();
+                },
+                "ReferenceStop" => {
+                  anim_stack.ref_stop = *vals[4].as_i64().unwrap();
+                },
                 x => todo!("{x:?}"),
               }
             },
@@ -1273,7 +1281,17 @@ impl KVs {
                 }
                 ("AnimationStack", "AnimStack") => {
                     assert_eq!(classtag, "");
-                    self.parse_anim_stack(id, id_to_kv[&id]);
+                    let as_idx = fbx_scene.anim_stack_by_id_or_new(id as usize);
+                    let anim_stack = &mut fbx_scene.anim_stacks[as_idx];
+                    anim_stack.name = String::from(name);
+                    self.parse_anim_stack(anim_stack, id, id_to_kv[&id]);
+                    for dst in conns!(id =>) {
+                        let dst_kv = &self.kvs[id_to_kv[&dst]];
+                        assert_eq!(dst_kv.key, "AnimationLayer");
+                        let al_idx = fbx_scene.anim_layer_by_id_or_new(dst as usize);
+                        fbx_scene.anim_layers[al_idx].anim_stack = as_idx;
+                    }
+                    assert_eq!(conns!(=> id).count(), 0);
                 }
                 ("AnimationLayer", "AnimLayer") => {
                     assert_eq!(classtag, "");

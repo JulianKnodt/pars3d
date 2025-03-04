@@ -1,7 +1,7 @@
 #![allow(unused)]
 
 use super::parser::{Data, Token, KV};
-use super::{id, FBXCluster, FBXMesh, FBXNode, FBXScene, FBXSkin};
+use super::{id, FBXAnimCurveNode, FBXAnimLayer, FBXCluster, FBXMesh, FBXNode, FBXScene, FBXSkin};
 use crate::F;
 use std::io::{self, Seek, SeekFrom, Write};
 
@@ -481,6 +481,35 @@ impl FBXCluster {
                 .collect::<Vec<_>>()
             )],
         );
+    }
+}
+
+impl FBXAnimLayer {
+    fn to_kvs(&self, parent: usize, kvs: &mut Vec<KV>) {
+        let al_kv = object_to_kv!(
+            Some(parent),
+            "AnimationLayer",
+            self.id,
+            self.name,
+            "AnimLayer",
+            ""
+        );
+        let al_kv = push_kv!(kvs, al_kv);
+    }
+}
+
+impl FBXAnimCurveNode {
+    fn to_kvs(&self, parent: usize, kvs: &mut Vec<KV>) {
+        let acn_kv = object_to_kv!(
+            Some(parent),
+            "AnimationCurveNode",
+            self.id,
+            self.name,
+            "AnimCurveNode",
+            ""
+        );
+        let acn_kv = push_kv!(kvs, acn_kv);
+        add_kvs!(kvs, acn_kv, "Properties70", &[]);
     }
 }
 
