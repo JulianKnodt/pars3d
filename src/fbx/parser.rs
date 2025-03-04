@@ -483,7 +483,7 @@ impl KVs {
                 "ReferenceStop" => {
                   anim_stack.ref_stop = *vals[4].as_i64().unwrap();
                 },
-                x => todo!("{x:?}"),
+                x => todo_if_strict!("{x:?}"),
               }
             },
           ),

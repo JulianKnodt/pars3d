@@ -2,8 +2,8 @@
 
 use super::parser::{Data, Token, KV};
 use super::{
-    id, FBXAnimCurveNode, FBXAnimLayer, FBXAnimStack, FBXCluster, FBXMesh, FBXNode, FBXScene,
-    FBXSkin,
+    id, FBXAnimCurve, FBXAnimCurveNode, FBXAnimLayer, FBXAnimStack, FBXCluster, FBXMesh, FBXNode,
+    FBXScene, FBXSkin,
 };
 use crate::F;
 use std::io::{self, Seek, SeekFrom, Write};
@@ -257,6 +257,16 @@ impl FBXScene {
             push_kv!(kvs, conn_oo!(conn_idx, cl.id, self.skins[cl.skin].id));
             // not sure what ID this is going to
             push_kv!(kvs, conn_oo!(conn_idx, node.id, cl.id));
+        }
+
+        for a_s in &self.anim_stacks {
+            a_s.to_kvs(obj_kv, &mut kvs);
+        }
+        for a_l in &self.anim_layers {
+            a_l.to_kvs(obj_kv, &mut kvs);
+        }
+        for a_c in &self.anim_curves {
+            a_c.to_kvs(obj_kv, &mut kvs);
         }
 
         // for each node add a connection from it to its parent
@@ -542,6 +552,20 @@ impl FBXAnimLayer {
             ""
         );
         let al_kv = push_kv!(kvs, al_kv);
+    }
+}
+
+impl FBXAnimCurve {
+    fn to_kvs(&self, parent: usize, kvs: &mut Vec<KV>) {
+        let ac_kv = object_to_kv!(
+            Some(parent),
+            "AnimationCurve",
+            self.id,
+            self.name,
+            "AnimCurve",
+            "",
+        );
+        let ac_kv = push_kv!(kvs, ac_kv);
     }
 }
 
