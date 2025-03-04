@@ -436,7 +436,13 @@ impl FBXNode {
             "LimbNode"
         );
         let limb_node_kv = push_kv!(kvs, limb_node_kv);
-        add_kvs!(kvs, limb_node_kv, "Version", &[Data::I32(101)],);
+        add_kvs!(
+            kvs,
+            limb_node_kv,
+            "Version", &[Data::I32(101)],
+            "TypeFlags", &[Data::str("Skeleton")],
+            "Properties70", &[] => |c| add_kvs!(kvs, c),
+        );
 
         Some(limb_node_id)
     }
