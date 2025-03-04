@@ -234,7 +234,7 @@ impl FBXScene {
             let node = &self.nodes[cl.node];
             push_kv!(kvs, conn_oo!(conn_idx, cl.id, self.skins[cl.skin].id));
             // not sure what ID this is going to
-            //push_kv!(kvs, conn_oo!(conn_idx, node.id, cl.id));
+            push_kv!(kvs, conn_oo!(conn_idx, node.id, cl.id));
         }
 
         // for each node add a connection from it to its parent
@@ -301,14 +301,10 @@ impl FBXMesh {
         add_kvs!(
             kvs,
             mesh_kv,
-            "Properties70",
-            &[],
-            "GeometryVersion",
-            &[Data::I32(101)],
-            "Vertices",
-            &[Data::F64Arr(vert_vals)],
-            "PolygonVertexIndex",
-            &[Data::I32Arr(faces)],
+            "Properties70", &[],
+            "GeometryVersion", &[Data::I32(101)],
+            "Vertices", &[Data::F64Arr(vert_vals)],
+            "PolygonVertexIndex", &[Data::I32Arr(faces)],
             /*
             "Layer", &[Data::I32(0)] => |c| add_kvs!(
               kvs, c,
@@ -465,7 +461,7 @@ impl FBXCluster {
             &[Data::F64Arr(
                 self.weights.iter().map(|&w| w as f64).collect::<Vec<_>>()
             )],
-            "Transform",
+            if self.tform != [[0.; 4]; 4] => "Transform",
             &[Data::F64Arr(
                 self.tform
                     .iter()
@@ -473,13 +469,18 @@ impl FBXCluster {
                     .map(|v| v as f64)
                     .collect::<Vec<_>>()
             )],
-            "TransformLink",
+            if self.tform_link != [[0.; 4]; 4] => "TransformLink",
             &[Data::F64Arr(
                 self.tform_link
                     .iter()
                     .flat_map(|&v| v.into_iter())
                     .map(|v| v as f64)
                     .collect::<Vec<_>>()
+            )],
+            if self.tform_assoc_model != [[0.; 4]; 4] => "TransformAssociateModel", &[Data::F64Arr(
+              self.tform_assoc_model.iter().flat_map(|&v| v.into_iter())
+                .map(|v| v as f64)
+                .collect::<Vec<_>>()
             )],
         );
     }

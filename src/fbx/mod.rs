@@ -195,6 +195,7 @@ pub struct FBXCluster {
 
     tform: [[F; 4]; 4],
     tform_link: [[F; 4]; 4],
+    tform_assoc_model: [[F; 4]; 4],
 
     // Note that this is not nullable, every cluster should be associated with a node
     node: usize,

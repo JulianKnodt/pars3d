@@ -589,6 +589,7 @@ impl KVs {
           "TransformAssociateModel", &[Data::F64Arr(_)] => |c: usize| {
             let tam = self.kvs[c].values[0].as_f64_arr().unwrap();
             assert_eq!(tam.len(), 16);
+            fbx_cl.tform_assoc_model = from_fn(|i| from_fn(|j| tam[i * 4 + j] as F));
           },
         );
     }
