@@ -42,6 +42,11 @@ fn main() {
         );
     }
     println!("# Nodes {:?}", scene.nodes.len());
+    /*
+    for n in &scene.nodes {
+      println!("\tNode: ID = {:?}", n.id);
+    }
+    */
 
     println!("# Skins {:?}", scene.skins.len());
     println!("# Clusters {:?}", scene.clusters.len());

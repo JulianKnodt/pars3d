@@ -105,7 +105,7 @@ pub enum FieldKind {
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FBXNode {
-    id: usize,
+    pub id: usize,
     pub mesh: Option<usize>,
     // also store materials used in each node
     materials: Vec<usize>,

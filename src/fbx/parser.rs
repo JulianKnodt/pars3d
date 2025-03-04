@@ -928,17 +928,6 @@ impl KVs {
     }
 
     pub fn to_scene(&self) -> FBXScene {
-        let mut id_to_kv = HashMap::new();
-
-        for (i, kv) in self.kvs.iter().enumerate() {
-            let Some(_) = kv.parent else { continue };
-            if let Some(id) = kv.id() {
-                if id == 0 && !matches!(kv.key.as_str(), "RootNode") {
-                    continue;
-                }
-                id_to_kv.insert(id, i);
-            }
-        }
         let mut fbx_scene = FBXScene::default();
 
         // parent->child pairs
@@ -985,6 +974,57 @@ impl KVs {
                     .map(|v| v.0)
             }};
         }
+
+        let mut id_to_kv = HashMap::new();
+
+        let objects = self
+            .find_root("Objects")
+            .into_iter()
+            .flat_map(|o| &self.children[&o]);
+        for &o in objects {
+            let kv = &self.kvs[o];
+            let id = kv.id().unwrap();
+            let prev = id_to_kv.insert(id, o);
+            assert_eq!(prev, None);
+        }
+
+        root_fields!(
+          self,
+          "Documents", &[],
+          // I think this is only ever 1 for 1 scene
+          "Count", &[Data::I32(1)] => |_| {},
+          "Document", &[Data::I64(_), Data::String(_), Data::String(_)] => |c: usize| {
+            let kv = &self.kvs[c];
+            fbx_scene.id = kv.values[0].as_int().unwrap() as usize;
+            assert_matches!(kv.values[1].as_str().unwrap(), "Scene" |  "");
+            assert_eq!(kv.values[2].as_str().unwrap(), "Scene", "{kv:?}");
+            match_children!(
+              self, c,
+              "Properties70", &[] => |c| match_children!(self,c,
+                "P", &[
+                  Data::String(_), Data::String(_), Data::String(_),
+                  Data::I32(_) | Data::String(_)
+                ] |
+                &[
+                  Data::String(_), Data::String(_), Data::String(_),
+                  Data::String(_), Data::String(_)
+                ] => |c: usize| {
+                  let vals = &self.kvs[c].values;
+                  match vals[0].as_str().unwrap() {
+                    "SourceObject" => {},
+                    "ActiveAnimStackName" => {},
+                    x => todo_if_strict!("Unknown document property {x}"),
+                  }
+                }
+              ),
+              "RootNode", &[Data::I64(_)] => |c: usize| {
+                match_children!(self, c);
+                let id = *self.kvs[c].values[0].as_i64().unwrap();
+                assert_eq!(None, id_to_kv.insert(id, c));
+              },
+            );
+          },
+        );
 
         let objects = self
             .find_root("Objects")
@@ -1058,7 +1098,10 @@ impl KVs {
 
                     let mut num_parents = 0;
                     for parent_id in conns!(=> id) {
-                        let parent = &self.kvs[id_to_kv[&parent_id]];
+                        let Some(&kvi) = id_to_kv.get(&parent_id) else {
+                            continue;
+                        };
+                        let parent = &self.kvs[kvi];
                         match parent.key.as_str() {
                             "RootNode" => fbx_scene.root_nodes.push(node_idx),
                             "Model" | "Node" => {
@@ -1109,11 +1152,17 @@ impl KVs {
                         }
                         "LimbNode" => {
                             assert_eq!(kv.key, "Model");
-                            for dst in conns!(id =>) {
-                                let dst = &self.kvs[id_to_kv[&dst]];
-                                assert_matches!(dst.key.as_str(), "Model" | "Node" | "NodeAttribute");
+                            for dst_id in conns!(id =>) {
+                                let dst = &self.kvs[id_to_kv[&dst_id]];
+                                assert_matches!(
+                                    dst.key.as_str(),
+                                    "Model" | "Node" | "NodeAttribute"
+                                );
                                 if dst.key == "Node" {
-                                  println!("{:?}", dst);
+                                    println!("{dst:?}");
+                                    let parent = &self.kvs[dst.parent.unwrap()];
+                                    println!("{:?}", parent);
+                                    //let gp  = self.kvs[dst.parent.unwrap()].parent.unwrap();
                                 }
                             }
                         }
@@ -1167,7 +1216,10 @@ impl KVs {
                             fbx_scene.clusters[cl_idx].skin = skin_idx;
                         }
                         for dst in conns!(id =>) {
-                            assert_eq!("Node", self.kvs[id_to_kv[&dst]].key);
+                            assert_matches!(
+                                self.kvs[id_to_kv[&dst]].key.as_str(),
+                                "Node" | "Model"
+                            );
                             let node_idx = fbx_scene.node_by_id_or_new(dst as usize);
                             assert_eq!(fbx_scene.nodes[node_idx].cluster, None);
                             fbx_scene.nodes[node_idx].cluster = Some(cl_idx);
@@ -1360,40 +1412,6 @@ impl KVs {
                 };
 
               },
-            );
-          },
-        );
-
-        root_fields!(
-          self,
-          "Documents", &[],
-          // I think this is only ever 1 for 1 scene
-          "Count", &[Data::I32(1)] => |_| {},
-          "Document", &[Data::I64(_), Data::String(_), Data::String(_)] => |c: usize| {
-            let kv = &self.kvs[c];
-            fbx_scene.id = kv.values[0].as_int().unwrap() as usize;
-            assert_matches!(kv.values[1].as_str().unwrap(), "Scene" |  "");
-            assert_eq!(kv.values[2].as_str().unwrap(), "Scene", "{kv:?}");
-            match_children!(
-              self, c,
-              "Properties70", &[] => |c| match_children!(self,c,
-                "P", &[
-                  Data::String(_), Data::String(_), Data::String(_),
-                  Data::I32(_) | Data::String(_)
-                ] |
-                &[
-                  Data::String(_), Data::String(_), Data::String(_),
-                  Data::String(_), Data::String(_)
-                ] => |c: usize| {
-                  let vals = &self.kvs[c].values;
-                  match vals[0].as_str().unwrap() {
-                    "SourceObject" => {},
-                    "ActiveAnimStackName" => {},
-                    x => todo_if_strict!("Unknown document property {x}"),
-                  }
-                }
-              ),
-              "RootNode", &[Data::I64(_)] => |c| match_children!(self, c),
             );
           },
         );

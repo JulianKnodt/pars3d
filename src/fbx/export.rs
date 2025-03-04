@@ -234,7 +234,7 @@ impl FBXScene {
             let node = &self.nodes[cl.node];
             push_kv!(kvs, conn_oo!(conn_idx, cl.id, self.skins[cl.skin].id));
             // not sure what ID this is going to
-            push_kv!(kvs, conn_oo!(conn_idx, node.id, cl.id));
+            //push_kv!(kvs, conn_oo!(conn_idx, node.id, cl.id));
         }
 
         // for each node add a connection from it to its parent
