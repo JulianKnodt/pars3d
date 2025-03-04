@@ -51,6 +51,8 @@ fn main() {
     println!("# Skins {:?}", scene.skins.len());
     println!("# Clusters {:?}", scene.clusters.len());
     println!("# Poses {:?}", scene.poses.len());
+    println!("# AnimLayers {:?}", scene.anim_layers.len());
+    println!("# AnimCurves {:?}", scene.anim_curves.len());
     let out = std::fs::File::create(dst).expect("Failed to create file");
     fbx::export::export_fbx(&scene, std::io::BufWriter::new(out)).expect("Failed to save scene");
 }

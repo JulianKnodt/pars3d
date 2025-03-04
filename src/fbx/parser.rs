@@ -1298,12 +1298,19 @@ impl KVs {
                 }
                 ("AnimationCurve", "AnimCurve") => {
                     assert_eq!(classtag, "");
-                    let anim_c_idx = fbx_scene.anim_curve_by_id_or_new(id as usize);
-                    let anim = &mut fbx_scene.anim_curves[anim_c_idx];
+                    let ac_idx = fbx_scene.anim_curve_by_id_or_new(id as usize);
+                    let anim = &mut fbx_scene.anim_curves[ac_idx];
                     self.parse_anim_curve(anim, id, id_to_kv[&id]);
                     assert_eq!(conns!(id =>).count(), 0);
                     assert_eq!(conns!(=> id).count(), 0);
                     // has property connections
+                    for (dst, key) in conns!(prop => id) {
+                        assert_matches!(key, "d|X" | "d|Y" | "d|Z");
+                        assert_eq!("AnimationCurveNode", self.kvs[id_to_kv[&dst]].key);
+                        assert_eq!(0, fbx_scene.anim_curves[ac_idx].anim_curve_node);
+                        let acn_idx = fbx_scene.anim_curve_node_by_id_or_new(id as usize);
+                        fbx_scene.anim_curves[ac_idx].anim_curve_node = acn_idx;
+                    }
                 }
                 // Don't handle these yet
                 ("Texture", "Texture") => {
@@ -1328,13 +1335,11 @@ impl KVs {
         }
 
         /*
-        for &(parent, child) in &connections {
+        for &(parent, child, key) in &prop_connections {
             println!(
-                "{:?} {:?} = {:?} {:?}",
+                "{:?} {:?} (key = {key})",
                 fbx_scene.id_kind(parent as usize),
                 fbx_scene.id_kind(child as usize),
-                self.kvs[id_to_kv[&parent]].key,
-                self.kvs[id_to_kv[&child]].key,
             );
         }
         */

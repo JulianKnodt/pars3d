@@ -253,7 +253,7 @@ pub struct FBXAnimCurve {
     times: Vec<u32>,
     values: Vec<F>,
 
-    anim_layer: usize,
+    anim_curve_node: usize,
 
     name: String,
 }
