@@ -1,7 +1,10 @@
 #![allow(unused)]
 
 use super::parser::{Data, Token, KV};
-use super::{id, FBXAnimCurveNode, FBXAnimLayer, FBXCluster, FBXMesh, FBXNode, FBXScene, FBXSkin};
+use super::{
+    id, FBXAnimCurveNode, FBXAnimLayer, FBXAnimStack, FBXCluster, FBXMesh, FBXNode, FBXScene,
+    FBXSkin,
+};
 use crate::F;
 use std::io::{self, Seek, SeekFrom, Write};
 
@@ -91,7 +94,26 @@ pub fn export_fbx(scene: &FBXScene, w: (impl Write + Seek)) -> io::Result<()> {
     write_tokens(&token_sets, w)
 }
 
+pub fn time_p(name: &str, val: i64) -> [Data; 5] {
+    [
+        Data::str(name),
+        Data::str("KTime"),
+        Data::str("Time"),
+        Data::str(""),
+        Data::I64(val),
+    ]
+}
+
 pub fn i32_p(name: &str, val: i32) -> [Data; 5] {
+    [
+        Data::str(name),
+        Data::str("int"),
+        Data::str("Integer"),
+        Data::str(""),
+        Data::I32(val),
+    ]
+}
+pub fn i64_p(name: &str, val: i32) -> [Data; 5] {
     [
         Data::str(name),
         Data::str("int"),
@@ -480,6 +502,31 @@ impl FBXCluster {
                 .map(|v| v as f64)
                 .collect::<Vec<_>>()
             )],
+        );
+    }
+}
+
+impl FBXAnimStack {
+    fn to_kvs(&self, parent: usize, kvs: &mut Vec<KV>) {
+        let as_kv = object_to_kv!(
+            Some(parent),
+            "AnimationStack",
+            self.id,
+            self.name,
+            "AnimStack",
+            ""
+        );
+        let as_kv = push_kv!(kvs, as_kv);
+        add_kvs!(
+            kvs, as_kv,
+            "Properties70",
+            &[] => |v| add_kvs!(kvs, v,
+                if self.local_start != 0 => "P", time_p("LocalStart", self.local_start),
+                "P", time_p("LocalStop", self.local_stop),
+                if self.ref_start != 0 => "P", time_p("ReferenceStart", self.ref_start),
+                "P", time_p("ReferenceStop", self.ref_stop),
+
+            ),
         );
     }
 }

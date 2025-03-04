@@ -1335,6 +1335,7 @@ impl KVs {
                     let tex_id = fbx_scene.texture_by_id_or_new(id as usize);
                     let tex = &mut fbx_scene.textures[tex_id];
                     self.parse_texture(tex, id, id_to_kv[&id]);
+                    tex.name = String::from(name);
                 }
                 ("DisplayLayer", "DisplayLayer") => continue,
                 ("Video", "Video") => continue,
