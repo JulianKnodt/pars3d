@@ -20,8 +20,10 @@ pub struct FBXScene {
     pub skins: Vec<FBXSkin>,
     pub clusters: Vec<FBXCluster>,
     pub poses: Vec<FBXPose>,
+    pub anim_layers: Vec<FBXAnimLayer>,
 
-    anims: Vec<FBXAnim>,
+    pub anim_curves: Vec<FBXAnimCurve>,
+    pub anim_curve_nodes: Vec<FBXAnimCurveNode>,
 
     blendshapes: Vec<FBXBlendshape>,
     blendshape_channels: Vec<FBXBlendshapeChannel>,
@@ -56,12 +58,14 @@ impl FBXScene {
     by_id_or_new!(mesh_by_id_or_new, meshes);
     by_id_or_new!(node_by_id_or_new, nodes);
     by_id_or_new!(cluster_by_id_or_new, clusters);
-    by_id_or_new!(anim_by_id_or_new, anims);
+    by_id_or_new!(anim_curve_by_id_or_new, anim_curves);
+    by_id_or_new!(anim_curve_node_by_id_or_new, anim_curve_nodes);
     by_id_or_new!(blendshape_by_id_or_new, blendshapes);
     by_id_or_new!(texture_by_id_or_new, textures);
     by_id_or_new!(pose_by_id_or_new, poses);
     by_id_or_new!(skin_by_id_or_new, skins);
     by_id_or_new!(blendshape_channel_by_id_or_new, blendshape_channels);
+    by_id_or_new!(anim_layer_by_id_or_new, anim_layers);
 
     pub fn id_kind(&self, id: usize) -> FieldKind {
         macro_rules! check {
@@ -77,12 +81,14 @@ impl FBXScene {
         check!(self.meshes, FieldKind::Mesh);
         check!(self.nodes, FieldKind::Node);
         check!(self.clusters, FieldKind::Cluster);
-        check!(self.anims, FieldKind::Anim);
+        check!(self.anim_curves, FieldKind::AnimCurve);
         check!(self.blendshapes, FieldKind::Blendshape);
         check!(self.textures, FieldKind::Texture);
         check!(self.poses, FieldKind::Pose);
         check!(self.skins, FieldKind::Skin);
         check!(self.blendshape_channels, FieldKind::BlendshapeChannel);
+        check!(self.anim_layers, FieldKind::AnimLayer);
+        check!(self.anim_curve_nodes, FieldKind::AnimCurveNode);
 
         return FieldKind::Unknown;
     }
@@ -94,12 +100,14 @@ pub enum FieldKind {
     Mesh,
     Node,
     Cluster,
-    Anim,
+    AnimCurve,
+    AnimCurveNode,
     Blendshape,
     Texture,
     Pose,
     Skin,
     BlendshapeChannel,
+    AnimLayer,
     Unknown,
 }
 
@@ -237,13 +245,32 @@ pub struct FBXBlendshapeChannel {
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct FBXAnim {
+pub struct FBXAnimCurve {
     id: usize,
 
     default: F,
 
     times: Vec<u32>,
     values: Vec<F>,
+
+    anim_layer: usize,
+
+    name: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct FBXAnimCurveNode {
+    id: usize,
+
+    layer: usize,
+
+    name: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct FBXAnimLayer {
+    id: usize,
+    name: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]

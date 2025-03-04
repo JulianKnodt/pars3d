@@ -1,6 +1,7 @@
 use super::{
-    FBXAnim, FBXBlendshape, FBXBlendshapeChannel, FBXCluster, FBXMaterial, FBXMesh,
-    FBXMeshMaterial, FBXNode, FBXScene, FBXSkin, FBXTexture, RefKind, VertexMappingKind,
+    FBXAnimCurve, FBXAnimCurveNode, FBXAnimLayer, FBXBlendshape, FBXBlendshapeChannel, FBXCluster,
+    FBXMaterial, FBXMesh, FBXMeshMaterial, FBXNode, FBXScene, FBXSkin, FBXTexture, RefKind,
+    VertexMappingKind,
 };
 use crate::{FaceKind, F};
 
@@ -506,12 +507,12 @@ impl KVs {
           ),
         );
     }
-    fn parse_anim_layer(&self, anim_layer_id: i64, kvi: usize) {
+    fn parse_anim_layer(&self, _anim_layer: &mut FBXAnimLayer, anim_layer_id: i64, kvi: usize) {
         assert!(anim_layer_id >= 0);
         assert_eq!(self.kvs[kvi].key, "AnimationLayer");
         match_children!(self, kvi);
     }
-    fn parse_anim_curve(&self, anim: &mut FBXAnim, anim_curve_id: i64, kvi: usize) {
+    fn parse_anim_curve(&self, anim: &mut FBXAnimCurve, anim_curve_id: i64, kvi: usize) {
         assert!(anim_curve_id >= 0);
         assert_eq!(self.kvs[kvi].key, "AnimationCurve");
         match_children!(
@@ -533,7 +534,12 @@ impl KVs {
           "KeyAttrRefCount", &[Data::I32Arr(_)] => |_| {},
         );
     }
-    fn parse_anim_curve_node(&self, anim_curve_node_id: i64, kvi: usize) {
+    fn parse_anim_curve_node(
+        &self,
+        _anim_curve_node: &mut FBXAnimCurveNode,
+        anim_curve_node_id: i64,
+        kvi: usize,
+    ) {
         assert!(anim_curve_node_id >= 0);
         assert_eq!(self.kvs[kvi].key, "AnimationCurveNode");
         match_children!(
@@ -974,6 +980,18 @@ impl KVs {
                     .filter(|&&(_src, dst)| dst == $dst)
                     .map(|v| v.0)
             }};
+            (prop $src: expr =>) => {{
+                prop_connections
+                    .iter()
+                    .filter(|&&(src, _dst, _)| src == $src)
+                    .map(|v| (v.1, v.2))
+            }};
+            (prop => $dst: expr) => {{
+                prop_connections
+                    .iter()
+                    .filter(|&&(_src, dst, _)| dst == $dst)
+                    .map(|v| (v.0, v.2))
+            }};
         }
 
         let mut id_to_kv = HashMap::new();
@@ -1259,19 +1277,33 @@ impl KVs {
                 }
                 ("AnimationLayer", "AnimLayer") => {
                     assert_eq!(classtag, "");
-                    self.parse_anim_layer(id, id_to_kv[&id]);
+                    let anim_layer_idx = fbx_scene.anim_layer_by_id_or_new(id as usize);
+                    let anim_layer = &mut fbx_scene.anim_layers[anim_layer_idx];
+                    self.parse_anim_layer(anim_layer, id, id_to_kv[&id]);
+                    anim_layer.name = String::from(name);
                 }
                 ("AnimationCurveNode", "AnimCurveNode") => {
                     assert_eq!(classtag, "");
-                    self.parse_anim_curve_node(id, id_to_kv[&id]);
+                    let acn_idx = fbx_scene.anim_curve_node_by_id_or_new(id as usize);
+                    let anim_curve_node = &mut fbx_scene.anim_curve_nodes[acn_idx];
+                    anim_curve_node.name = String::from(name);
+                    self.parse_anim_curve_node(anim_curve_node, id, id_to_kv[&id]);
+                    assert_eq!(conns!(id =>).count(), 0);
+                    for src in conns!(=> id) {
+                        let kv = &self.kvs[id_to_kv[&src]];
+                        assert_eq!(kv.key, "AnimationLayer");
+                        let al_idx = fbx_scene.anim_layer_by_id_or_new(src as usize);
+                        fbx_scene.anim_curve_nodes[acn_idx].layer = al_idx;
+                    }
                 }
                 ("AnimationCurve", "AnimCurve") => {
                     assert_eq!(classtag, "");
-                    let anim_id = fbx_scene.anim_by_id_or_new(id as usize);
-                    let anim = &mut fbx_scene.anims[anim_id];
+                    let anim_c_idx = fbx_scene.anim_curve_by_id_or_new(id as usize);
+                    let anim = &mut fbx_scene.anim_curves[anim_c_idx];
                     self.parse_anim_curve(anim, id, id_to_kv[&id]);
                     assert_eq!(conns!(id =>).count(), 0);
                     assert_eq!(conns!(=> id).count(), 0);
+                    // has property connections
                 }
                 // Don't handle these yet
                 ("Texture", "Texture") => {
@@ -1286,6 +1318,8 @@ impl KVs {
 
                 ("Pose", "Pose") => {
                     self.parse_pose(&mut fbx_scene, id, id_to_kv[&id]);
+                    let pose_idx = fbx_scene.pose_by_id_or_new(id as usize);
+                    fbx_scene.poses[pose_idx].name = String::from(name);
                 }
                 ("LayeredTexture", "LayeredTexture") => continue,
 
