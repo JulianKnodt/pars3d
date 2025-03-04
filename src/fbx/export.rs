@@ -260,7 +260,7 @@ impl FBXScene {
         }
 
         for pose in &self.poses {
-            pose.to_kvs(obj_kv, &mut kvs);
+            pose.to_kvs(&self.nodes, obj_kv, &mut kvs);
         }
 
         for a_s in &self.anim_stacks {
@@ -530,7 +530,7 @@ impl FBXCluster {
 }
 
 impl FBXPose {
-    fn to_kvs(&self, parent: usize, kvs: &mut Vec<KV>) {
+    fn to_kvs(&self, nodes: &[FBXNode], parent: usize, kvs: &mut Vec<KV>) {
         let pose_kv = object_to_kv!(Some(parent), "Pose", self.id, self.name, "Pose", "BindPose");
         let pose_kv = push_kv!(kvs, pose_kv);
         add_kvs!(
@@ -541,7 +541,26 @@ impl FBXPose {
             "Version",
             &[Data::I32(101)],
             "NbPoseNodes", &[Data::I32(self.nodes.len() as i32)],
-            "PoseNode", &[] => |c| add_kvs!(kvs, c, /* TODO here add array of nodes */),
+            "PoseNode", &[] => |c: usize| {
+              // need to do this manually because it's an array
+              for (&n, m)  in self.nodes.iter().zip(self.matrices.iter()) {
+                push_kv!(kvs, KV {
+                  key: String::from("Node"),
+                  values: vec![Data::I64(nodes[n].id as i64)],
+                  parent: Some(c),
+                });
+                push_kv!(kvs, KV {
+                  key: String::from("Matrix"),
+                  values: vec![
+                    Data::F64Arr(
+                      m.iter().flat_map(|v| v.iter())
+                        .copied()
+                        .map(|v| v as f64).collect())
+                  ],
+                  parent: Some(c),
+                });
+              }
+            },
         );
     }
 }
