@@ -537,9 +537,19 @@ impl KVs {
             let val = self.kvs[c].values[0].as_f32_arr().unwrap();
             anim.values.extend(val.iter().map(|&v| v as F));
           },
-          "KeyAttrFlags", &[Data::I32Arr(_)] => |_| {},
-          "KeyAttrDataFloat", &[Data::F32Arr(_)] => |_| {},
-          "KeyAttrRefCount", &[Data::I32Arr(_)] => |_| {},
+          "KeyAttrFlags", &[Data::I32Arr(_)] => |c: usize| {
+            let val = self.kvs[c].values[0].as_i32_arr().unwrap();
+            anim.flags.extend(val.iter().copied());
+          },
+          "KeyAttrDataFloat", &[Data::F32Arr(_)] => |c: usize| {
+            let val = self.kvs[c].values[0].as_f32_arr().unwrap();
+            anim.data.extend(val.iter().map(|&v| v as F));
+          },
+          "KeyAttrRefCount", &[Data::I32Arr(_)] => |c: usize| {
+            let val = self.kvs[c].values[0].as_i32_arr().unwrap();
+            assert!(val.iter().all(|&v| v >= 0));
+            anim.ref_count.extend(val.iter().copied());
+          },
         );
     }
     fn parse_anim_curve_node(

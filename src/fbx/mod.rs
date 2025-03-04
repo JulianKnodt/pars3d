@@ -267,6 +267,10 @@ pub struct FBXAnimCurve {
     times: Vec<u32>,
     values: Vec<F>,
 
+    flags: Vec<i32>,
+    data: Vec<F>,
+    ref_count: Vec<i32>,
+
     anim_curve_node: usize,
 
     name: String,

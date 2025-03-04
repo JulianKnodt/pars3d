@@ -572,6 +572,26 @@ impl FBXAnimCurve {
             "",
         );
         let ac_kv = push_kv!(kvs, ac_kv);
+        add_kvs!(
+            kvs,
+            ac_kv,
+            "Default",
+            &[Data::F64(self.default as f64)],
+            "KeyVer",
+            &[Data::I32(101)],
+            "KeyTime",
+            &[Data::I64Arr(self.times.iter().map(|&v| v as i64).collect())],
+            "KeyValueFloat",
+            &[Data::F32Arr(
+                self.values.iter().map(|&v| v as f32).collect()
+            )],
+            "KeyAttrFlags",
+            &[Data::I32Arr(self.flags.iter().copied().collect())],
+            "KeyAttrDataFloat",
+            &[Data::F32Arr(self.data.iter().map(|&v| v as F).collect())],
+            "KeyAttrRefCount",
+            &[Data::I32Arr(self.ref_count.iter().copied().collect())],
+        );
     }
 }
 
