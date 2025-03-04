@@ -3,7 +3,7 @@
 use super::parser::{Data, Token, KV};
 use super::{
     id, FBXAnimCurve, FBXAnimCurveNode, FBXAnimLayer, FBXAnimStack, FBXCluster, FBXMesh, FBXNode,
-    FBXScene, FBXSkin,
+    FBXPose, FBXScene, FBXSkin,
 };
 use crate::F;
 use std::io::{self, Seek, SeekFrom, Write};
@@ -259,11 +259,18 @@ impl FBXScene {
             push_kv!(kvs, conn_oo!(conn_idx, node.id, cl.id));
         }
 
+        for pose in &self.poses {
+            pose.to_kvs(obj_kv, &mut kvs);
+        }
+
         for a_s in &self.anim_stacks {
             a_s.to_kvs(obj_kv, &mut kvs);
         }
         for a_l in &self.anim_layers {
             a_l.to_kvs(obj_kv, &mut kvs);
+
+            let a_s = &self.anim_stacks[a_l.anim_stack];
+            push_kv!(kvs, conn_oo!(conn_idx, a_l.id, a_s.id));
         }
         for a_c in &self.anim_curves {
             a_c.to_kvs(obj_kv, &mut kvs);
@@ -522,6 +529,23 @@ impl FBXCluster {
     }
 }
 
+impl FBXPose {
+    fn to_kvs(&self, parent: usize, kvs: &mut Vec<KV>) {
+        let pose_kv = object_to_kv!(Some(parent), "Pose", self.id, self.name, "Pose", "BindPose");
+        let pose_kv = push_kv!(kvs, pose_kv);
+        add_kvs!(
+            kvs,
+            pose_kv,
+            "Type",
+            &[Data::str("BindPose")],
+            "Version",
+            &[Data::I32(101)],
+            "NbPoseNodes", &[Data::I32(self.nodes.len() as i32)],
+            "PoseNode", &[] => |c| add_kvs!(kvs, c, /* TODO here add array of nodes */),
+        );
+    }
+}
+
 impl FBXAnimStack {
     fn to_kvs(&self, parent: usize, kvs: &mut Vec<KV>) {
         let as_kv = object_to_kv!(
@@ -711,6 +735,7 @@ pub fn write_token_set(
                 Data::I64Arr(arr) => write_arr!($dst, i64, arr),
                 Data::I32Arr(arr) => write_arr!($dst, i32, arr),
                 Data::F64Arr(arr) => write_arr!($dst, f64, arr),
+                Data::F32Arr(arr) => write_arr!($dst, f32, arr),
                 Data::String(s) => write_string!($dst, s, true, true),
                 Data::Bool(b) => write_word!($dst, bool, *b),
                 Data::Binary(b) => {

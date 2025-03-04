@@ -495,7 +495,10 @@ impl KVs {
         let pose_idx = fbx_scene.pose_by_id_or_new(id as usize);
         match_children!(
           self, kvi,
-          "Type", &[Data::String(_)] => |_| {},
+          "Type", &[Data::String(_)] => |c: usize| {
+            let v = self.kvs[c].values[0].as_str().unwrap();
+            assert_eq!(v, "BindPose");
+          },
           "Version", &[Data::I32(_)] => |_| {},
           // how many nodes are associated with this pose?
           "NbPoseNodes", &[Data::I32(_)] => |_| {},
@@ -1353,6 +1356,7 @@ impl KVs {
                 ("BindingTable", "BindingTable") => continue,
 
                 ("Pose", "Pose") => {
+                    assert_eq!(classtag, "BindPose");
                     self.parse_pose(&mut fbx_scene, id, id_to_kv[&id]);
                     let pose_idx = fbx_scene.pose_by_id_or_new(id as usize);
                     fbx_scene.poses[pose_idx].name = String::from(name);
