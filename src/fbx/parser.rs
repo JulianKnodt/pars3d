@@ -1001,13 +1001,13 @@ impl KVs {
                     .filter(|&&(_src, dst)| dst == $dst)
                     .map(|v| v.0)
             }};
-            (prop $src: expr =>) => {{
+            (PROP $src: expr =>) => {{
                 prop_connections
                     .iter()
                     .filter(|&&(src, _dst, _)| src == $src)
                     .map(|v| (v.1, v.2))
             }};
-            (prop => $dst: expr) => {{
+            (PROP => $dst: expr) => {{
                 prop_connections
                     .iter()
                     .filter(|&&(_src, dst, _)| dst == $dst)
@@ -1335,11 +1335,13 @@ impl KVs {
                     assert_eq!(conns!(id =>).count(), 0);
                     assert_eq!(conns!(=> id).count(), 0);
                     // has property connections
-                    for (dst, key) in conns!(prop => id) {
-                        assert_matches!(key, "d|X" | "d|Y" | "d|Z");
+                    for (dst, key) in conns!(PROP => id) {
+                        assert_matches!(key, "d|X" | "d|Y" | "d|Z" | "d|DeformPercent");
                         assert_eq!("AnimationCurveNode", self.kvs[id_to_kv[&dst]].key);
                         assert_eq!(0, fbx_scene.anim_curves[ac_idx].anim_curve_node);
                         let acn_idx = fbx_scene.anim_curve_node_by_id_or_new(id as usize);
+                        // TODO is this inverted?
+                        assert_eq!(fbx_scene.anim_curves[ac_idx].anim_curve_node, 0);
                         fbx_scene.anim_curves[ac_idx].anim_curve_node = acn_idx;
                     }
                 }
@@ -1360,6 +1362,11 @@ impl KVs {
                     self.parse_pose(&mut fbx_scene, id, id_to_kv[&id]);
                     let pose_idx = fbx_scene.pose_by_id_or_new(id as usize);
                     fbx_scene.poses[pose_idx].name = String::from(name);
+                    assert_eq!(conns!(id =>).count(), 0);
+                    assert_eq!(conns!(=> id).count(), 0);
+
+                    assert_eq!(conns!(PROP id =>).count(), 0);
+                    assert_eq!(conns!(PROP => id).count(), 0);
                 }
                 ("LayeredTexture", "LayeredTexture") => continue,
 
