@@ -1,4 +1,4 @@
-use super::{cross, dot, edges, normalize, sub, FaceKind, F};
+use super::{cross, dot, edges, normalize, quad_area, sub, tri_area, FaceKind, F};
 use std::cmp::minmax;
 use std::collections::HashMap;
 
@@ -97,7 +97,17 @@ pub fn quadrangulate(
             2 => corner_b,
             _ => tri_a[2],
         });
-        let [v0, v1, v2, v3] = new_quad.map(|vi| vs[vi]);
+        let q_vis @ [v0, v1, v2, v3] = new_quad.map(|vi| vs[vi]);
+        let tri_area_a = tri_area(tri_a.map(|vi| vs[vi]));
+        let tri_area_b = tri_area(tri_b.map(|vi| vs[vi]));
+        if tri_area_a < 1e-12 || tri_area_b < 1e-12 {
+          continue;
+        }
+        let og_area = tri_area_a + tri_area_b;
+        let new_area = quad_area(q_vis);
+        if (og_area - new_area).abs() > 1e-4 {
+            continue;
+        }
         let new_angle0 = dot(normalize(sub(v0, v1)), normalize(sub(v2, v1)))
             .clamp(-1., 1.)
             .acos();
@@ -116,7 +126,7 @@ pub fn quadrangulate(
                 if delta1 > angle_eps {
                     continue;
                 }
-                delta0 + delta1
+                delta0 * delta1
             }
             QuadPreference::Symmetric => {
                 let delta = (new_angle0 - new_angle1).abs();

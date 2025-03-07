@@ -307,6 +307,14 @@ impl FaceKind {
     pub(crate) fn empty() -> Self {
         FaceKind::Poly(vec![])
     }
+    #[inline]
+    pub fn is_tri(&self) -> bool {
+      matches!(self, FaceKind::Tri(_))
+    }
+    #[inline]
+    pub fn is_quad(&self) -> bool {
+      matches!(self, FaceKind::Quad(_))
+    }
 }
 
 impl From<&[usize]> for FaceKind {
@@ -345,12 +353,35 @@ pub(crate) fn cross([x, y, z]: [F; 3], [a, b, c]: [F; 3]) -> [F; 3] {
     [y * c - z * b, z * a - x * c, x * b - y * a]
 }
 
+pub fn length<const N: usize>(v: [F; N]) -> F {
+    v.iter().map(|v| v * v).sum::<F>().max(0.)
+}
+
+/// Normalizes a vector, returning a zero vector if it has 0 norm
+#[inline]
+pub fn normalize<const N: usize>(v: [F; N]) -> [F; N] {
+    let sum: F = v.iter().map(|v| v * v).sum();
+    if sum < 1e-20 {
+        return [0.; N];
+    }
+    let s = sum.sqrt();
+    v.map(|v| v / s)
+}
+
 pub(crate) fn dot([a, b, c]: [F; 3], [x, y, z]: [F; 3]) -> F {
     a * x + b * y + c * z
 }
 
 pub(crate) fn append_one([a, b, c]: [F; 3]) -> [F; 4] {
     [a, b, c, 1.]
+}
+
+pub(crate) fn quad_area([a, b, c, d]: [[F; 3]; 4]) -> F {
+    0.5 * length(cross(sub(a, c), sub(b, d)))
+}
+
+pub fn tri_area([a, b, c]: [[F; 3]; 3]) -> F {
+    0.5 * length(cross(sub(a, b), sub(b, c)))
 }
 
 /// Apply a transformation (col major 4x4) to a point
@@ -389,17 +420,6 @@ pub fn matmul<const N: usize>(ta: [[F; N]; N], tb: [[F; N]; N]) -> [[F; N]; N] {
         }
     }
     out
-}
-
-/// Normalizes a vector, returning a zero vector if it has 0 norm
-#[inline]
-pub fn normalize<const N: usize>(v: [F; N]) -> [F; N] {
-    let sum: F = v.iter().map(|v| v * v).sum();
-    if sum < 1e-20 {
-        return [0.; N];
-    }
-    let s = sum.sqrt();
-    v.map(|v| v / s)
 }
 
 pub fn rotate_on_axis(v: [F; 3], axis: [F; 3], s: F, c: F) -> [F; 3] {
