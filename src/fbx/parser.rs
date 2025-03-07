@@ -1189,6 +1189,13 @@ impl KVs {
                         // FIXME handle these?
                         "Null" => {
                             assert_eq!(kv.key, "Model");
+                            for dst_id in conns!(id =>) {
+                                let dst = &self.kvs[id_to_kv[&dst_id]];
+                                assert_matches!(
+                                    dst.key.as_str(),
+                                    "Model" | "Node" | "NodeAttribute"
+                                );
+                            }
                         }
                         "LimbNode" => {
                             assert_eq!(kv.key, "Model");
@@ -1198,12 +1205,6 @@ impl KVs {
                                     dst.key.as_str(),
                                     "Model" | "Node" | "NodeAttribute"
                                 );
-                                if dst.key == "Node" {
-                                    println!("{dst:?}");
-                                    let parent = &self.kvs[dst.parent.unwrap()];
-                                    println!("{:?}", parent);
-                                    //let gp  = self.kvs[dst.parent.unwrap()].parent.unwrap();
-                                }
                             }
                         }
                         x => todo_if_strict!("Unknown Model::classtag {x:?}"),

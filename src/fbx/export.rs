@@ -631,7 +631,7 @@ impl FBXAnimCurve {
             "KeyAttrFlags",
             &[Data::I32Arr(self.flags.iter().copied().collect())],
             "KeyAttrDataFloat",
-            &[Data::F32Arr(self.data.iter().map(|&v| v as F).collect())],
+            &[Data::F32Arr(self.data.iter().map(|&v| v as f32).collect())],
             "KeyAttrRefCount",
             &[Data::I32Arr(self.ref_count.iter().copied().collect())],
         );
