@@ -309,11 +309,11 @@ impl FaceKind {
     }
     #[inline]
     pub fn is_tri(&self) -> bool {
-      matches!(self, FaceKind::Tri(_))
+        matches!(self, FaceKind::Tri(_))
     }
     #[inline]
     pub fn is_quad(&self) -> bool {
-      matches!(self, FaceKind::Quad(_))
+        matches!(self, FaceKind::Quad(_))
     }
 }
 

@@ -360,6 +360,38 @@ impl Mesh {
             ..Default::default()
         }
     }
+    pub fn num_quad_chords(&self) -> usize {
+        use std::collections::HashSet;
+        let mut seen_edges: HashSet<[usize; 2]> = HashSet::new();
+        let mut edge_face_adj: HashMap<[usize; 2], Vec<usize>> = HashMap::new();
+        for ([e0, e1], f) in self.edges() {
+            let e = std::cmp::minmax(e0, e1);
+            edge_face_adj.entry(e).or_default().push(f);
+        }
+        let mut num_chords = 0;
+        for &[e0, e1] in edge_face_adj.keys() {
+            let e = std::cmp::minmax(e0, e1);
+            if !seen_edges.insert(e) {
+                continue;
+            }
+            num_chords += 1;
+            let mut buf: Vec<[usize; 2]> = vec![e];
+            while let Some([n0, n1]) = buf.pop() {
+                let n = std::cmp::minmax(n0, n1);
+                if !seen_edges.insert(n) {
+                    continue;
+                }
+                for &adj in &edge_face_adj[&n] {
+                    let face = &self.f[adj];
+                    let Some(opp_e) = face.quad_opp_edge(n0, n1) else {
+                        continue;
+                    };
+                    buf.push(opp_e);
+                }
+            }
+        }
+        num_chords
+    }
 
     /// Returns an iterator over (edge, face) pairs in this mesh.
     /// Each edge will be visited multiple times, equaling the number of its adjacent faces.

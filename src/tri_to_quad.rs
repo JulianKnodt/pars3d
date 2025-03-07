@@ -101,7 +101,7 @@ pub fn quadrangulate(
         let tri_area_a = tri_area(tri_a.map(|vi| vs[vi]));
         let tri_area_b = tri_area(tri_b.map(|vi| vs[vi]));
         if tri_area_a < 1e-12 || tri_area_b < 1e-12 {
-          continue;
+            continue;
         }
         let og_area = tri_area_a + tri_area_b;
         let new_area = quad_area(q_vis);
