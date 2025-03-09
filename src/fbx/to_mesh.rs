@@ -439,7 +439,12 @@ impl From<FBXScene> for Scene {
                     assert_eq!(cl.indices.len(), cl.weights.len());
                     for (&vi, &w) in cl.indices.iter().zip(cl.weights.iter()) {
                         let Some(slot) = joint_ws[vi].iter().position(|&v| v == 0.) else {
-                            eprintln!("More than 4 joint weights for a single vertex {vi}");
+                            use std::sync::atomic::AtomicBool;
+                            static DID_WARN: AtomicBool = AtomicBool::new(false);
+                            if DID_WARN.fetch_or(true, std::sync::atomic::Ordering::SeqCst) {
+                                continue;
+                            }
+                            eprintln!("[WARNING]: More than 4 influences for a single vertex ({vi}), will be culled");
                             continue;
                         };
                         //.expect("INTERNAL ERROR: More than 4 joint weights");

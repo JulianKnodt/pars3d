@@ -1259,7 +1259,7 @@ impl KVs {
                         for dst in conns!(id =>) {
                             assert_matches!(
                                 self.kvs[id_to_kv[&dst]].key.as_str(),
-                                "Node" | "Model"
+                                "Node" | "Model" /* | "Geometry" // TODO */
                             );
                             let node_idx = fbx_scene.node_by_id_or_new(dst as usize);
                             assert_eq!(fbx_scene.nodes[node_idx].cluster, None);

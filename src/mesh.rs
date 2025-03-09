@@ -360,7 +360,9 @@ impl Mesh {
             ..Default::default()
         }
     }
-    pub fn num_quad_chords(&self) -> usize {
+    /// Computes the number of chords in a mesh,
+    /// and accepts a function which is run on each chord's length.
+    pub fn num_quad_chords(&self, mut chord_size_fn: impl FnMut(usize)) -> usize {
         use std::collections::HashSet;
         let mut seen_edges: HashSet<[usize; 2]> = HashSet::new();
         let mut edge_face_adj: HashMap<[usize; 2], Vec<usize>> = HashMap::new();
@@ -375,20 +377,24 @@ impl Mesh {
                 continue;
             }
             num_chords += 1;
+            let mut curr_chord_len = 0;
             let mut buf: Vec<[usize; 2]> = vec![e];
             while let Some([n0, n1]) = buf.pop() {
                 let n = std::cmp::minmax(n0, n1);
-                if !seen_edges.insert(n) {
-                    continue;
-                }
+                curr_chord_len += 1;
                 for &adj in &edge_face_adj[&n] {
                     let face = &self.f[adj];
-                    let Some(opp_e) = face.quad_opp_edge(n0, n1) else {
+                    let Some([oe_0, oe_1]) = face.quad_opp_edge(n0, n1) else {
                         continue;
                     };
+                    let opp_e = std::cmp::minmax(oe_0, oe_1);
+                    if !seen_edges.insert(opp_e) {
+                        continue;
+                    }
                     buf.push(opp_e);
                 }
             }
+            chord_size_fn(curr_chord_len);
         }
         num_chords
     }
