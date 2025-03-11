@@ -838,7 +838,7 @@ impl KVs {
                   let idxs = arr
                       .iter()
                       .copied()
-                      .inspect(|&idx| assert!(idx >= 0, "{arr:?}"))
+                      .inspect(|&idx| assert!(idx >= 0, "Found negative UV index {idx:?}"))
                       .map(|v| v as usize);
                   out.uv.indices.extend(idxs);
               }
