@@ -251,6 +251,13 @@ impl Scene {
         self.settings.scale = tgt;
     }
 
+    pub fn num_vertices(&self) -> usize {
+        self.meshes.iter().map(|m| m.v.len()).sum::<usize>()
+    }
+    pub fn num_faces(&self) -> usize {
+        self.meshes.iter().map(|m| m.f.len()).sum::<usize>()
+    }
+
     pub fn set_axis_to(&mut self, tgt_axes: &CoordSystem) {
         let curr_axes = self.settings.coord_system();
         for m in self.meshes.iter_mut() {

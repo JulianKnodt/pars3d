@@ -34,6 +34,8 @@ fn main() -> std::io::Result<()> {
     let scene = load(&src).expect("Failed to load input scene");
     println!("#Meshes = {}", scene.meshes.len());
     println!("#Nodes = {}", scene.nodes.len());
+    println!("#V = {}", scene.num_vertices());
+    println!("#F = {}", scene.num_faces());
     println!("- Geometry Info:");
     let mut mesh = scene.clone().into_flattened_mesh();
     mesh.geometry_only();
