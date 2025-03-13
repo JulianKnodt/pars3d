@@ -350,6 +350,13 @@ pub struct Mesh {
 }
 
 impl Mesh {
+    pub fn new_geometry(v: Vec<[F; 3]>, f: Vec<FaceKind>) -> Self {
+        Self {
+            v,
+            f,
+            ..Default::default()
+        }
+    }
     /// Flips the 2nd channel of each UV.
     pub fn flip_uv_v(&mut self) {
         for uv_chan in self.uv.iter_mut() {

@@ -77,7 +77,9 @@ pub fn face_coloring<'a>(face_group: impl Fn(usize) -> usize, num_fs: usize) -> 
 }
 
 /// Uses a fixed set of high contrast colors to color each face group.
-/// Face group should be O(1).
+/// Face group should be O(1). Outputs a color for each face, which can be applied with
+/// Mesh::with_face_coloring. `palette` can be arbitrary, but one example is
+/// pars3d::coloring::HIGH_CONTRAST.
 pub fn greedy_face_coloring(
     face_group: impl Fn(usize) -> usize,
     num_fs: usize,

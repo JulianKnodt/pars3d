@@ -71,6 +71,9 @@ pub mod anim;
 /// Unified mesh representation.
 pub mod mesh;
 
+pub use mesh::Mesh;
+pub use mesh::Scene;
+
 /// Approximately convert a triangle mesh to a mixed tri/quad mesh.
 pub mod tri_to_quad;
 
