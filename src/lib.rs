@@ -83,9 +83,6 @@ pub mod fbx;
 
 pub mod util;
 
-/// Quasi-random generation
-mod rand;
-
 pub fn load(v: impl AsRef<Path>) -> std::io::Result<mesh::Scene> {
     use util::FileFormat::*;
     let scene = match util::extension_to_format(&v) {
