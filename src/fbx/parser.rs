@@ -452,13 +452,15 @@ impl KVs {
           ),
         );
     }
-    fn parse_skin(&self, _fbx_skin: &mut FBXSkin, skin_id: i64, kvi: usize) {
+    fn parse_skin(&self, skin: &mut FBXSkin, skin_id: i64, kvi: usize) {
         assert!(skin_id >= 0);
         match_children!(
           self, kvi,
           "Version", &[Data::I32(_)] => |_| {},
           // Damn you FBX
-          "Link_DeformAcuracy", &[Data::F64(_)] => |c| match_children!(self, c),
+          "Link_DeformAcuracy", &[Data::F64(_)] => |c: usize| {
+            skin.deform_acc = self.kvs[c].values[0].as_float().unwrap();
+          },
           "SkinningType", &[Data::String(_)] => |c: usize| {
             let ty = self.kvs[c].values[0].as_str().unwrap();
             assert_matches!(ty, "Linear");
@@ -539,13 +541,15 @@ impl KVs {
           "Default", &[Data::F64(_)] => |c: usize| {
             anim.default = *self.kvs[c].values[0].as_f64().unwrap() as F;
           },
-          "KeyVer", &[Data::I32(_)] => |c| {
+          "KeyVer", &[Data::I32(_)] => |c: usize| {
             match_children!(self, c);
           },
           "KeyTime", &[Data::I64Arr(_)] => |c: usize| {
             let val = self.kvs[c].values[0].as_i64_arr().unwrap();
             assert!(val.iter().all(|&v| v >= 0));
+            assert!(anim.times.is_empty());
             anim.times.extend(val.iter().map(|&v| v as u32));
+            match_children!(self, c);
           },
           "KeyValueFloat", &[Data::F32Arr(_)] => |c: usize| {
             let val = self.kvs[c].values[0].as_f32_arr().unwrap();
@@ -607,7 +611,8 @@ impl KVs {
           // Damn you FBX
           "Indexes", &[Data::I32Arr(_)] => |c: usize| {
             let idxs = self.kvs[c].values[0].as_i32_arr().unwrap();
-            fbx_cl.indices.extend(idxs.iter().map(|&v| TryInto::<usize>::try_into(v).unwrap()));
+            assert!(idxs.iter().all(|&v| v >= 0));
+            fbx_cl.indices.extend(idxs.iter().map(|&v| v as usize));
           },
           "Weights", &[Data::F64Arr(_)] => |c: usize| {
             let ws = self.kvs[c].values[0].as_f64_arr().unwrap();
@@ -1414,6 +1419,13 @@ impl KVs {
                 fbx_scene.id_kind(child as usize),
             );
         }
+        for &(parent, child) in &connections  {
+            println!(
+                "{:?}({parent}) -> {:?}({child})",
+                fbx_scene.id_kind(parent as usize),
+                fbx_scene.id_kind(child as usize),
+            );
+        }
         */
 
         root_fields!(
@@ -1527,8 +1539,8 @@ impl KVs {
                   "UnitScaleFactor" => assign!(settings.unit_scale_factor, as_f64),
                   "OriginalUnitScaleFactor" => assign!(settings.og_unit_scale_factor, as_f64),
 
-                  "TimeSpanStart" => assign!(settings.time_span_start, as_f64),
-                  "TimeSpanStop" => assign!(settings.time_span_stop, as_f64),
+                  "TimeSpanStart" => assign!(settings.time_span_start, as_i64),
+                  "TimeSpanStop" => assign!(settings.time_span_stop, as_i64),
                   // ignored
                   "AmbientColor" => {},
                   "DefaultCamera" => {},

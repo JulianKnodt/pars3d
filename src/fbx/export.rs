@@ -219,8 +219,8 @@ impl FBXScene {
               "P", f64_p("UnitScaleFactor", settings.unit_scale_factor),
               "P", f64_p("OriginalUnitScaleFactor", settings.og_unit_scale_factor),
 
-              "P", f64_p("TimeSpanStart", settings.time_span_start),
-              "P", f64_p("TimeSpanStop", settings.time_span_stop),
+              "P", time_p("TimeSpanStart", settings.time_span_start),
+              "P", time_p("TimeSpanStop", settings.time_span_stop),
 
               "P", f64_p("CustomFrameRate", settings.frame_rate),
 
@@ -254,6 +254,7 @@ impl FBXScene {
                 "Count", &[Data::I32(1)],
                 "PropertyTemplate", &[Data::str("FbxMesh")]
             ),
+            // TODO animation stack local start and stop needs to go here as well.
           ),
         );
 
@@ -513,10 +514,11 @@ impl FBXSkin {
         add_kvs!(
             kvs,
             skin_kv,
-            "Version",
-            &[Data::I32(101)],
-            "SkinningType",
-            &[Data::str("Linear")],
+            "Version", &[Data::I32(101)],
+
+            if self.deform_acc != 0. =>
+              "Link_DeformAcuracy", &[Data::F64(self.deform_acc as f64)],
+            "SkinningType", &[Data::str("Linear")],
         );
     }
 }
@@ -548,27 +550,28 @@ impl FBXCluster {
             &[Data::F64Arr(
                 self.weights.iter().map(|&w| w as f64).collect::<Vec<_>>()
             )],
-            if self.tform != [[0.; 4]; 4] => "Transform",
-            &[Data::F64Arr(
-                self.tform
-                    .iter()
-                    .flat_map(|&v| v.into_iter())
-                    .map(|v| v as f64)
-                    .collect::<Vec<_>>()
-            )],
-            if self.tform_link != [[0.; 4]; 4] => "TransformLink",
-            &[Data::F64Arr(
-                self.tform_link
-                    .iter()
-                    .flat_map(|&v| v.into_iter())
-                    .map(|v| v as f64)
-                    .collect::<Vec<_>>()
-            )],
-            if self.tform_assoc_model != [[0.; 4]; 4] => "TransformAssociateModel", &[Data::F64Arr(
-              self.tform_assoc_model.iter().flat_map(|&v| v.into_iter())
-                .map(|v| v as f64)
-                .collect::<Vec<_>>()
-            )],
+            if self.tform != [[0.; 4]; 4] =>
+              "Transform", &[Data::F64Arr(
+                  self.tform
+                      .iter()
+                      .flat_map(|&v| v.into_iter())
+                      .map(|v| v as f64)
+                      .collect::<Vec<_>>()
+              )],
+            if self.tform_link != [[0.; 4]; 4] =>
+              "TransformLink", &[Data::F64Arr(
+                  self.tform_link
+                      .iter()
+                      .flat_map(|&v| v.into_iter())
+                      .map(|v| v as f64)
+                      .collect::<Vec<_>>()
+              )],
+            if self.tform_assoc_model != [[0.; 4]; 4] =>
+              "TransformAssociateModel", &[Data::F64Arr(
+                self.tform_assoc_model.iter().flat_map(|&v| v.into_iter())
+                  .map(|v| v as f64)
+                  .collect::<Vec<_>>()
+              )],
         );
     }
 }
@@ -665,7 +668,7 @@ impl FBXAnimCurve {
             "Default",
             &[Data::F64(self.default as f64)],
             "KeyVer",
-            &[Data::I32(101)],
+            &[Data::I32(4008)],
             "KeyTime",
             &[Data::I64Arr(self.times.iter().map(|&v| v as i64).collect())],
             "KeyValueFloat",

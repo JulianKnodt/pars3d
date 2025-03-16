@@ -181,8 +181,8 @@ impl From<Settings> for FBXSettings {
             unit_scale_factor: settings.scale as f64,
             og_unit_scale_factor: settings.scale as f64,
 
-            time_span_start: 0.,
-            time_span_stop: 0.,
+            time_span_start: 0,
+            time_span_stop: 0,
 
             frame_rate: 60.,
         }
@@ -388,6 +388,7 @@ impl From<(FBXSkin, &[FBXCluster])> for Skin {
             clusters: cluster_idxs,
             mesh: _,
             name: _,
+            deform_acc: _,
         } = fbx_skin;
 
         let mut skin = Self::default();

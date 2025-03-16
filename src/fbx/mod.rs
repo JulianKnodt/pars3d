@@ -189,9 +189,10 @@ impl FBXMeshMaterial {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct FBXSkin {
     id: usize,
+    deform_acc: F,
     clusters: Vec<usize>,
     mesh: usize,
     name: String,
@@ -429,8 +430,8 @@ pub struct FBXSettings {
     // no idea wtf this is
     og_unit_scale_factor: f64,
 
-    time_span_start: f64,
-    time_span_stop: f64,
+    time_span_start: i64,
+    time_span_stop: i64,
 
     frame_rate: f64,
 }
@@ -450,8 +451,8 @@ impl Default for FBXSettings {
             unit_scale_factor: 1.,
             og_unit_scale_factor: 1.,
 
-            time_span_start: 0.,
-            time_span_stop: 0.,
+            time_span_start: 0,
+            time_span_stop: 0,
 
             frame_rate: 0.,
         }
