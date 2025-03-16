@@ -272,6 +272,7 @@ pub struct FBXAnimCurve {
     ref_count: Vec<i32>,
 
     anim_curve_node: usize,
+    anim_curve_node_key: String,
 
     name: String,
 }
@@ -280,7 +281,15 @@ pub struct FBXAnimCurve {
 pub struct FBXAnimCurveNode {
     id: usize,
 
+    dx: Option<F>,
+    dy: Option<F>,
+    dz: Option<F>,
+
+    // I think only one of these can be set, but not sure?
     layer: usize,
+
+    node: usize,
+    node_key: String,
 
     name: String,
 }
@@ -419,6 +428,11 @@ pub struct FBXSettings {
     unit_scale_factor: f64,
     // no idea wtf this is
     og_unit_scale_factor: f64,
+
+    time_span_start: f64,
+    time_span_stop: f64,
+
+    frame_rate: f64,
 }
 
 impl Default for FBXSettings {
@@ -435,6 +449,11 @@ impl Default for FBXSettings {
 
             unit_scale_factor: 1.,
             og_unit_scale_factor: 1.,
+
+            time_span_start: 0.,
+            time_span_stop: 0.,
+
+            frame_rate: 0.,
         }
     }
 }

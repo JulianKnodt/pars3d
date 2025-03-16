@@ -68,13 +68,14 @@ pub fn vertex_scalar_coloring(
 
 /// Constructs a coloring for each face, based on some classification function.
 pub fn face_coloring<'a>(face_group: impl Fn(usize) -> usize, num_fs: usize) -> Vec<[F; 3]> {
-    use crate::coloring::hue_to_rgb;
     // note that `sin` below is a cheap way to make it pseudo random
     (0..num_fs)
         // also add num_fs to make it more random.
-        .map(|i| std::array::from_fn(|j| {
-          (((j * j + 1) as F * 33.31293) * (face_group(i) + num_fs) as F).sin() * 0.5 + 0.5
-        }))
+        .map(|i| {
+            std::array::from_fn(|j| {
+                (((j * j + 1) as F * 33.31293) * (face_group(i) + num_fs) as F).sin() * 0.5 + 0.5
+            })
+        })
         .collect()
 }
 

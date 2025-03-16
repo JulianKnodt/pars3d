@@ -68,6 +68,18 @@ macro_rules! conn_oo {
     }};
 }
 
+macro_rules! conn_op {
+    ($conn_idx: expr, $src: expr, $dst: expr, $name: expr) => {{
+        let vals = &[
+            Data::str("OP"),
+            Data::I64($src as i64),
+            Data::I64($dst as i64),
+            Data::str($name),
+        ];
+        KV::new("C", vals, Some($conn_idx))
+    }};
+}
+
 // 1. convert scene to KVs
 // 2. convert KVs to tokens
 // 3. export tokens as binary to writer
@@ -129,6 +141,15 @@ pub fn f64_p(name: &str, val: f64) -> [Data; 5] {
         Data::str("Number"),
         Data::str(""),
         Data::F64(val),
+    ]
+}
+pub fn enum_p(name: &str, val: i32) -> [Data; 5] {
+    [
+        Data::str(name),
+        Data::str("enum"),
+        Data::str(""),
+        Data::str(""),
+        Data::I32(val),
     ]
 }
 
@@ -197,6 +218,13 @@ impl FBXScene {
               "P", i32_p("OriginalUpAxisSign", settings.og_up_axis_sign),
               "P", f64_p("UnitScaleFactor", settings.unit_scale_factor),
               "P", f64_p("OriginalUnitScaleFactor", settings.og_unit_scale_factor),
+
+              "P", f64_p("TimeSpanStart", settings.time_span_start),
+              "P", f64_p("TimeSpanStop", settings.time_span_stop),
+
+              "P", f64_p("CustomFrameRate", settings.frame_rate),
+
+              "P", enum_p("TimeMode", 3),
             ),
           ),
         );
@@ -274,6 +302,22 @@ impl FBXScene {
         }
         for a_c in &self.anim_curves {
             a_c.to_kvs(obj_kv, &mut kvs);
+
+            let a_cn = &self.anim_curve_nodes[a_c.anim_curve_node];
+            push_kv!(
+                kvs,
+                conn_op!(conn_idx, a_c.id, a_cn.id, &a_c.anim_curve_node_key)
+            );
+        }
+
+        for a_cn in &self.anim_curve_nodes {
+            a_cn.to_kvs(obj_kv, &mut kvs);
+
+            let a_l = &self.anim_layers[a_cn.layer];
+            push_kv!(kvs, conn_oo!(conn_idx, a_cn.id, a_l.id));
+
+            let node = &self.nodes[a_cn.node];
+            push_kv!(kvs, conn_op!(conn_idx, a_cn.id, node.id, &a_cn.node_key));
         }
 
         // for each node add a connection from it to its parent
@@ -536,10 +580,9 @@ impl FBXPose {
         add_kvs!(
             kvs,
             pose_kv,
-            "Type",
-            &[Data::str("BindPose")],
-            "Version",
-            &[Data::I32(101)],
+            //
+            "Type", &[Data::str("BindPose")],
+            "Version", &[Data::I32(101)],
             "NbPoseNodes", &[Data::I32(self.nodes.len() as i32)],
             "PoseNode", &[] => |c: usize| {
               // need to do this manually because it's an array
@@ -577,7 +620,8 @@ impl FBXAnimStack {
         );
         let as_kv = push_kv!(kvs, as_kv);
         add_kvs!(
-            kvs, as_kv,
+            kvs,
+            as_kv,
             "Properties70",
             &[] => |v| add_kvs!(kvs, v,
                 if self.local_start != 0 => "P", time_p("LocalStart", self.local_start),
@@ -649,7 +693,13 @@ impl FBXAnimCurveNode {
             ""
         );
         let acn_kv = push_kv!(kvs, acn_kv);
-        add_kvs!(kvs, acn_kv, "Properties70", &[]);
+        add_kvs!(kvs, acn_kv, "Properties70", &[] => |v| add_kvs!(kvs, v,
+            if self.dx.is_some() => "P", f64_p("d|X", self.dx.unwrap() as f64),
+            if self.dy.is_some() => "P", f64_p("d|Y", self.dy.unwrap() as f64),
+            if self.dz.is_some() => "P", f64_p("d|Z", self.dz.unwrap() as f64),
+            //if self.deform_percent.is_some() => "P", f64_p("d|DeformPercent", self.deform_percent.unwrap() as f64),
+          )
+        );
     }
 }
 

@@ -180,6 +180,11 @@ impl From<Settings> for FBXSettings {
 
             unit_scale_factor: settings.scale as f64,
             og_unit_scale_factor: settings.scale as f64,
+
+            time_span_start: 0.,
+            time_span_stop: 0.,
+
+            frame_rate: 60.,
         }
     }
 }

@@ -312,6 +312,11 @@ impl KVs {
                   "RotationOrder" => {},
                   "RotationActive" => {},
                   "ScalingMax" => {},
+                  "GeometricTranslation" => {
+                    [4,5,6].map(|i| vals[i].as_float().unwrap());
+                  },
+
+                  "lockInfluenceWeights" => {},
 
                   "currentUVSet" => {},
                   "filmboxTypeID" => {},
@@ -324,6 +329,7 @@ impl KVs {
 
                   x => todo_if_strict!("Unhandled node key: {x:?}"),
                 }
+                match_children!(self, c);
              },
           ),
           "MultiLayer", &[Data::I32(_)] => |_| {},
@@ -509,11 +515,13 @@ impl KVs {
               assert!(node_id >= 0);
               let node_idx = fbx_scene.node_by_id_or_new(node_id as usize);
               fbx_scene.poses[pose_idx].nodes.push(node_idx);
+              match_children!(self, c);
             },
             "Matrix", &[Data::F64Arr(_)] => |c: usize| {
               let mat = self.kvs[c].values[0].as_f64_arr().unwrap();
               assert_eq!(mat.len(), 16);
               fbx_scene.poses[pose_idx].matrices.push(from_fn(|i| from_fn(|j| mat[i * 4 + j] as F)));
+              match_children!(self, c);
             }
           ),
         );
@@ -531,9 +539,12 @@ impl KVs {
           "Default", &[Data::F64(_)] => |c: usize| {
             anim.default = *self.kvs[c].values[0].as_f64().unwrap() as F;
           },
-          "KeyVer", &[Data::I32(_)] => |_| {},
+          "KeyVer", &[Data::I32(_)] => |c| {
+            match_children!(self, c);
+          },
           "KeyTime", &[Data::I64Arr(_)] => |c: usize| {
             let val = self.kvs[c].values[0].as_i64_arr().unwrap();
+            assert!(val.iter().all(|&v| v >= 0));
             anim.times.extend(val.iter().map(|&v| v as u32));
           },
           "KeyValueFloat", &[Data::F32Arr(_)] => |c: usize| {
@@ -557,7 +568,7 @@ impl KVs {
     }
     fn parse_anim_curve_node(
         &self,
-        _anim_curve_node: &mut FBXAnimCurveNode,
+        anim_curve_node: &mut FBXAnimCurveNode,
         anim_curve_node_id: i64,
         kvi: usize,
     ) {
@@ -572,12 +583,12 @@ impl KVs {
             ] => |c: usize| {
               let val = &self.kvs[c].values;
               match val[0].as_str().unwrap() {
-                "d|filmboxTypeID" => {},
-                "d|lockInfluenceWeights" => {},
-                "d|X" => {},
-                "d|Y" => {},
-                "d|Z" => {},
-                "d|DeformPercent" => {},
+                "d|filmboxTypeID" => todo!(),
+                "d|lockInfluenceWeights" => todo!(),
+                "d|X" => anim_curve_node.dx = val[4].as_float(),
+                "d|Y" => anim_curve_node.dy = val[4].as_float(),
+                "d|Z" => anim_curve_node.dz = val[4].as_float(),
+                "d|DeformPercent" => todo!("{val:?}"),
                 x => todo_if_strict!("Unknown anim curve node P70 {x:?}"),
               }
             },
@@ -1025,7 +1036,12 @@ impl KVs {
             let kv = &self.kvs[o];
             let id = kv.id().unwrap();
             let prev = id_to_kv.insert(id, o);
-            assert_eq!(prev, None);
+            assert_eq!(
+                prev,
+                None,
+                "{id} {o} : {kv:?} {:?}",
+                self.kvs[prev.unwrap()]
+            );
         }
 
         root_fields!(
@@ -1262,7 +1278,7 @@ impl KVs {
                                 "Node" | "Model" /* | "Geometry" // TODO */
                             );
                             let node_idx = fbx_scene.node_by_id_or_new(dst as usize);
-                            assert_eq!(fbx_scene.nodes[node_idx].cluster, None);
+                            assert_eq!(fbx_scene.nodes[node_idx].cluster, None, "{dst} {cl_idx}");
                             fbx_scene.nodes[node_idx].cluster = Some(cl_idx);
                             assert_eq!(fbx_scene.clusters[cl_idx].node, 0);
                             fbx_scene.clusters[cl_idx].node = node_idx;
@@ -1327,6 +1343,19 @@ impl KVs {
                         let al_idx = fbx_scene.anim_layer_by_id_or_new(src as usize);
                         fbx_scene.anim_curve_nodes[acn_idx].layer = al_idx;
                     }
+
+                    for (src, key) in conns!(PROP => id) {
+                        // possibly matches all node attributes?
+                        assert_matches!(key, "Lcl Translation" | "Lcl Rotation");
+                        assert_eq!(self.kvs[id_to_kv[&src]].key, "Model");
+
+                        let node_idx = fbx_scene.node_by_id_or_new(src as usize);
+                        let acn = &mut fbx_scene.anim_curve_nodes[acn_idx];
+                        assert_eq!(acn.node, 0);
+                        assert_eq!(acn.node_key, "");
+                        acn.node = node_idx;
+                        acn.node_key = key.to_string();
+                    }
                 }
                 ("AnimationCurve", "AnimCurve") => {
                     assert_eq!(classtag, "");
@@ -1337,13 +1366,15 @@ impl KVs {
                     assert_eq!(conns!(=> id).count(), 0);
                     // has property connections
                     for (dst, key) in conns!(PROP => id) {
-                        assert_matches!(key, "d|X" | "d|Y" | "d|Z" | "d|DeformPercent");
                         assert_eq!("AnimationCurveNode", self.kvs[id_to_kv[&dst]].key);
-                        assert_eq!(0, fbx_scene.anim_curves[ac_idx].anim_curve_node);
-                        let acn_idx = fbx_scene.anim_curve_node_by_id_or_new(id as usize);
-                        // TODO is this inverted?
-                        assert_eq!(fbx_scene.anim_curves[ac_idx].anim_curve_node, 0);
-                        fbx_scene.anim_curves[ac_idx].anim_curve_node = acn_idx;
+                        // This should be all the possible values in AnimCurveNode? Not sure
+                        assert_matches!(key, "d|X" | "d|Y" | "d|Z" | "d|DeformPercent");
+
+                        let acn_idx = fbx_scene.anim_curve_node_by_id_or_new(dst as usize);
+                        let ac = &mut fbx_scene.anim_curves[ac_idx];
+                        assert_eq!(0, ac.anim_curve_node);
+                        ac.anim_curve_node = acn_idx;
+                        ac.anim_curve_node_key = String::from(key);
                     }
                 }
                 // Don't handle these yet
@@ -1378,7 +1409,7 @@ impl KVs {
         /*
         for &(parent, child, key) in &prop_connections {
             println!(
-                "{:?} {:?} (key = {key})",
+                "{:?}({parent}) -> {:?}({child}) (key = {key})",
                 fbx_scene.id_kind(parent as usize),
                 fbx_scene.id_kind(child as usize),
             );
@@ -1420,7 +1451,24 @@ impl KVs {
                 "Revision", &[Data::String(_)] => |_| {},
                 "Comment", &[Data::String(_)] => |_| {},
               ),
-              "Properties70", &[] => |_| { /* match_children!(self, v) */ },
+              "Properties70", &[] => |c| match_children!(
+                self, c,
+                "P", &[
+                  Data::String(_), Data::String(_), Data::String(_), Data::String(_),
+                  Data::String(_)
+                ] | &[
+                  Data::String(_), Data::String(_), Data::String(_), Data::String(_),
+                ] => |c: usize| {
+                  let vals = &self.kvs[c].values;
+                  match vals[0].as_str().unwrap() {
+                    "DocumentUrl" => {},
+                    "SrcDocumentUrl" => {},
+                    x if x.starts_with("Original") => {},
+                    x if x.starts_with("LastSaved") => {},
+                    _ => {},
+                  }
+                },
+              ),
             );
           },
 
@@ -1478,13 +1526,14 @@ impl KVs {
                   "OriginalUpAxisSign" => assign!(settings.og_up_axis_sign, as_i32),
                   "UnitScaleFactor" => assign!(settings.unit_scale_factor, as_f64),
                   "OriginalUnitScaleFactor" => assign!(settings.og_unit_scale_factor, as_f64),
+
+                  "TimeSpanStart" => assign!(settings.time_span_start, as_f64),
+                  "TimeSpanStop" => assign!(settings.time_span_stop, as_f64),
                   // ignored
                   "AmbientColor" => {},
                   "DefaultCamera" => {},
                   "TimeMode" => {},
-                  "TimeSpanStart" => {},
-                  "TimeSpanStop" => {},
-                  "CustomFrameRate" => {},
+                  "CustomFrameRate" => assign!(settings.frame_rate, as_f64),
                   "TimeProtocol" => {},
                   "SnapOnFrameMode" => {},
                   "TimeMarker" => {},
@@ -1512,7 +1561,7 @@ impl KVs {
               "FbxVideo" | "FbxAnimCurveNode" | "FbxFileTexture" | "FbxBindingTable" |
               "FbxImplementation" | "FbxNull" | "FbxSurfaceLambert" | "FbxAnimLayer" |
               "FbxAnimStack" | "FbxCamera" | "FbxMesh" | "FbxNode" | "FbxSurfacePhong" |
-              "FbxDisplayLayer" | "FbxLayeredTexture" | "FbxLight"
+              "FbxDisplayLayer" | "FbxLayeredTexture" | "FbxLight" | "FbxSkeleton"
 
             ),
           ),
