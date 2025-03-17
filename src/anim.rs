@@ -58,12 +58,28 @@ pub struct Channel {
     pub sampler: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Time {
+    Float(F),
+    Frame(u64),
+}
+
+impl Time {
+    pub fn to_float(&self) -> F {
+        match *self {
+            Time::Float(f) => f,
+            // TODO need to add a conversion method here
+            Time::Frame(f) => f as F,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Sampler {
     pub interpolation_kind: InterpolationKind,
     // TODO maybe make the time an enum? For FBX it's a u64 time, but gltf is float
     // Time to modify property
-    pub input: Vec<F>,
+    pub input: Vec<Time>,
     // What property is being modified
     pub output: OutputProperty,
 }

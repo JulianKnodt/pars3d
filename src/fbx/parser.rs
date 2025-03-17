@@ -592,7 +592,7 @@ impl KVs {
                 "d|X" => anim_curve_node.dx = vals[4].as_float(),
                 "d|Y" => anim_curve_node.dy = vals[4].as_float(),
                 "d|Z" => anim_curve_node.dz = vals[4].as_float(),
-                "d|DeformPercent" => todo_if_strict!("{val:?}"),
+                "d|DeformPercent" => todo_if_strict!("{vals:?}"),
                 x => todo_if_strict!("Unknown anim curve node P70 {x:?}"),
               }
             },
@@ -869,7 +869,7 @@ impl KVs {
                       mapping_kind = match self.kvs[c].values[0].as_str().unwrap() {
                           "AllSame" => MappingKind::Uniform,
                           "ByPolygon" => MappingKind::PerPolygon,
-                          x => todo_if_strict!("Unknown mapping kind {x:?}"),
+                          x => todo!("Unknown mapping kind {x:?}"),
                       };
                   },
                   "ReferenceInformationType", &[Data::String(_)] => |_| {},

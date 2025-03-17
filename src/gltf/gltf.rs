@@ -1,4 +1,4 @@
-use crate::anim::{Animation, Channel, InterpolationKind, OutputProperty, Sampler};
+use crate::anim::{Animation, Channel, InterpolationKind, OutputProperty, Sampler, Time};
 use crate::{identity, matmul, F};
 use gltf_json::validation::{Checked::Valid, USize64};
 use std::io::{self, Write};
@@ -226,7 +226,9 @@ where
                         w.into_f32().map(|v| v as F).collect::<Vec<_>>(),
                     ),
                 };
-                samplers[sampler].input = inputs;
+                samplers[sampler]
+                    .input
+                    .extend(inputs.iter().copied().map(Time::Float));
                 samplers[sampler].output = outputs;
                 use gltf::animation::Interpolation as GLTFInterpolation;
                 samplers[sampler].interpolation_kind = match c.sampler().interpolation() {
@@ -436,7 +438,10 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
                 .last_mut()
                 .unwrap()
                 .push(bytes.len() - a_offset);
-            let input_bytes = sampler.input.iter().flat_map(|&v| to_f32(v).to_le_bytes());
+            let input_bytes = sampler
+                .input
+                .iter()
+                .flat_map(|&v| to_f32(v.to_float()).to_le_bytes());
             bytes.extend(input_bytes);
 
             a_out_offsets
