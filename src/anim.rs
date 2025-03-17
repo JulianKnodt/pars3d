@@ -19,10 +19,18 @@ impl InterpolationKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Dim {
+    XYZ,
+    X,
+    Y,
+    Z,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Property {
-    Translation,
-    Rotation,
-    Scale,
+    Translation(Dim),
+    Rotation(Dim),
+    Scale(Dim),
     MorphTargetWeights,
 }
 
@@ -30,10 +38,14 @@ pub enum Property {
 pub enum OutputProperty {
     #[default]
     None,
+    /// GLB
     Translation(Vec<[F; 3]>),
     Rotation(Vec<[F; 4]>),
     Scale(Vec<[F; 3]>),
     MorphTargetWeight(Vec<F>),
+
+    /// FBX
+    SingleChannel(Property, Vec<F>),
 }
 
 impl OutputProperty {
@@ -44,6 +56,7 @@ impl OutputProperty {
             OutputProperty::Rotation(t) => t.len(),
             OutputProperty::Scale(t) => t.len(),
             OutputProperty::MorphTargetWeight(t) => t.len(),
+            OutputProperty::SingleChannel(_, t) => t.len(),
         }
     }
     pub fn is_empty(&self) -> bool {
@@ -77,7 +90,6 @@ impl Time {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Sampler {
     pub interpolation_kind: InterpolationKind,
-    // TODO maybe make the time an enum? For FBX it's a u64 time, but gltf is float
     // Time to modify property
     pub input: Vec<Time>,
     // What property is being modified

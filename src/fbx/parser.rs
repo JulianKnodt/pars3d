@@ -1326,7 +1326,9 @@ impl KVs {
                         let dst_kv = &self.kvs[id_to_kv[&dst]];
                         assert_eq!(dst_kv.key, "AnimationLayer");
                         let al_idx = fbx_scene.anim_layer_by_id_or_new(dst as usize);
-                        fbx_scene.anim_layers[al_idx].anim_stack = as_idx;
+                        let al = &mut fbx_scene.anim_layers[al_idx];
+                        assert_eq!(al.anim_stack, 0);
+                        al.anim_stack = as_idx;
                     }
                     assert_eq!(conns!(=> id).count(), 0);
                 }
@@ -1359,9 +1361,9 @@ impl KVs {
                         let node_idx = fbx_scene.node_by_id_or_new(src as usize);
                         let acn = &mut fbx_scene.anim_curve_nodes[acn_idx];
                         assert_eq!(acn.node, 0);
-                        assert_eq!(acn.node_key, "");
+                        assert_eq!(acn.node_key, super::NodeAnimAttrKey::UnknownDefault);
                         acn.node = node_idx;
-                        acn.node_key = key.to_string();
+                        acn.node_key = super::NodeAnimAttrKey::from_str(key);
                     }
                 }
                 ("AnimationCurve", "AnimCurve") => {
@@ -1381,7 +1383,7 @@ impl KVs {
                         let ac = &mut fbx_scene.anim_curves[ac_idx];
                         assert_eq!(0, ac.anim_curve_node);
                         ac.anim_curve_node = acn_idx;
-                        ac.anim_curve_node_key = String::from(key);
+                        ac.anim_curve_node_key = super::AnimCurveNodeKey::from_str(key);
                     }
                 }
                 // Don't handle these yet

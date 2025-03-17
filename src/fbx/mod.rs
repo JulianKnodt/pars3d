@@ -8,6 +8,9 @@ pub mod parser;
 /// From/Into conversions between unified representation and FBX representation.
 pub mod to_mesh;
 
+/// From/Into conversions between animations and FBX representation.
+pub mod to_anim;
+
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FBXScene {
     id: usize,
@@ -94,6 +97,11 @@ impl FBXScene {
         check!(self.anim_stacks, FieldKind::AnimStack);
 
         FieldKind::Unknown
+    }
+
+    /// Number of animations in this FBX
+    pub fn num_animations(&self) -> usize {
+        self.anim_layers.len()
     }
 }
 
@@ -259,6 +267,38 @@ pub struct FBXAnimStack {
     name: String,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum AnimCurveNodeKey {
+    X,
+    Y,
+    Z,
+    DeformPercent,
+    #[default]
+    UnknownDefault,
+}
+
+impl AnimCurveNodeKey {
+    fn from_str(s: &str) -> Self {
+        match s {
+            "d|X" => Self::X,
+            "d|Y" => Self::Y,
+            "d|Z" => Self::Z,
+            "d|DeformPercent" => Self::DeformPercent,
+            x => panic!("{x}"),
+        }
+    }
+    fn as_str(&self) -> &'static str {
+        use AnimCurveNodeKey::*;
+        match self {
+            X => "d|X",
+            Y => "d|Y",
+            Z => "d|Z",
+            DeformPercent => "d|DeformPercent",
+            UnknownDefault => unreachable!("Should've set AnimCurveNodeKey"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct FBXAnimCurve {
     id: usize,
@@ -267,6 +307,7 @@ pub struct FBXAnimCurve {
 
     /// needs to be u64 otherwise not enough bits (that's crazy).
     times: Vec<u64>,
+
     values: Vec<F>,
 
     flags: Vec<i32>,
@@ -274,9 +315,38 @@ pub struct FBXAnimCurve {
     ref_count: Vec<i32>,
 
     anim_curve_node: usize,
-    anim_curve_node_key: String,
+    anim_curve_node_key: AnimCurveNodeKey,
 
     name: String,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum NodeAnimAttrKey {
+    Translation,
+    Rotation,
+    Scaling,
+    #[default]
+    UnknownDefault,
+}
+
+impl NodeAnimAttrKey {
+    fn from_str(s: &str) -> Self {
+        match s {
+            "Lcl Translation" => Self::Translation,
+            "Lcl Rotation" => Self::Rotation,
+            "Lcl Scaling" => Self::Scaling,
+            x => panic!("{x}"),
+        }
+    }
+    fn as_str(&self) -> &'static str {
+        use NodeAnimAttrKey::*;
+        match self {
+            Translation => "Lcl Translation",
+            Rotation => "LcL Rotation",
+            Scaling => "Lcl Scaling",
+            UnknownDefault => unreachable!("Should've set NodeAnimAttrKey"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -291,7 +361,7 @@ pub struct FBXAnimCurveNode {
     layer: usize,
 
     node: usize,
-    node_key: String,
+    node_key: NodeAnimAttrKey,
 
     name: String,
 }
@@ -300,6 +370,7 @@ pub struct FBXAnimCurveNode {
 pub struct FBXAnimLayer {
     id: usize,
 
+    // TODO may need to check this is 1-1
     anim_stack: usize,
     name: String,
 }

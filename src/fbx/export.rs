@@ -362,7 +362,7 @@ impl FBXScene {
             let a_cn = &self.anim_curve_nodes[a_c.anim_curve_node];
             push_kv!(
                 kvs,
-                conn_op!(conn_idx, a_c.id, a_cn.id, &a_c.anim_curve_node_key)
+                conn_op!(conn_idx, a_c.id, a_cn.id, a_c.anim_curve_node_key.as_str())
             );
         }
 
@@ -373,7 +373,10 @@ impl FBXScene {
             push_kv!(kvs, conn_oo!(conn_idx, a_cn.id, a_l.id));
 
             let node = &self.nodes[a_cn.node];
-            push_kv!(kvs, conn_op!(conn_idx, a_cn.id, node.id, &a_cn.node_key));
+            push_kv!(
+                kvs,
+                conn_op!(conn_idx, a_cn.id, node.id, a_cn.node_key.as_str())
+            );
         }
 
         // for each node add a connection from it to its parent

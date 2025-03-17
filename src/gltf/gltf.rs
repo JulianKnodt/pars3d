@@ -1,4 +1,4 @@
-use crate::anim::{Animation, Channel, InterpolationKind, OutputProperty, Sampler, Time};
+use crate::anim::{Animation, Channel, Dim, InterpolationKind, OutputProperty, Sampler, Time};
 use crate::{identity, matmul, F};
 use gltf_json::validation::{Checked::Valid, USize64};
 use std::io::{self, Write};
@@ -195,9 +195,9 @@ where
                 use crate::anim::Property;
                 use gltf::animation::Property as GLTFProperty;
                 let target_property = match c.target().property() {
-                    GLTFProperty::Translation => Property::Translation,
-                    GLTFProperty::Rotation => Property::Rotation,
-                    GLTFProperty::Scale => Property::Scale,
+                    GLTFProperty::Translation => Property::Translation(Dim::XYZ),
+                    GLTFProperty::Rotation => Property::Rotation(Dim::XYZ),
+                    GLTFProperty::Scale => Property::Scale(Dim::XYZ),
                     GLTFProperty::MorphTargetWeights => Property::MorphTargetWeights,
                 };
                 let sampler = c.sampler().index();
@@ -467,6 +467,8 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
                     let raw = t.iter().flat_map(|&v| to_f32(v).to_le_bytes());
                     bytes.extend(raw)
                 }
+                // TODO convert these to GLTF properties.
+                _ => todo!(),
             }
         }
     }
@@ -717,7 +719,7 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
         .collect::<Vec<_>>();
 
     for (ai, anim) in scene.animations.iter().enumerate() {
-        use crate::anim::Property::*;
+        use crate::anim::Property;
         use gltf_json::animation::Property as GLTFProp;
         let channels = anim
             .channels
@@ -727,10 +729,10 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
                 target: gltf_json::animation::Target {
                     node: gltf_json::Index::new(c.target_node_idx as u32),
                     path: Valid(match c.target_property {
-                        Translation => GLTFProp::Translation,
-                        Rotation => GLTFProp::Rotation,
-                        Scale => GLTFProp::Scale,
-                        MorphTargetWeights => GLTFProp::MorphTargetWeights,
+                        Property::Translation(_) => GLTFProp::Translation,
+                        Property::Rotation(_) => GLTFProp::Rotation,
+                        Property::Scale(_) => GLTFProp::Scale,
+                        Property::MorphTargetWeights => GLTFProp::MorphTargetWeights,
                     }),
                     extras: Default::default(),
                     extensions: Default::default(),
@@ -779,6 +781,8 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
                         OutputProperty::Translation(_) | OutputProperty::Scale(_) => {
                             gltf_json::accessor::Type::Vec3
                         }
+                        // Convert these to GLTF accessor types.
+                        _ => todo!(),
                     }),
                     min: None,
                     max: None,
