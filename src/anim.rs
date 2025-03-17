@@ -61,6 +61,7 @@ pub struct Channel {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Sampler {
     pub interpolation_kind: InterpolationKind,
+    // TODO maybe make the time an enum? For FBX it's a u64 time, but gltf is float
     // Time to modify property
     pub input: Vec<F>,
     // What property is being modified
