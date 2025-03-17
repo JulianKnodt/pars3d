@@ -105,6 +105,9 @@ For FBX parsing, my philosophy is if there's something I didn't expect it should
 Immediately. This is great for figuring out exactly what is wrong, but if your input FBX file
 doesn't fit what is expected it will not work at all. Better than silently being wrong though.
 
+If you do not want this behavior, disable default features, specifically `strict_fbx`, which
+will stop crashes on unknown fields.
+
 Furthermore, it doesn't currently do much for changing materials between formats, which I'll add
 in at some point.
 

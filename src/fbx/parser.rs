@@ -585,14 +585,14 @@ impl KVs {
               Data::String(_), Data::String(_), Data::String(_), Data::String(_),
               Data::I16(_) | Data::I32(_) | Data::F64(_),
             ] => |c: usize| {
-              let val = &self.kvs[c].values;
-              match val[0].as_str().unwrap() {
-                "d|filmboxTypeID" => todo!(),
-                "d|lockInfluenceWeights" => todo!(),
-                "d|X" => anim_curve_node.dx = val[4].as_float(),
-                "d|Y" => anim_curve_node.dy = val[4].as_float(),
-                "d|Z" => anim_curve_node.dz = val[4].as_float(),
-                "d|DeformPercent" => todo!("{val:?}"),
+              let vals = &self.kvs[c].values;
+              match vals[0].as_str().unwrap() {
+                "d|filmboxTypeID" => todo_if_strict!("{vals:?}"),
+                "d|lockInfluenceWeights" => todo_if_strict!("{vals:?}"),
+                "d|X" => anim_curve_node.dx = vals[4].as_float(),
+                "d|Y" => anim_curve_node.dy = vals[4].as_float(),
+                "d|Z" => anim_curve_node.dz = vals[4].as_float(),
+                "d|DeformPercent" => todo_if_strict!("{val:?}"),
                 x => todo_if_strict!("Unknown anim curve node P70 {x:?}"),
               }
             },
@@ -869,7 +869,7 @@ impl KVs {
                       mapping_kind = match self.kvs[c].values[0].as_str().unwrap() {
                           "AllSame" => MappingKind::Uniform,
                           "ByPolygon" => MappingKind::PerPolygon,
-                          x => todo!("Unknown mapping kind {x:?}"),
+                          x => todo_if_strict!("Unknown mapping kind {x:?}"),
                       };
                   },
                   "ReferenceInformationType", &[Data::String(_)] => |_| {},
@@ -899,7 +899,7 @@ impl KVs {
                               let mat_idxs = arr.iter().map(|&i| i as usize).collect::<Vec<_>>();
                               out.mat = FBXMeshMaterial::PerFace(mat_idxs);
                           }
-                          x => todo!("Unknown material kind {x:?}"),
+                          x => todo_if_strict!("Unknown material kind {x:?}"),
                       }
                   },
               );
@@ -997,7 +997,7 @@ impl KVs {
                     let name = name.as_str().unwrap();
                     prop_connections.push((src, dst, name));
                 }
-                x => todo!("Unknown connection in FBX {x:?}"),
+                x => todo_if_strict!("Unknown connection in FBX {x:?}"),
             }
 
             assert!(!self.children.contains_key(&child));
@@ -1094,12 +1094,12 @@ impl KVs {
         for &o in objects {
             let kv = &self.kvs[o];
             let [id, name_objtype, classtag] = &kv.values[..] else {
-                todo!("{:?}", kv.values);
+                unreachable!("{:?}", kv.values);
             };
             let id = id.as_int().unwrap();
             let n_o = name_objtype.as_str().unwrap().split_once("\\x00\\x01");
             let Some((name, obj_type)) = n_o else {
-                todo!("{name_objtype:?}");
+                unreachable!("{name_objtype:?}");
             };
 
             let classtag = classtag.as_str().unwrap();
@@ -1174,10 +1174,12 @@ impl KVs {
                             }
                             "CollectionExclusive" => continue,
                             "Deformer" => continue,
-                            x => todo!(
-                                "Unknown parent for model {x:?} {:?}",
-                                self.kvs[id_to_kv[&id]]
-                            ),
+                            x => {
+                                todo_if_strict!(
+                                    "Unknown parent for model {x:?} {:?}",
+                                    self.kvs[id_to_kv[&id]]
+                                );
+                            }
                         }
                         num_parents += 1;
                     }
@@ -1203,7 +1205,7 @@ impl KVs {
                                         let n = fbx_scene.node_by_id_or_new(c as usize);
                                         fbx_scene.nodes[n].children.push(n);
                                     }
-                                    x => todo!("{x:?}: {kv:?}"),
+                                    x => todo_if_strict!("{x:?}: {kv:?}"),
                                 }
                             }
                         }
@@ -1551,7 +1553,7 @@ impl KVs {
                   "SnapOnFrameMode" => {},
                   "TimeMarker" => {},
                   "CurrentTimeMarker" => {},
-                  x => todo!("Unhandled Properties70 P {x:?}")
+                  x => todo_if_strict!("Unhandled Properties70 P {x:?}")
                 };
 
               },
@@ -1851,7 +1853,7 @@ fn read_scope(
     let curr_read = read;
     for _pi in 0..prop_count {
         let Some(d) = read_word!(u8).as_ascii() else {
-            todo!();
+            unreachable!();
         };
         let data = match d {
             // TODO are these signed or unsigned?
