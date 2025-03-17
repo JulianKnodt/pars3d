@@ -548,7 +548,7 @@ impl KVs {
             let val = self.kvs[c].values[0].as_i64_arr().unwrap();
             assert!(val.iter().all(|&v| v >= 0));
             assert!(anim.times.is_empty());
-            anim.times.extend(val.iter().map(|&v| v as u32));
+            anim.times.extend(val.iter().map(|&v| v as u64));
             match_children!(self, c);
           },
           "KeyValueFloat", &[Data::F32Arr(_)] => |c: usize| {
@@ -1541,6 +1541,7 @@ impl KVs {
 
                   "TimeSpanStart" => assign!(settings.time_span_start, as_i64),
                   "TimeSpanStop" => assign!(settings.time_span_stop, as_i64),
+
                   // ignored
                   "AmbientColor" => {},
                   "DefaultCamera" => {},
@@ -1565,18 +1566,110 @@ impl KVs {
           self,
           "Definitions", &[],
           "Version", &[Data::I32(_)] => |_| {},
-          "Count", &[Data::I32(_)] => |_| {},
-          "ObjectType", &[Data::String(_)] => |c| match_children!(self, c,
-            "Count", &[Data::I32(_)] => |_| {},
-            "PropertyTemplate", &[Data::String(_)] => |c: usize| assert_matches!(
-              self.kvs[c].values[0].as_str().unwrap(),
-              "FbxVideo" | "FbxAnimCurveNode" | "FbxFileTexture" | "FbxBindingTable" |
-              "FbxImplementation" | "FbxNull" | "FbxSurfaceLambert" | "FbxAnimLayer" |
-              "FbxAnimStack" | "FbxCamera" | "FbxMesh" | "FbxNode" | "FbxSurfacePhong" |
-              "FbxDisplayLayer" | "FbxLayeredTexture" | "FbxLight" | "FbxSkeleton"
+          "Count", &[Data::I32(_ /* total count */)] => |_| {},
+          "ObjectType", &[Data::String(_)] => |c: usize| {
+            //let obj_ty = self.kvs[c].values[0].as_str().unwrap();
+            match_children!(self, c,
+              "Count", &[Data::I32(_)] => |_| {},
+              "PropertyTemplate", &[Data::String(_)] => |c: usize| {
+                let ty = self.kvs[c].values[0].as_str().unwrap();
+                assert_matches!(
+                  ty,
+                  "FbxVideo" | "FbxAnimCurveNode" | "FbxFileTexture" | "FbxBindingTable" |
+                  "FbxImplementation" | "FbxNull" | "FbxSurfaceLambert" | "FbxAnimLayer" |
+                  "FbxAnimStack" | "FbxCamera" | "FbxMesh" | "FbxNode" | "FbxSurfacePhong" |
+                  "FbxDisplayLayer" | "FbxLayeredTexture" | "FbxLight" | "FbxSkeleton"
+                );
+                match_children!(self, c,
+                  "Properties70", &[] => |c| match_children!(self, c,
+                    "P", &[
+                      Data::String(_), Data::String(_), Data::String(_), Data::String(_),
+                      Data::F64(_), Data::F64(_), Data::F64(_),
+                    ] | &[
+                      Data::String(_), Data::String(_), Data::String(_), Data::String(_),
+                      Data::I32(_) | Data::F64(_) | Data::String(_) | Data::I64(_),
+                    ] | &[
+                      Data::String(_), Data::String(_), Data::String(_), Data::String(_),
+                    ] => |c: usize| {
+                      let vals = &self.kvs[c].values;
+                      // I suspect this is the template for all objects? To reduce repeats?
+                      match (ty, vals[0].as_str().unwrap()) {
+                        // Mesh properties
+                        ("FbxMesh", "Color") => {},
+                        ("FbxMesh", "BBoxMin" | "BBoxMax") => {},
+                        ("FbxMesh", "Primary Visibility") => {},
+                        ("FbxMesh", "Casts Shadows" | "Receive Shadows") => {},
 
-            ),
-          ),
+                        // Node Properties
+                        ("FbxNode", "QuaternionInterpolate") => {},
+                        ("FbxNode", "RotationOffset") => {},
+                        ("FbxNode", "RotationPivot") => {},
+                        ("FbxNode", "RotationOrder" | "RotationActive") => {},
+                        ("FbxNode", "RotationSpaceForLimitOnly") => {},
+                        ("FbxNode", "RotationStiffnessX" | "RotationStiffnessY" | "RotationStiffnessZ") => {},
+                        ("FbxNode", "ScalingOffset" | "ScalingPivot") => {},
+                        ("FbxNode", "TranslationActive" | "TranslationMin" | "TranslationMax") => {},
+                        // MinX, MinY, MinZ, MaxX, ...
+                        ("FbxNode", x) if x.starts_with("TranslationM") => {},
+                        ("FbxNode", "AxisLen") => {},
+                        ("FbxNode", "PreRotation" | "PostRotation") => {},
+                        ("FbxNode", "RotationMin" | "RotationMax") => {},
+                        ("FbxNode", x) if x.starts_with("RotationM") => {},
+                        ("FbxNode", "InheritType") => {},
+                        ("FbxNode", "ScalingActive" | "ScalingMin" | "ScalingMax") => {},
+                        ("FbxNode", x) if x.starts_with("ScalingM") => {},
+
+                        ("FbxNode", "GeometricTranslation" | "GeometricRotation" | "GeometricScaling") => {},
+                        ("FbxNode", x) if x.starts_with("MinDamp") || x.starts_with("MaxDamp") => {},
+
+                        ("FbxNode", x) if x.starts_with("PreferedAngle") => {},
+                        ("FbxNode", "LookAtProperty" | "UpVectorProperty") => {},
+                        ("FbxNode", "Show" | "Freeze" | "Visibility" | "Visibility Inheritance") => {},
+                        ("FbxNode", "NegativePercentShapeSupport") => {},
+                        ("FbxNode", "DefaultAttributeIndex") => {},
+                        ("FbxNode", "LODBox") => {},
+
+                        ("FbxNode", "Lcl Translation") => {},
+                        ("FbxNode", "Lcl Rotation") => {},
+                        ("FbxNode", "Lcl Scaling") => {},
+
+                        // "Material" properties
+                        ("FbxSurfacePhong", _) => {},
+                        // "Texture"
+                        ("FbxFileTexture", _) => {},
+                        // "Video"
+                        ("FbxVideo", "Width" | "Height") => {},
+                        ("FbxVideo", "Path" | "AccessMode") => {},
+                        ("FbxVideo", "StartFrame" | "StopFrame" | "Offset" | "PlaySpeed" | "FrameRate" | "LastFrame") => {},
+                        ("FbxVideo", "FreeRunning" | "Loop" | "InterlaceMode") => {},
+                        ("FbxVideo", "ImageSequence" | "ImageSequenceOffset") => {},
+
+                        // "AnimationStack"
+                        ("FbxAnimStack", "Description") => {}
+
+                        ("FbxAnimStack", "LocalStart") => {}
+                        ("FbxAnimStack", "LocalStop") => {}
+                        ("FbxAnimStack", "ReferenceStart") => {}
+                        ("FbxAnimStack", "ReferenceStop") => {}
+
+                        // "AnimationLayer"
+                        ("FbxAnimLayer", "Weight") => {/* TODO could be important? */},
+                        ("FbxAnimLayer", "Mute" | "Solo" | "Lock") => {},
+                        ("FbxAnimLayer", "Color") => { /* WTF? this is an animation */ },
+                        ("FbxAnimLayer", "BlendMode" | "BlendModeBypass") => {},
+                        ("FbxAnimLayer", "RotationAccumulationMode" | "ScaleAccumulationMode") => {},
+
+                        // "AnimationCurveNode"
+                        ("FbxAnimCurveNode", "d") => {},
+
+                        (_, p) => todo_if_strict!("{ty} {p} {vals:?}"),
+                      }
+                    }
+                  )
+                );
+              }
+            )
+          },
         );
 
         // objects (handled earlier)

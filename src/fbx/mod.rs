@@ -265,7 +265,8 @@ pub struct FBXAnimCurve {
 
     default: F,
 
-    times: Vec<u32>,
+    /// needs to be u64 otherwise not enough bits (that's crazy).
+    times: Vec<u64>,
     values: Vec<F>,
 
     flags: Vec<i32>,

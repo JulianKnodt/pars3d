@@ -245,16 +245,71 @@ impl FBXScene {
 
         root_fields!(kvs, "References", &[]);
 
+        let total_count = self.meshes.len()
+            + self.nodes.len()
+            + self.nodes.iter().filter(|v| v.is_null_node).count()
+            + self.anim_curve_nodes.len()
+            + self.anim_layers.len()
+            + self.anim_stacks.len()
+            + 1 /* Global Settings */;
         root_fields!(
           kvs, "Definitions", &[] => |c| add_kvs!(kvs, c,
             "Version", &[Data::I32(101)],
-            "Count", &[Data::I32(1 /* not sure what this is */)],
-            "ObjectType", &[Data::str("" /* not sure */)] => |c| add_kvs!(
+            // number of meshes
+            "Count", &[Data::I32(total_count as i32)],
+            "ObjectType", &[Data::str("GlobalSettings")] => |c| add_kvs!(kvs, c, "Count", &[Data::I32(1)]),
+            "ObjectType", &[Data::str("Geometry")] => |c| add_kvs!(
                 kvs, c,
-                "Count", &[Data::I32(1)],
-                "PropertyTemplate", &[Data::str("FbxMesh")]
+                "Count", &[Data::I32(self.meshes.len() as i32)],
+                "PropertyTemplate", &[Data::str("FbxMesh")] => |c| add_kvs!(
+                  kvs, c, "Properties70", &[] => |c| add_kvs!(kvs, c,
+                  // TODO mesh properties here
+                  ),
+                ),
             ),
-            // TODO animation stack local start and stop needs to go here as well.
+            "ObjectType", &[Data::str("Model")] => |c| add_kvs!(
+              kvs, c,
+              "Count", &[Data::I32(self.nodes.len() as i32)],
+              "PropertyTemplate", &[Data::str("FbxNode")] => |c| add_kvs!(
+                kvs, c, "Properties70", &[] => |c| add_kvs!(kvs, c
+                  // TODO node properties here
+                ),
+              ),
+            ),
+            "ObjectType", &[Data::str("AnimationStack")] => |c| add_kvs!(
+              kvs, c,
+              "Count", &[Data::I32(self.anim_stacks.len() as i32)],
+              "PropertyTemplate", &[Data::str("FbxAnimStack")] => |c| add_kvs!(
+                kvs, c, "Properties70", &[] => |c| add_kvs!(kvs, c,
+                  "P", time_p(
+                    "LocalStart",
+                    self.anim_stacks.iter().fold(i64::MAX, |acc, n| acc.min(n.local_start))
+                  ),
+                  "P", time_p(
+                    "LocalStop",
+                    self.anim_stacks.iter().fold(i64::MIN, |acc, n| acc.max(n.local_stop))
+                  ),
+                  "P", time_p(
+                    "ReferenceStart",
+                    self.anim_stacks.iter().fold(i64::MAX, |acc, n| acc.min(n.ref_start))
+                  ),
+                  "P", time_p(
+                    "ReferenceStop",
+                    self.anim_stacks.iter().fold(i64::MIN, |acc, n| acc.max(n.ref_stop))
+                  ),
+                ),
+              ),
+            ),
+
+            "ObjectType", &[Data::str("AnimationCurveNode")] => |c| add_kvs!(
+              kvs, c,
+              "Count", &[Data::I32(self.anim_curve_nodes.len() as i32)],
+              "PropertyTemplate", &[Data::str("FbxAnimCurveNode")] => |c| add_kvs!(
+                kvs, c, "Properties70", &[] => |c| add_kvs!(kvs, c,
+                  "P", &[Data::str("d"), Data::str("Compound"), Data::str(""), Data::str("")],
+                ),
+              ),
+            ),
           ),
         );
 
@@ -585,7 +640,7 @@ impl FBXPose {
             pose_kv,
             //
             "Type", &[Data::str("BindPose")],
-            "Version", &[Data::I32(101)],
+            "Version", &[Data::I32(100)],
             "NbPoseNodes", &[Data::I32(self.nodes.len() as i32)],
             "PoseNode", &[] => |c: usize| {
               // need to do this manually because it's an array
