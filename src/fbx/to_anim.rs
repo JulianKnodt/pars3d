@@ -2,7 +2,9 @@ use super::{
     AnimCurveNodeKey, FBXAnimCurve, FBXAnimCurveNode, FBXScene,
     NodeAnimAttrKey, /*FBXAnimLayer, FBXAnimStack,*/
 };
-use crate::anim::{Animation, Dim, InterpolationKind, OutputProperty, Property, Sampler, Time};
+use crate::anim::{
+    Animation, Channel, Dim, InterpolationKind, OutputProperty, Property, Sampler, Samplers, Time,
+};
 
 impl FBXScene {
     pub fn extract_animations(&self) -> impl Iterator<Item = Animation> + '_ {
@@ -20,24 +22,46 @@ impl FBXScene {
         };
         anim
     }
-}
 
-// There can be multiple different anim curves for each anim curve node.
-/*
-impl From<FBXAnimCurveNode> for Channel {
-  fn from(a_cn: FBXAnimCurveNode) -> Channel {
-    let target_property: Property = match a_cn.key {
-      x => todo!("{x:?}"),
+    pub fn channel_for_anim_curve_node(&self, a_cn_idx: usize) -> Channel {
+        let a_cn = &self.anim_curve_nodes[a_cn_idx];
+        let dim = match (a_cn.dx, a_cn.dy, a_cn.dz) {
+            (Some(_), None, None) => Dim::X,
+            (None, Some(_), None) => Dim::Y,
+            (None, None, Some(_)) => Dim::Z,
+            (Some(_), Some(_), Some(_)) => Dim::XYZ,
+            _ => todo!(),
+        };
+        let target_property: Property = match a_cn.node_key {
+            NodeAnimAttrKey::Translation => Property::Translation(dim),
+            NodeAnimAttrKey::Rotation => Property::Rotation(dim),
+            NodeAnimAttrKey::Scaling => Property::Rotation(dim),
+            x => todo!("{x:?}"),
+        };
+        let mut a_cs = self
+            .anim_curves
+            .iter()
+            .enumerate()
+            .filter(|v| v.1.anim_curve_node == a_cn_idx)
+            .map(|(i, _)| i);
+        let a_c0 = a_cs.next();
+        let a_c1 = a_cs.next();
+        let a_c2 = a_cs.next();
+        assert_eq!(a_cs.next(), None);
+        let sampler = match (a_c0, a_c1, a_c2) {
+            (None, None, None) => todo!("Case where anim curve node has no curves"),
+            (Some(i), None, None) => Samplers::One(i),
+            (Some(i), Some(j), None) => Samplers::Two([i, j]),
+            (Some(i), Some(j), Some(k)) => Samplers::Three([i, j, k]),
+            _ => unreachable!(),
+        };
+        Channel {
+            target_node_idx: a_cn.node,
+            target_property,
+            sampler,
+        }
     }
-
-    Channel {
-      target_node_idx: a_cn.node,
-      target_property,
-      sampler: a_cn.anim_curve,
-    }
-  }
 }
-*/
 
 impl From<(FBXAnimCurve, &[FBXAnimCurveNode])> for Sampler {
     fn from((a_c, a_cns): (FBXAnimCurve, &[FBXAnimCurveNode])) -> Sampler {
@@ -46,8 +70,8 @@ impl From<(FBXAnimCurve, &[FBXAnimCurveNode])> for Sampler {
             AnimCurveNodeKey::X => Dim::X,
             AnimCurveNodeKey::Y => Dim::Y,
             AnimCurveNodeKey::Z => Dim::Z,
+            AnimCurveNodeKey::DeformPercent => unreachable!(),
             AnimCurveNodeKey::UnknownDefault => todo!(),
-            x => todo!("{x:?}"),
         };
         let prop = match a_cn.node_key {
             NodeAnimAttrKey::Translation => Property::Translation(dim()),

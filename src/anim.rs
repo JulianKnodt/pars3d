@@ -64,11 +64,29 @@ impl OutputProperty {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Samplers {
+    One(usize),
+    Two([usize; 2]),
+    Three([usize; 3]),
+}
+
+impl Samplers {
+    pub fn one(&self) -> Option<usize> {
+        if let &Self::One(s) = self {
+            Some(s)
+        } else {
+            None
+        }
+    }
+    // TODO convert multiple samplers into a single sampler
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Channel {
     pub target_node_idx: usize,
     pub target_property: Property,
-    pub sampler: usize,
+    pub sampler: Samplers,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

@@ -1,4 +1,6 @@
-use crate::anim::{Animation, Channel, Dim, InterpolationKind, OutputProperty, Sampler, Time};
+use crate::anim::{
+    Animation, Channel, Dim, InterpolationKind, OutputProperty, Sampler, Samplers, Time,
+};
 use crate::{identity, matmul, F};
 use gltf_json::validation::{Checked::Valid, USize64};
 use std::io::{self, Write};
@@ -239,7 +241,7 @@ where
                 Channel {
                     target_node_idx,
                     target_property,
-                    sampler,
+                    sampler: Samplers::One(sampler),
                 }
             })
             .collect::<Vec<_>>();
@@ -725,7 +727,7 @@ pub fn save_glb(scene: &crate::mesh::Scene, dst: impl Write) -> io::Result<()> {
             .channels
             .iter()
             .map(|c| gltf_json::animation::Channel {
-                sampler: gltf_json::Index::new(c.sampler as u32),
+                sampler: gltf_json::Index::new(c.sampler.one().unwrap() as u32),
                 target: gltf_json::animation::Target {
                     node: gltf_json::Index::new(c.target_node_idx as u32),
                     path: Valid(match c.target_property {
