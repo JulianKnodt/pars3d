@@ -307,6 +307,13 @@ impl FaceKind {
     pub(crate) fn empty() -> Self {
         FaceKind::Poly(vec![])
     }
+    pub(crate) fn new(num_verts: usize) -> Self {
+        match num_verts {
+            3 => Self::Tri([0; 3]),
+            4 => Self::Quad([0; 4]),
+            _ => Self::Poly(vec![0; num_verts]),
+        }
+    }
     #[inline]
     pub fn is_tri(&self) -> bool {
         matches!(self, FaceKind::Tri(_))

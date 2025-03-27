@@ -1,4 +1,4 @@
-use super::{Vec3, F};
+use super::{FaceKind, F};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::Path;
@@ -7,8 +7,8 @@ pub mod to_mesh;
 
 #[derive(Debug, Default)]
 pub struct OFF {
-    v: Vec<Vec3>,
-    f: Vec<[usize; 3]>,
+    v: Vec<[F; 3]>,
+    f: Vec<FaceKind>,
 }
 
 pub fn read_from_file(p: impl AsRef<Path>) -> io::Result<OFF> {
@@ -54,8 +54,11 @@ pub fn buf_read(buf_read: impl BufRead) -> io::Result<OFF> {
                 };
                 verts = pusize(first);
                 faces = pusize(face_count);
-                pusize(e); // check that it parses
-                           // TODO could allocate space for verts or faces, but not necessary
+                let _num_edges = pusize(e); // check that it parses
+
+                off.v.reserve(verts);
+                off.f.reserve(faces);
+
                 state = ParseState::Vert;
             }
             ParseState::Vert => {
@@ -66,22 +69,22 @@ pub fn buf_read(buf_read: impl BufRead) -> io::Result<OFF> {
                     panic!("Missing z in {l}")
                 };
                 off.v.push([first, y, z].map(pf));
-                if off.v.len() == verts {
-                    state = ParseState::Face;
-                }
             }
             ParseState::Face => {
-                let Some(vi1) = iter.next() else {
-                    panic!("Missing 2nd vert idx in {l}")
-                };
-                let Some(vi2) = iter.next() else {
-                    panic!("Missing 3rd vert idx in {l}")
-                };
-                off.f.push([first, vi1, vi2].map(pusize));
-                if off.f.len() == faces {
-                    state = ParseState::Done;
+                let num_verts = pusize(first);
+                let mut f = FaceKind::new(num_verts);
+                let fs = f.as_mut_slice();
+                for i in 0..num_verts {
+                    fs[i] = pusize(iter.next().expect("Missing vertex index in OFF face"));
                 }
+                off.f.push(f);
             }
+        }
+        if off.v.len() == verts && state == ParseState::Vert {
+            state = ParseState::Face;
+        }
+        if off.f.len() == faces && state == ParseState::Face {
+            state = ParseState::Done;
         }
     }
 
@@ -97,8 +100,16 @@ impl OFF {
             writeln!(dst, "{x} {y} {z}")?;
         }
         dst.write_all(b"# Faces:\n")?;
-        for [vi0, vi1, vi2] in &self.f {
-            writeln!(dst, "{vi0} {vi1} {vi2}")?;
+        for f in &self.f {
+            let fs = f.as_slice();
+            let Some((last, rest)) = fs.split_last() else {
+                continue;
+            };
+            write!(dst, "{} ", fs.len())?;
+            for r in rest {
+                write!(dst, "{} ", r)?;
+            }
+            writeln!(dst, "{}", last)?;
         }
         Ok(())
     }
