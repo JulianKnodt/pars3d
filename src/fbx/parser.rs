@@ -592,7 +592,7 @@ impl KVs {
                 "d|X" => anim_curve_node.dx = vals[4].as_float(),
                 "d|Y" => anim_curve_node.dy = vals[4].as_float(),
                 "d|Z" => anim_curve_node.dz = vals[4].as_float(),
-                "d|DeformPercent" => todo_if_strict!("{vals:?}"),
+                "d|DeformPercent" => anim_curve_node.deform_percent = vals[4].as_float(),
                 x => todo_if_strict!("Unknown anim curve node P70 {x:?}"),
               }
             },

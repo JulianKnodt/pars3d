@@ -758,7 +758,8 @@ impl FBXAnimCurveNode {
             if self.dx.is_some() => "P", f64_p("d|X", self.dx.unwrap() as f64),
             if self.dy.is_some() => "P", f64_p("d|Y", self.dy.unwrap() as f64),
             if self.dz.is_some() => "P", f64_p("d|Z", self.dz.unwrap() as f64),
-            //if self.deform_percent.is_some() => "P", f64_p("d|DeformPercent", self.deform_percent.unwrap() as f64),
+            if self.deform_percent.is_some() =>
+              "P", f64_p("d|DeformPerecent", self.deform_percent.unwrap() as f64),
           )
         );
     }

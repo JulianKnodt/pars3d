@@ -356,6 +356,7 @@ pub struct FBXAnimCurveNode {
     dx: Option<F>,
     dy: Option<F>,
     dz: Option<F>,
+    deform_percent: Option<F>,
 
     // I think only one of these can be set, but not sure?
     layer: usize,
