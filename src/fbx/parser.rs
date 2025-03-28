@@ -1,7 +1,7 @@
 use super::{
     FBXAnimCurve, FBXAnimCurveNode, FBXAnimLayer, FBXAnimStack, FBXBlendshape,
     FBXBlendshapeChannel, FBXCluster, FBXMaterial, FBXMesh, FBXMeshMaterial, FBXNode, FBXScene,
-    FBXSkin, FBXTexture, RefKind, VertexMappingKind,
+    FBXSkin, FBXTexture, MeshOrNode, RefKind, VertexMappingKind,
 };
 use crate::{FaceKind, F};
 
@@ -1355,15 +1355,27 @@ impl KVs {
 
                     for (src, key) in conns!(PROP => id) {
                         // possibly matches all node attributes?
-                        assert_matches!(key, "Lcl Translation" | "Lcl Rotation");
-                        assert_eq!(self.kvs[id_to_kv[&src]].key, "Model");
+                        assert_matches!(key, "Lcl Translation" | "Lcl Rotation" | "DeformPercent");
+                        match self.kvs[id_to_kv[&src]].key.as_str() {
+                          "Model" /* Joints */ => {
+                            let node_idx = fbx_scene.node_by_id_or_new(src as usize);
+                            let acn = &mut fbx_scene.anim_curve_nodes[acn_idx];
+                            assert_eq!(acn.rel, MeshOrNode::None);
+                            assert_eq!(acn.rel_key, super::NodeAnimAttrKey::None);
+                            acn.rel = MeshOrNode::Node(node_idx);
+                            acn.rel_key = super::NodeAnimAttrKey::from_str(key);
+                          },
+                          "Deformer" /* Blendshape */ => {
+                            let bsc_idx = fbx_scene.blendshape_channel_by_id_or_new(src as usize);
+                            let acn = &mut fbx_scene.anim_curve_nodes[acn_idx];
+                            assert_eq!(acn.rel, MeshOrNode::None);
+                            assert_eq!(acn.rel_key, super::NodeAnimAttrKey::None);
 
-                        let node_idx = fbx_scene.node_by_id_or_new(src as usize);
-                        let acn = &mut fbx_scene.anim_curve_nodes[acn_idx];
-                        assert_eq!(acn.node, 0);
-                        assert_eq!(acn.node_key, super::NodeAnimAttrKey::UnknownDefault);
-                        acn.node = node_idx;
-                        acn.node_key = super::NodeAnimAttrKey::from_str(key);
+                            acn.rel = MeshOrNode::Mesh(bsc_idx);
+                            acn.rel_key = super::NodeAnimAttrKey::from_str(key);
+                          }
+                          x => todo_if_strict!("{x:?}"),
+                        }
                     }
                 }
                 ("AnimationCurve", "AnimCurve") => {
@@ -1641,6 +1653,23 @@ impl KVs {
                         ("FbxSurfacePhong", _) => {},
                         // "Texture"
                         ("FbxFileTexture", _) => {},
+                        // LayeredTexture
+                        ("FbxLayeredTexture", "TextureTypeUse") => {},
+                        ("FbxLayeredTexture", "Texture alpha" |"PremultiplyAlpha") => {},
+                        ("FbxLayeredTexture", "CurrentMappingType" | "CurrentTextureBlendMode") => {},
+                        ("FbxLayeredTexture", "WrapModeU" | "WrapModeV" | "UVSwap") => {},
+                        ("FbxLayeredTexture", "UVSet") => {},
+                        ("FbxLayeredTexture", "Translation" | "Rotation" | "Scaling") => {},
+                        ("FbxLayeredTexture", "TextureRotationPivot" | "TextureScalingPivot") => {},
+                        // SurfaceLambert
+                        ("FbxSurfaceLambert", "ShadingModel") => {},
+                        ("FbxSurfaceLambert", "MultiLayer") => {},
+                        ("FbxSurfaceLambert", "EmissiveColor" | "EmissiveFactor") => {},
+                        ("FbxSurfaceLambert", "AmbientColor" | "AmbientFactor") => {},
+                        ("FbxSurfaceLambert", "DiffuseColor" | "DiffuseFactor") => {},
+                        ("FbxSurfaceLambert", "Bump" | "NormalMap" | "BumpFactor") => {}
+                        ("FbxSurfaceLambert", _) => {},
+
                         // "Video"
                         ("FbxVideo", "Width" | "Height") => {},
                         ("FbxVideo", "Path" | "AccessMode") => {},
@@ -1666,7 +1695,7 @@ impl KVs {
                         // "AnimationCurveNode"
                         ("FbxAnimCurveNode", "d") => {},
 
-                        (_, p) => todo_if_strict!("{ty} {p} {vals:?}"),
+                        (_, p) => todo_if_strict!("{ty} {p:?} {vals:?}"),
                       }
                     }
                   )

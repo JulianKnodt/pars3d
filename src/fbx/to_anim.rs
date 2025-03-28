@@ -1,6 +1,7 @@
 use super::{
     AnimCurveNodeKey, FBXAnimCurve, FBXAnimCurveNode, FBXScene,
-    NodeAnimAttrKey, /*FBXAnimLayer, FBXAnimStack,*/
+    MeshOrNode, /*FBXAnimLayer, FBXAnimStack,*/
+    NodeAnimAttrKey,
 };
 use crate::anim::{
     Animation, Channel, Dim, InterpolationKind, OutputProperty, Property, Sampler, Samplers, Time,
@@ -32,7 +33,7 @@ impl FBXScene {
             (Some(_), Some(_), Some(_)) => Dim::XYZ,
             _ => todo!(),
         };
-        let target_property: Property = match a_cn.node_key {
+        let target_property: Property = match a_cn.rel_key {
             NodeAnimAttrKey::Translation => Property::Translation(dim),
             NodeAnimAttrKey::Rotation => Property::Rotation(dim),
             NodeAnimAttrKey::Scaling => Property::Rotation(dim),
@@ -55,8 +56,11 @@ impl FBXScene {
             (Some(i), Some(j), Some(k)) => Samplers::Three([i, j, k]),
             _ => unreachable!(),
         };
+        let MeshOrNode::Node(node_idx) = a_cn.rel else {
+            todo!();
+        };
         Channel {
-            target_node_idx: a_cn.node,
+            target_node_idx: node_idx,
             target_property,
             sampler,
         }
@@ -71,13 +75,14 @@ impl From<(FBXAnimCurve, &[FBXAnimCurveNode])> for Sampler {
             AnimCurveNodeKey::Y => Dim::Y,
             AnimCurveNodeKey::Z => Dim::Z,
             AnimCurveNodeKey::DeformPercent => unreachable!(),
-            AnimCurveNodeKey::UnknownDefault => todo!(),
+            AnimCurveNodeKey::None => todo!(),
         };
-        let prop = match a_cn.node_key {
+        let prop = match a_cn.rel_key {
             NodeAnimAttrKey::Translation => Property::Translation(dim()),
             NodeAnimAttrKey::Rotation => Property::Rotation(dim()),
             NodeAnimAttrKey::Scaling => Property::Scale(dim()),
-            NodeAnimAttrKey::UnknownDefault => todo!(),
+            NodeAnimAttrKey::DeformPercent => unreachable!(),
+            NodeAnimAttrKey::None => todo!(),
         };
         let output_property = OutputProperty::SingleChannel(prop, a_c.values);
         Sampler {

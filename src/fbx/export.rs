@@ -3,7 +3,7 @@
 use super::parser::{Data, Token, KV};
 use super::{
     id, FBXAnimCurve, FBXAnimCurveNode, FBXAnimLayer, FBXAnimStack, FBXCluster, FBXMesh, FBXNode,
-    FBXPose, FBXScene, FBXSkin,
+    FBXPose, FBXScene, FBXSkin, MeshOrNode,
 };
 use crate::F;
 use std::io::{self, Seek, SeekFrom, Write};
@@ -372,11 +372,20 @@ impl FBXScene {
             let a_l = &self.anim_layers[a_cn.layer];
             push_kv!(kvs, conn_oo!(conn_idx, a_cn.id, a_l.id));
 
-            let node = &self.nodes[a_cn.node];
-            push_kv!(
-                kvs,
-                conn_op!(conn_idx, a_cn.id, node.id, a_cn.node_key.as_str())
-            );
+            match a_cn.rel {
+                MeshOrNode::Node(node) => {
+                    let node = &self.nodes[node];
+                    let key = a_cn.rel_key.as_str();
+                    push_kv!(kvs, conn_op!(conn_idx, a_cn.id, node.id, key));
+                }
+                MeshOrNode::Mesh(mesh) => {
+                    let mesh = &self.blendshape_channels[mesh];
+                    let key = a_cn.rel_key.as_str();
+                    push_kv!(kvs, conn_op!(conn_idx, a_cn.id, mesh.id, key));
+                }
+                // No connection?
+                MeshOrNode::None => continue,
+            }
         }
 
         // for each node add a connection from it to its parent

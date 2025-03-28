@@ -29,8 +29,8 @@ pub struct FBXScene {
     pub anim_curves: Vec<FBXAnimCurve>,
     pub anim_curve_nodes: Vec<FBXAnimCurveNode>,
 
-    blendshapes: Vec<FBXBlendshape>,
-    blendshape_channels: Vec<FBXBlendshapeChannel>,
+    pub blendshapes: Vec<FBXBlendshape>,
+    pub blendshape_channels: Vec<FBXBlendshapeChannel>,
 
     root_nodes: Vec<usize>,
 
@@ -274,7 +274,7 @@ pub enum AnimCurveNodeKey {
     Z,
     DeformPercent,
     #[default]
-    UnknownDefault,
+    None,
 }
 
 impl AnimCurveNodeKey {
@@ -294,7 +294,7 @@ impl AnimCurveNodeKey {
             Y => "d|Y",
             Z => "d|Z",
             DeformPercent => "d|DeformPercent",
-            UnknownDefault => unreachable!("Should've set AnimCurveNodeKey"),
+            None => unreachable!("Should've set AnimCurveNodeKey"),
         }
     }
 }
@@ -325,8 +325,10 @@ pub enum NodeAnimAttrKey {
     Translation,
     Rotation,
     Scaling,
+    // Technically a blend shape animation not node
+    DeformPercent,
     #[default]
-    UnknownDefault,
+    None,
 }
 
 impl NodeAnimAttrKey {
@@ -335,6 +337,7 @@ impl NodeAnimAttrKey {
             "Lcl Translation" => Self::Translation,
             "Lcl Rotation" => Self::Rotation,
             "Lcl Scaling" => Self::Scaling,
+            "DeformPercent" => Self::DeformPercent,
             x => panic!("{x}"),
         }
     }
@@ -344,9 +347,18 @@ impl NodeAnimAttrKey {
             Translation => "Lcl Translation",
             Rotation => "LcL Rotation",
             Scaling => "Lcl Scaling",
-            UnknownDefault => unreachable!("Should've set NodeAnimAttrKey"),
+            DeformPercent => "DeformPercent",
+            None => unreachable!("Should've set NodeAnimAttrKey"),
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum MeshOrNode {
+    #[default]
+    None,
+    Node(usize),
+    Mesh(usize),
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -361,8 +373,10 @@ pub struct FBXAnimCurveNode {
     // I think only one of these can be set, but not sure?
     layer: usize,
 
-    node: usize,
-    node_key: NodeAnimAttrKey,
+    // What is this anim curve node related to?
+    // assumes that each anim curve node related to one thing.
+    rel: MeshOrNode,
+    rel_key: NodeAnimAttrKey,
 
     name: String,
 }

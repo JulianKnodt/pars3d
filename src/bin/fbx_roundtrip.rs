@@ -55,6 +55,11 @@ fn main() {
     println!("# AnimLayers {:?}", scene.anim_layers.len());
     println!("# AnimCurves {:?}", scene.anim_curves.len());
     println!("# AnimCurveNodes {:?}", scene.anim_curve_nodes.len());
+    println!("# Blendshapes {:?}", scene.blendshapes.len());
+    println!(
+        "# Blendshape Channels {:?}",
+        scene.blendshape_channels.len()
+    );
     let out = std::fs::File::create(dst).expect("Failed to create file");
     fbx::export::export_fbx(&scene, std::io::BufWriter::new(out)).expect("Failed to save scene");
 }
