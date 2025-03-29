@@ -72,6 +72,13 @@ pub struct Material {
     pub path: String,
 }
 
+impl Material {
+    /// Gets the texture from this material of a given kind.
+    pub fn textures_by_kind(&self, kind: TextureKind) -> impl Iterator<Item = &Texture> + '_ {
+        self.textures.iter().filter(move |t| t.kind == kind)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Skin {
     pub inv_bind_matrices: Vec<[[F; 4]; 4]>,

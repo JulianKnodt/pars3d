@@ -121,6 +121,12 @@ impl ObjObject {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct ObjImage {
+    img: DynamicImage,
+    path: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct MTL {
     pub ka: Vec3,
     pub kd: Vec3,
@@ -128,26 +134,20 @@ pub struct MTL {
     pub ke: Vec3,
 
     /// diffuse map
-    pub map_kd: Option<DynamicImage>,
-    pub map_kd_path: String,
+    pub map_kd: Option<ObjImage>,
     /// specular map
-    pub map_ks: Option<DynamicImage>,
-    pub map_ks_path: String,
+    pub map_ks: Option<ObjImage>,
     /// ambient map
-    pub map_ka: Option<DynamicImage>,
-    pub map_ka_path: String,
+    pub map_ka: Option<ObjImage>,
     /// emissive map
-    pub map_ke: Option<DynamicImage>,
-    pub map_ke_path: String,
+    pub map_ke: Option<ObjImage>,
     /// Normal Map
-    pub bump_normal: Option<DynamicImage>,
-    pub bump_normal_path: String,
+    pub bump_normal: Option<ObjImage>,
 
     /// Bump/Height Map
-    pub disp: Option<DynamicImage>,
-
+    pub disp: Option<ObjImage>,
     /// Ambient Occlusion Map
-    pub map_ao: Option<DynamicImage>,
+    pub map_ao: Option<ObjImage>,
 
     /// Read but don't do anything yet
     pub ns: f32,
@@ -173,12 +173,6 @@ impl Default for MTL {
             disp: None,
             map_ao: None,
 
-            bump_normal_path: String::new(),
-            map_ka_path: String::new(),
-            map_ke_path: String::new(),
-            map_kd_path: String::new(),
-            map_ks_path: String::new(),
-
             ns: 0.,
             ni: 0.,
             // IMPORTANT set this to 1 otherwise it will be transparent.
@@ -192,6 +186,7 @@ impl MTL {
     pub fn is_empty(&self) -> bool {
         self == &Self::default()
     }
+    /*
     pub fn diffuse_image(&self) -> DynamicImage {
         if let Some(diffuse) = self.map_kd.as_ref() {
             return diffuse.clone();
@@ -200,6 +195,7 @@ impl MTL {
         out.put_pixel(0, 0, image::Rgb(self.kd.map(|f| f as f32)));
         out.into()
     }
+    */
 }
 
 fn parse_face(
@@ -542,27 +538,24 @@ pub fn parse_mtl(p: impl AsRef<Path>) -> io::Result<Vec<(String, MTL)>> {
                     continue;
                 };
 
-                let (img_dst, path_dst) = match kind.as_str() {
-                    "map_kd" => (&mut curr_mtl.map_kd, Some(&mut curr_mtl.map_kd_path)),
-                    "map_ks" => (&mut curr_mtl.map_ks, Some(&mut curr_mtl.map_ks_path)),
-                    "map_ka" => (&mut curr_mtl.map_ka, Some(&mut curr_mtl.map_ka_path)),
-                    "map_ke" => (&mut curr_mtl.map_ke, Some(&mut curr_mtl.map_ke_path)),
-                    "disp" => (&mut curr_mtl.disp, None),
-                    "map_ao" => (&mut curr_mtl.map_ao, None),
-                    "bump" | "map_bump" | "map_normal" | "bump_normal" => (
-                        &mut curr_mtl.bump_normal,
-                        Some(&mut curr_mtl.bump_normal_path),
-                    ),
+                let img_dst = match kind.as_str() {
+                    "map_kd" => &mut curr_mtl.map_kd,
+                    "map_ks" => &mut curr_mtl.map_ks,
+                    "map_ka" => &mut curr_mtl.map_ka,
+                    "map_ke" => &mut curr_mtl.map_ke,
+                    "disp" => &mut curr_mtl.disp,
+                    "map_ao" => &mut curr_mtl.map_ao,
+                    "bump" | "map_bump" | "map_normal" | "bump_normal" => &mut curr_mtl.bump_normal,
                     // TODO need to implement these
                     "map_ns" => continue,
                     "map_d" => continue,
                     "refl" => continue,
                     _ => unreachable!(),
                 };
-                *img_dst = Some(img);
-                if let Some(path_dst) = path_dst {
-                    *path_dst = c.to_str().unwrap().into();
-                }
+                *img_dst = Some(ObjImage {
+                    img,
+                    path: c.to_str().unwrap().into(),
+                });
             }
             "newmtl" => {
                 let old = std::mem::take(&mut curr_mtl);
@@ -617,8 +610,9 @@ impl MTL {
         macro_rules! write_image {
             ($img : expr, $name_suffix : expr, $mtl_img_string: expr $(,)?) => {
                 if let Some(map) = $img {
+                    let img = &map.img;
                     let name = format!("{name_prefix}_{}.png", $name_suffix);
-                    map.save(&name)
+                    img.save(&name)
                         .unwrap_or_else(|_| panic!("Failed to save {name}"));
                     let name = Path::new(&name).file_name().unwrap().to_str().unwrap();
                     writeln!(dst, "{} {name}", $mtl_img_string)?;

@@ -13,6 +13,7 @@
 #![feature(generic_arg_infer)]
 #![feature(os_str_display)]
 
+
 #[cfg(not(feature = "f64"))]
 pub type U = u32;
 #[cfg(not(feature = "f64"))]
@@ -42,6 +43,7 @@ pub mod obj;
 
 /// OFF parsing
 pub mod off;
+
 
 /// STL parsing
 pub mod stl;
@@ -82,6 +84,9 @@ pub mod tri_to_quad;
 pub mod fbx;
 
 pub mod util;
+
+/// Re-exported for materials.
+pub use image::DynamicImage;
 
 pub fn load(v: impl AsRef<Path>) -> std::io::Result<mesh::Scene> {
     use util::FileFormat::*;

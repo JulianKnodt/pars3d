@@ -1,6 +1,7 @@
-use super::{Obj, ObjObject, MTL};
+use super::{Obj, ObjImage, ObjObject, MTL};
 use crate::mesh::{Material, Mesh, Node, Scene, Texture, TextureKind, Transform};
 use crate::{append_one, FaceKind};
+use image::DynamicImage;
 
 use std::array::from_fn;
 use std::collections::HashMap;
@@ -108,32 +109,43 @@ impl From<Obj> for Scene {
     }
 }
 
+fn to_parts(img: Option<ObjImage>) -> (Option<DynamicImage>, String) {
+    let Some(img) = img else {
+        return (None, String::new());
+    };
+    (Some(img.img), img.path)
+}
+
 impl From<MTL> for Material {
     fn from(mtl: MTL) -> Self {
         let mut mat = Material::default();
+        let (kd, kd_path) = to_parts(mtl.map_kd);
         mat.textures.push(Texture {
             kind: TextureKind::Diffuse,
             mul: append_one(mtl.kd),
-            image: mtl.map_kd,
-            original_path: mtl.map_kd_path,
+            image: kd,
+            original_path: kd_path,
         });
+        let (ks, ks_path) = to_parts(mtl.map_ks);
         mat.textures.push(Texture {
             kind: TextureKind::Specular,
             mul: append_one(mtl.ks),
-            image: mtl.map_ks,
-            original_path: mtl.map_ks_path,
+            image: ks,
+            original_path: ks_path,
         });
+        let (ke, ke_path) = to_parts(mtl.map_ke);
         mat.textures.push(Texture {
             kind: TextureKind::Emissive,
             mul: append_one(mtl.ke),
-            image: mtl.map_ke,
-            original_path: mtl.map_ke_path,
+            image: ke,
+            original_path: ke_path,
         });
+        let (normals, normals_path) = to_parts(mtl.bump_normal);
         mat.textures.push(Texture {
             kind: TextureKind::Normal,
             mul: [1.; 4],
-            image: mtl.bump_normal,
-            original_path: mtl.bump_normal_path,
+            image: normals,
+            original_path: normals_path,
         });
         mat
     }
