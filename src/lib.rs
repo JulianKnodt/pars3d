@@ -13,7 +13,6 @@
 #![feature(generic_arg_infer)]
 #![feature(os_str_display)]
 
-
 #[cfg(not(feature = "f64"))]
 pub type U = u32;
 #[cfg(not(feature = "f64"))]
@@ -43,7 +42,6 @@ pub mod obj;
 
 /// OFF parsing
 pub mod off;
-
 
 /// STL parsing
 pub mod stl;
@@ -357,8 +355,8 @@ pub(crate) fn add<const N: usize>(a: [F; N], b: [F; N]) -> [F; N] {
     std::array::from_fn(|i| a[i] + b[i])
 }
 
-pub(crate) fn sub([a, b, c]: [F; 3], [x, y, z]: [F; 3]) -> [F; 3] {
-    [a - x, b - y, c - z]
+pub(crate) fn sub<const N: usize>(a: [F; N], b: [F; N]) -> [F; N] {
+    std::array::from_fn(|i| a[i] - b[i])
 }
 
 pub(crate) fn cross([x, y, z]: [F; 3], [a, b, c]: [F; 3]) -> [F; 3] {
@@ -394,6 +392,57 @@ pub(crate) fn quad_area([a, b, c, d]: [[F; 3]; 4]) -> F {
 
 pub fn tri_area([a, b, c]: [[F; 3]; 3]) -> F {
     0.5 * length(cross(sub(a, b), sub(b, c)))
+}
+
+pub fn tri_area_2d([a, b, c]: [[F; 2]; 3]) -> F {
+    let [ba0, ba1] = sub(b, a);
+    let [ca0, ca1] = sub(c, a);
+    0.5 * (ba0 * ca1 - ba1 * ca0)
+}
+
+/// Given a triangle in 2d and a point p, compute the barycentric coordinate of point `p`.
+pub fn barycentric_2d(p: [F; 2], [a, b, c]: [[F; 2]; 3]) -> [F; 3] {
+    let a2 = tri_area_2d([a, b, p]);
+    let a1 = tri_area_2d([a, p, c]);
+    let a0 = tri_area_2d([p, b, c]);
+
+    let total_area = a0 + a1 + a2;
+    if total_area.abs() < 1e-12 {
+        return [1., 0., 0.];
+    }
+
+    [a0, a1, a2].map(|v| v / total_area)
+}
+
+#[test]
+fn test_bary_2d() {
+    let tri = [[0., 0.], [1., 0.], [0., 1.]];
+
+    assert_eq!(barycentric_2d([0., 0.], tri), [1., 0., 0.]);
+    assert_eq!(barycentric_2d([1., 0.], tri), [0., 1., 0.]);
+    assert_eq!(barycentric_2d([0., 1.], tri), [0., 0., 1.]);
+}
+
+pub fn barycentric_3d(p: [F; 3], [a, b, c]: [[F; 3]; 3]) -> [F; 3] {
+    let a2 = tri_area([a, b, p]);
+    let a1 = tri_area([a, p, c]);
+    let a0 = tri_area([p, b, c]);
+
+    let total_area = a0 + a1 + a2;
+    if total_area.abs() < 1e-12 {
+        return [1., 0., 0.];
+    }
+
+    [a0, a1, a2].map(|v| v / total_area)
+}
+
+#[test]
+fn test_bary_3d() {
+    let tri = [[0., 0., 0.], [1., 0., 0.], [0., 1., 0.]];
+
+    assert_eq!(barycentric_3d([0., 0., 0.], tri), [1., 0., 0.]);
+    assert_eq!(barycentric_3d([1., 0., 0.], tri), [0., 1., 0.]);
+    assert_eq!(barycentric_3d([0., 1., 0.], tri), [0., 0., 1.]);
 }
 
 /// Apply a transformation (col major 4x4) to a point
