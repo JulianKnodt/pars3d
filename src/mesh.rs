@@ -275,6 +275,14 @@ impl Scene {
         }
     }
 
+    pub fn scale_vert_colors(&mut self, s: F) {
+        for m in &mut self.meshes {
+            for vc in &mut m.vert_colors {
+                *vc = kmul(s, *vc);
+            }
+        }
+    }
+
     /// Converts this scene into a flattened mesh which can then be repopulated back into a
     /// scene later.
     pub fn into_flattened_mesh(&self) -> Mesh {
@@ -436,6 +444,22 @@ impl Mesh {
         self.face_mat_idx
             .iter()
             .find_map(|(fr, mi)| fr.contains(&fi).then_some(*mi))
+    }
+    /// If the mesh uses only a single material, returns that material.
+    pub fn single_mat(&self) -> Option<usize> {
+        if self.face_mat_idx.is_empty() {
+            return None;
+        }
+
+        let mat0 = self.face_mat_idx[0].1;
+        if self.face_mat_idx.len() == 1 {
+            return Some(mat0);
+        }
+
+        self.face_mat_idx[1..]
+            .iter()
+            .all(|v| v.1 == mat0)
+            .then_some(mat0)
     }
     /// The number of triangles in this mesh, after triangulation.
     pub fn num_tris(&self) -> usize {
