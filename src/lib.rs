@@ -84,7 +84,7 @@ pub mod fbx;
 pub mod util;
 
 /// Re-exported for materials.
-pub use image::DynamicImage;
+pub use image;
 
 pub fn load(v: impl AsRef<Path>) -> std::io::Result<mesh::Scene> {
     use util::FileFormat::*;
