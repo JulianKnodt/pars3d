@@ -275,14 +275,6 @@ impl Scene {
         }
     }
 
-    pub fn scale_vert_colors(&mut self, s: F) {
-        for m in &mut self.meshes {
-            for vc in &mut m.vert_colors {
-                *vc = kmul(s, *vc);
-            }
-        }
-    }
-
     /// Converts this scene into a flattened mesh which can then be repopulated back into a
     /// scene later.
     pub fn into_flattened_mesh(&self) -> Mesh {
