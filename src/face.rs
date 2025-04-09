@@ -1,4 +1,4 @@
-use crate::{add, barycentric_2d, edges, kmul, F};
+use crate::{add, barycentric_2d, barycentric_3d, edges, kmul, F};
 
 /// Face representation for meshes.
 /// Tris and quads are stack allocated,
@@ -236,6 +236,13 @@ impl FaceKind<[F; 2]> {
 }
 
 impl FaceKind<[F; 3]> {
+    pub fn barycentric(&self, p: [F; 3]) -> [F; 3] {
+        match self {
+            FaceKind::Tri(t) => barycentric_3d(p, *t),
+            FaceKind::Quad(_) => todo!(),
+            FaceKind::Poly(_p) => unimplemented!(),
+        }
+    }
     pub fn from_barycentric(&self, bs: [F; 3]) -> [F; 3] {
         match self {
             FaceKind::Tri(ps) => ps

@@ -194,7 +194,7 @@ pub(crate) fn append_one([a, b, c]: [F; 3]) -> [F; 4] {
     [a, b, c, 1.]
 }
 
-pub(crate) fn quad_area([a, b, c, d]: [[F; 3]; 4]) -> F {
+pub fn quad_area([a, b, c, d]: [[F; 3]; 4]) -> F {
     0.5 * length(cross(sub(a, c), sub(b, d)))
 }
 
