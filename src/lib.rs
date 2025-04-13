@@ -206,13 +206,13 @@ pub fn tri_area([a, b, c]: [[F; 3]; 3]) -> F {
 }
 
 /// More robust ln triangle area.
-pub fn ln_tri_area([a,b,c]: [[F;3]; 3]) -> F {
-  let e0 = length(sub(a,b));
-  let e1 = length(sub(b,c));
-  let e2 = length(sub(c,a));
-  let s = 0.5 * (e0 + e1 + e2);
-  let acl = |s: F| (s.abs() + 1e-14).ln();
-  0.5 * (acl(s) + acl(s-e0) + acl(s-e1) + acl(s-e2))
+pub fn ln_tri_area([a, b, c]: [[F; 3]; 3]) -> F {
+    let e0 = length(sub(a, b));
+    let e1 = length(sub(b, c));
+    let e2 = length(sub(c, a));
+    let s = 0.5 * (e0 + e1 + e2);
+    let acl = |s: F| (s.abs() + 1e-14).ln();
+    0.5 * (acl(s) + acl(s - e0) + acl(s - e1) + acl(s - e2))
 }
 
 pub fn tri_area_2d([a, b, c]: [[F; 2]; 3]) -> F {

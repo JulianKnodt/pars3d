@@ -34,6 +34,6 @@ impl EdgeKind {
         true
     }
     pub fn is_boundary(&self) -> bool {
-      matches!(self, EdgeKind::Boundary(_))
+        matches!(self, EdgeKind::Boundary(_))
     }
 }

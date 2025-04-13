@@ -1,4 +1,4 @@
-use crate::{add, barycentric_2d, barycentric_3d, edges, kmul, F};
+use crate::{add, barycentric_2d, barycentric_3d, edges, kmul, F, sub, cross};
 
 /// Face representation for meshes.
 /// Tris and quads are stack allocated,
@@ -251,6 +251,14 @@ impl FaceKind<[F; 3]> {
                 .fold([0.; 3], |acc, (i, n)| add(acc, kmul(bs[i], *n))),
             FaceKind::Quad(_) => todo!(),
             FaceKind::Poly(_) => unimplemented!(),
+        }
+    }
+    /// The non-normalized normal of this face.
+    pub fn normal(&self) -> [F; 3] {
+        match self {
+            &FaceKind::Tri([a, b, c]) => cross(sub(b, a), sub(b, c)),
+            &FaceKind::Quad([a, b, c, d]) => cross(sub(c, a), sub(d, b)),
+            FaceKind::Poly(_) => todo!(),
         }
     }
 }
