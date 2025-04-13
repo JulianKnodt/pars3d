@@ -473,6 +473,17 @@ impl Mesh {
             self.f.extend(f.as_triangle_fan().map(FaceKind::Tri));
         }
     }
+    pub fn num_boundary_edges(&self) -> usize {
+        use std::collections::BTreeMap;
+        let mut edges: BTreeMap<[usize; 2], u32> = BTreeMap::new();
+        for f in &self.f {
+            for [e0, e1] in f.edges() {
+                let cnt = edges.entry(std::cmp::minmax(e0, e1)).or_default();
+                *cnt = *cnt + 1u32;
+            }
+        }
+        edges.values().filter(|&&v| v == 1).count()
+    }
 
     /// Normalize this mesh's geometry to lay within [-1, 1].
     /// Outputs scale and translation to reposition back to the original dimension.

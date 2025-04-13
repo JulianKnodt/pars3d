@@ -1,4 +1,4 @@
-use crate::{add, barycentric_2d, barycentric_3d, edges, kmul, F, sub, cross};
+use crate::{add, barycentric_2d, barycentric_3d, cross, edges, kmul, sub, F};
 
 /// Face representation for meshes.
 /// Tris and quads are stack allocated,
