@@ -71,6 +71,9 @@ pub mod anim;
 /// Unified mesh representation.
 pub mod mesh;
 
+/// Edge representations
+pub mod edge;
+
 pub use mesh::Mesh;
 pub use mesh::Scene;
 
