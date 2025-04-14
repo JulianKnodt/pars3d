@@ -270,4 +270,11 @@ impl FaceKind<[F; 3]> {
             FaceKind::Poly(_) => todo!(),
         }
     }
+    pub fn area(&self) -> F {
+        match self {
+            &FaceKind::Tri(t) => super::tri_area(t),
+            &FaceKind::Quad(q) => super::quad_area(q),
+            FaceKind::Poly(_) => todo!(),
+        }
+    }
 }
