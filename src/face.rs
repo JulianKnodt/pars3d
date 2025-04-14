@@ -186,6 +186,15 @@ impl FaceKind {
             _ => Self::Poly(vec![0; num_verts]),
         }
     }
+    pub fn offset(&mut self, o: i32) {
+        for v in self.as_mut_slice() {
+            if o < 0 {
+                *v = *v - (o.abs() as usize);
+            } else {
+                *v = *v + o as usize;
+            }
+        }
+    }
 }
 
 impl From<&[usize]> for FaceKind {
