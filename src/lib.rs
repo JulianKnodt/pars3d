@@ -174,6 +174,18 @@ pub(crate) fn cross([x, y, z]: [F; 3], [a, b, c]: [F; 3]) -> [F; 3] {
     [y * c - z * b, z * a - x * c, x * b - y * a]
 }
 
+pub(crate) fn cross_2d([x, y]: [F; 2], [a, b]: [F; 2]) -> F {
+    x * b - y * a
+}
+
+pub(crate) fn tri_area_2d([a, b, c]: [[F; 2]; 3]) -> F {
+    cross_2d(sub(b, a), sub(c, a)) / 2.
+}
+
+pub(crate) fn quad_area_2d([a, b, c, d]: [[F; 2]; 4]) -> F {
+    cross_2d(sub(b, d), sub(a, c)) / 2.
+}
+
 pub fn length<const N: usize>(v: [F; N]) -> F {
     v.iter().map(|v| v * v).sum::<F>().max(0.)
 }
@@ -213,12 +225,6 @@ pub fn ln_tri_area([a, b, c]: [[F; 3]; 3]) -> F {
     let s = 0.5 * (e0 + e1 + e2);
     let acl = |s: F| (s.abs() + 1e-14).ln();
     0.5 * (acl(s) + acl(s - e0) + acl(s - e1) + acl(s - e2))
-}
-
-pub fn tri_area_2d([a, b, c]: [[F; 2]; 3]) -> F {
-    let [ba0, ba1] = sub(b, a);
-    let [ca0, ca1] = sub(c, a);
-    0.5 * (ba0 * ca1 - ba1 * ca0)
 }
 
 /// Given a triangle in 2d and a point p, compute the barycentric coordinate of point `p`.

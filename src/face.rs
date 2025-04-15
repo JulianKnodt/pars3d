@@ -242,6 +242,13 @@ impl FaceKind<[F; 2]> {
             p[1] *= y;
         }
     }
+    pub fn area(&self) -> F {
+        match self {
+            &FaceKind::Tri(t) => super::tri_area_2d(t),
+            &FaceKind::Quad(q) => super::quad_area_2d(q),
+            &FaceKind::Poly(_) => todo!(),
+        }
+    }
 }
 
 impl FaceKind<[F; 3]> {
