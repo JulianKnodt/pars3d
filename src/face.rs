@@ -65,6 +65,8 @@ impl<T> FaceKind<T> {
 }
 
 impl FaceKind {
+    /// Maps the values on this face into either a tri, quad or poly.
+    /// CAUTION: may allocate.
     pub fn map_kind<T>(&self, f: impl Fn(usize) -> T) -> FaceKind<T> {
         match self {
             Self::Tri(t) => FaceKind::Tri(t.map(f)),
@@ -199,6 +201,45 @@ impl FaceKind {
             }
         }
     }
+    /// The non-normalized normal of this face.
+    pub fn normal(&self, v: &[[F; 3]]) -> [F; 3] {
+        match self {
+            &FaceKind::Tri([a, b, c]) => cross(sub(v[b], v[a]), sub(v[b], v[c])),
+            &FaceKind::Quad([a, b, c, d]) => cross(sub(v[c], v[a]), sub(v[d], v[b])),
+            FaceKind::Poly(vs) => {
+                let n = vs.len();
+                let avg = (0..n)
+                    .map(|i| {
+                        let [p, c, n] = std::array::from_fn(|j| vs[(i + j) % n]);
+                        cross(sub(v[n], v[c]), sub(v[p], v[c]))
+                    })
+                    .reduce(add)
+                    .unwrap();
+                kmul(1. / (n + 2) as F, avg)
+            }
+        }
+    }
+    pub fn area(&self, vs: &[[F; 3]]) -> F {
+        match self {
+            &FaceKind::Tri(t) => super::tri_area(t.map(|vi| vs[vi])),
+            &FaceKind::Quad(q) => super::quad_area(q.map(|vi| vs[vi])),
+            FaceKind::Poly(p) => {
+                let mut vis = p.iter().copied();
+                let Some(root) = vis.next() else {
+                    return 0.;
+                };
+                let Some(mut v0) = vis.next() else {
+                    return 0.;
+                };
+                let mut sum = 0.;
+                for v1 in vis {
+                    sum += super::tri_area([root, v0, v1].map(|vi| vs[vi]));
+                    v0 = v1;
+                }
+                sum
+            }
+        }
+    }
 }
 
 impl From<&[usize]> for FaceKind {
@@ -291,6 +332,7 @@ impl FaceKind<[F; 3]> {
             }
         }
     }
+    /// The area of this face
     pub fn area(&self) -> F {
         match self {
             &FaceKind::Tri(t) => super::tri_area(t),
