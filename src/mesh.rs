@@ -571,6 +571,11 @@ impl Mesh {
                         assert_eq!(mesh.v.len(), mesh.joint_weights.len());
                     }
 
+                    if let Some(&vc) = self.vert_colors.get(flat_vi) {
+                        mesh.vert_colors.push(vc);
+                        assert_eq!(mesh.v.len(), mesh.vert_colors.len());
+                    }
+
                     vi
                 };
                 *vertex_map[mi].entry(flat_vi).or_insert_with(new_vert_ins)
