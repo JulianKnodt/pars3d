@@ -163,7 +163,9 @@ impl Ply {
                 PropertyList => {
                     let should_match = ["property", "list", "uchar", "int"];
                     if !l.split_whitespace().take(4).eq(should_match.into_iter()) {
-                        return parse_err!(format!("Unknown face property list, got {l:?}, expected {should_match:?}"));
+                        return parse_err!(format!(
+                            "Unknown face property list, got {l:?}, expected {should_match:?}"
+                        ));
                     }
                     EndHeader
                 }

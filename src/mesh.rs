@@ -3,7 +3,7 @@ use super::{add, kmul, sub, FaceKind, F, U};
 
 use std::array::from_fn;
 use std::collections::hash_map::Entry;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 
 /// Max number of supported UV channels
@@ -384,7 +384,6 @@ impl Mesh {
     /// Computes the number of chords in a mesh,
     /// and accepts a function which is run on each chord's length.
     pub fn num_quad_chords(&self, mut chord_size_fn: impl FnMut(usize)) -> usize {
-        use std::collections::HashSet;
         let mut seen_edges: HashSet<[usize; 2]> = HashSet::new();
         let mut edge_face_adj: HashMap<[usize; 2], Vec<usize>> = HashMap::new();
         for ([e0, e1], f) in self.edges() {
@@ -627,6 +626,20 @@ impl Mesh {
             }
             *ws = ws.map(|v| v / sum);
         }
+    }
+    /// For all values from the other mesh, append them to this mesh.
+    pub fn append(&mut self, o: &mut Self) {
+        self.v.append(&mut o.v);
+        self.n.append(&mut o.n);
+        for i in 0..MAX_UV {
+            self.uv[i].append(&mut o.uv[i]);
+        }
+        self.vert_colors.append(&mut o.vert_colors);
+        self.f.append(&mut o.f);
+        self.face_mesh_idx.append(&mut o.face_mesh_idx);
+        self.face_mat_idx.append(&mut o.face_mat_idx);
+        self.joint_idxs.append(&mut o.joint_idxs);
+        self.joint_weights.append(&mut o.joint_weights);
     }
 }
 
