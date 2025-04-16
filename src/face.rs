@@ -294,6 +294,12 @@ impl FaceKind<[F; 2]> {
             &FaceKind::Poly(_) => todo!(),
         }
     }
+    pub fn tri(&self) -> Option<[[F; 2]; 3]> {
+        if let Self::Tri(t) = self {
+            return Some(*t);
+        };
+        None
+    }
 }
 
 impl FaceKind<[F; 3]> {
