@@ -96,6 +96,10 @@ impl FaceKind {
     pub fn edges(&self) -> impl Iterator<Item = [usize; 2]> + '_ {
         edges(self.as_slice())
     }
+    /// Returns each edge in sorted order in this face: minmax(vi0, vi1), minmax(vi1, vi2), ...
+    pub fn edges_ord(&self) -> impl Iterator<Item = [usize; 2]> + '_ {
+        self.edges().map(|[a, b]| std::cmp::minmax(a, b))
+    }
 
     /// Returns indices of each edge in this face:
     /// [0, 1], [1, 2]... [N, 0]
@@ -274,14 +278,38 @@ impl FaceKind<[F; 3]> {
         match self {
             &FaceKind::Tri([a, b, c]) => cross(sub(b, a), sub(b, c)),
             &FaceKind::Quad([a, b, c, d]) => cross(sub(c, a), sub(d, b)),
-            FaceKind::Poly(_) => todo!(),
+            FaceKind::Poly(vs) => {
+                let n = vs.len();
+                let avg = (0..n)
+                    .map(|i| {
+                        let [p, c, n] = std::array::from_fn(|j| vs[(i + j) % n]);
+                        cross(sub(n, c), sub(p, c))
+                    })
+                    .reduce(add)
+                    .unwrap();
+                kmul(1. / (n + 2) as F, avg)
+            }
         }
     }
     pub fn area(&self) -> F {
         match self {
             &FaceKind::Tri(t) => super::tri_area(t),
             &FaceKind::Quad(q) => super::quad_area(q),
-            FaceKind::Poly(_) => todo!(),
+            FaceKind::Poly(p) => {
+                let mut vis = p.iter().copied();
+                let Some(root) = vis.next() else {
+                    return 0.;
+                };
+                let Some(mut v0) = vis.next() else {
+                    return 0.;
+                };
+                let mut sum = 0.;
+                for v1 in vis {
+                    sum += super::tri_area([root, v0, v1]);
+                    v0 = v1;
+                }
+                sum
+            }
         }
     }
     pub fn tri(&self) -> Option<[[F; 3]; 3]> {
