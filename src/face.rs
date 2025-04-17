@@ -67,7 +67,7 @@ impl<T> FaceKind<T> {
 impl FaceKind {
     /// Maps the values on this face into either a tri, quad or poly.
     /// CAUTION: may allocate.
-    pub fn map_kind<T>(&self, f: impl Fn(usize) -> T) -> FaceKind<T> {
+    pub fn map_kind<T>(&self, mut f: impl FnMut(usize) -> T) -> FaceKind<T> {
         match self {
             Self::Tri(t) => FaceKind::Tri(t.map(f)),
             Self::Quad(q) => FaceKind::Quad(q.map(f)),
@@ -159,7 +159,7 @@ impl FaceKind {
     }
 
     /// Remaps each vertex in this face.
-    pub fn map(&mut self, mut f: impl FnMut(usize) -> usize) {
+    pub fn remap(&mut self, mut f: impl FnMut(usize) -> usize) {
         for v in self.as_mut_slice() {
             *v = f(*v);
         }
@@ -179,6 +179,9 @@ impl FaceKind {
             Quad(_) => {}
             Poly(ref mut v) => {
                 v.dedup();
+                while !v.is_empty() && v.last() == v.first() {
+                    v.pop();
+                }
                 if v.len() < 3 {
                     return true;
                 }
@@ -244,6 +247,7 @@ impl FaceKind {
             }
         }
     }
+
     pub fn area(&self, vs: &[[F; 3]]) -> F {
         match self {
             &FaceKind::Tri(t) => super::tri_area(t.map(|vi| vs[vi])),

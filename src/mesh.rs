@@ -3,7 +3,7 @@ use super::{add, kmul, sub, FaceKind, F, U};
 
 use std::array::from_fn;
 use std::collections::hash_map::Entry;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::ops::Range;
 
 /// Max number of supported UV channels
@@ -293,7 +293,7 @@ impl Scene {
             let curr_f = out.f.len();
             out.f.extend(m.f.iter().map(|f| {
                 let mut f = f.clone();
-                f.map(|vi| vi + curr_vertex_offset);
+                f.remap(|vi| vi + curr_vertex_offset);
                 f
             }));
             out.face_mesh_idx.extend(m.f.iter().map(|_| mi));
@@ -545,7 +545,7 @@ impl Mesh {
             mat_map[mi].push(self.mat_for_face(fi));
 
             let mut f = f.clone();
-            f.map(|flat_vi| {
+            f.remap(|flat_vi| {
                 let new_vert_ins = || {
                     let vi = mesh.v.len();
                     mesh.v.push(self.v[flat_vi]);
@@ -645,6 +645,48 @@ impl Mesh {
         self.face_mat_idx.append(&mut o.face_mat_idx);
         self.joint_idxs.append(&mut o.joint_idxs);
         self.joint_weights.append(&mut o.joint_weights);
+    }
+
+    /// Deletes vertices present in this mesh, but which are not used in any faces.
+    pub fn delete_unused_vertices(&mut self) -> usize {
+        let curr_len = self.v.len();
+        // use BTreeSet to retain order
+        let mut used: BTreeSet<usize> = BTreeSet::new();
+        for f in &self.f {
+            used.extend(f.as_slice().iter());
+        }
+
+        let mut remap = vec![usize::MAX; self.v.len()];
+        for (new_vi, &og_vi) in used.iter().enumerate() {
+            remap[og_vi] = new_vi;
+        }
+        for f in &mut self.f {
+            f.remap(|vi| remap[vi]);
+        }
+
+        macro_rules! clear_vec {
+            ($vec: expr) => {{
+                let mut i = 0;
+                $vec.retain(|_| {
+                    let keep = used.contains(&i);
+                    i += 1;
+                    keep
+                });
+            }};
+        }
+
+        clear_vec!(&mut self.v);
+        assert_eq!(self.v.len(), used.len());
+
+        clear_vec!(&mut self.n);
+        for i in 0..MAX_UV {
+            clear_vec!(&mut self.uv[i]);
+        }
+        clear_vec!(&mut self.joint_idxs);
+        clear_vec!(&mut self.joint_weights);
+        clear_vec!(&mut self.vert_colors);
+
+        curr_len - used.len()
     }
 }
 
