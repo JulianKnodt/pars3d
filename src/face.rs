@@ -74,6 +74,31 @@ impl FaceKind {
             Self::Poly(p) => FaceKind::Poly(p.into_iter().map(|&v| f(v)).collect()),
         }
     }
+    pub fn from_iter(mut it: impl Iterator<Item = usize>) -> Self {
+        let e0 = it.next();
+        let e1 = it.next();
+        let e2 = it.next();
+        let [e0, e1, e2] = match (e0, e1, e2) {
+            (None, None, None) => return FaceKind::empty(),
+            (Some(e0), None, None) => return FaceKind::Poly(vec![e0]),
+            (Some(e0), Some(e1), None) => return FaceKind::Poly(vec![e0, e1]),
+
+            (Some(e0), Some(e1), Some(e2)) => [e0, e1, e2],
+            (Some(_), None, Some(_)) | (None, Some(_), Some(_) | None) | (None, None, Some(_)) => {
+                unreachable!()
+            }
+        };
+        let q = it.next();
+        let penta = it.next();
+        let mut poly = match (q, penta) {
+            (None, None) => return FaceKind::Tri([e0, e1, e2]),
+            (Some(q), None) => return FaceKind::Quad([e0, e1, e2, q]),
+            (Some(q), Some(p)) => vec![e0, e1, e2, q, p],
+            (None, Some(_)) => unreachable!(),
+        };
+        poly.extend(it);
+        FaceKind::Poly(poly)
+    }
     /// For a quad, returns the edge opposite to the provided edge.
     pub fn quad_opp_edge(&self, e0: usize, e1: usize) -> Option<[usize; 2]> {
         match self {
