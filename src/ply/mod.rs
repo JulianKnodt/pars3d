@@ -13,8 +13,13 @@ pub struct Ply {
     /// Vertex colors
     vc: Vec<[u8; 3]>,
 
+    /// Vertex Normals
     n: Vec<[F; 3]>,
 
+    /// UV coordinates (called st in PLYs for historical reasons)
+    uv: Vec<[F; 2]>,
+
+    /// Faces for this mesh
     f: Vec<FaceKind>,
 }
 
@@ -45,6 +50,8 @@ enum Field {
     NX,
     NY,
     NZ,
+    S,
+    T,
     Red,
     Green,
     Blue,
@@ -53,10 +60,17 @@ enum Field {
 
 impl Ply {
     /// Construct a new PLY mesh, with optional empty vertex colors.
-    pub fn new(v: Vec<[F; 3]>, vc: Vec<[u8; 3]>, n: Vec<[F; 3]>, f: Vec<FaceKind>) -> Self {
+    pub fn new(
+        v: Vec<[F; 3]>,
+        vc: Vec<[u8; 3]>,
+        n: Vec<[F; 3]>,
+        uv: Vec<[F; 2]>,
+        f: Vec<FaceKind>,
+    ) -> Self {
         assert!(vc.is_empty() || v.len() == vc.len());
         assert!(n.is_empty() || n.len() == v.len());
-        Self { v, vc, n, f }
+        assert!(uv.is_empty() || uv.len() == v.len());
+        Self { v, vc, n, uv, f }
     }
 
     pub fn read_from_file(p: impl AsRef<Path>) -> io::Result<Self> {
@@ -70,13 +84,17 @@ impl Ply {
         let mut state = ReadExpect::Header;
         let mut prop_set = vec![];
         let mut fields = vec![];
+
         let mut has_color = false;
         let mut has_normal = false;
+        let mut has_uv = false;
 
         let mut v = vec![];
         let mut vc = vec![];
         let mut n = vec![];
+        let mut uv: Vec<[F; 2]> = vec![];
         let mut f = vec![];
+
         let mut num_v = 0;
         let mut num_f = 0;
         macro_rules! parse_err {
@@ -165,6 +183,9 @@ impl Ply {
                         Some("ny") => Field::NY,
                         Some("nz") => Field::NZ,
 
+                        Some("s") => Field::S,
+                        Some("t") => Field::T,
+
                         Some("red") => Field::Red,
                         Some("green") => Field::Green,
                         Some("blue") => Field::Blue,
@@ -176,15 +197,20 @@ impl Ply {
                     has_color =
                         has_color || matches!(field, Field::Red | Field::Green | Field::Blue);
                     has_normal = has_normal || matches!(field, Field::NX | Field::NY | Field::NZ);
+                    has_uv = has_uv || matches!(field, Field::S | Field::T);
                     VertexProperty
                 }
                 PropertyList => {
-                    let should_match = ["property", "list", "uchar", "int"];
-                    if !l.split_whitespace().take(4).eq(should_match.into_iter()) {
+                    let mut it = l.split_whitespace();
+                    let got = [it.next(), it.next(), it.next(), it.next()];
+                    let should_match = [Some("property"), Some("list"), Some("uchar"), Some("int")];
+                    if got != should_match {
                         return parse_err!(format!(
-                            "Unknown face property list, got {l:?}, expected {should_match:?}"
+                            "Unknown face property list, got {got:?}, expected {should_match:?}"
                         ));
                     }
+                    use std::assert_matches::assert_matches;
+                    assert_matches!(it.next(), Some("vertex_index") | Some("vertex_indices"));
                     EndHeader
                 }
                 EndHeader => {
@@ -192,12 +218,10 @@ impl Ply {
                         return parse_err!("Unknown end of header");
                     }
                     // in theory could match on the beginning of each vertex but lazy
-                    if num_v == 0 && num_f == 0 {
-                        Done
-                    } else if num_v == 0 {
-                        Faces
-                    } else {
-                        Vertices
+                    match (num_v, num_f) {
+                        (0, 0) => Done,
+                        (0, _) => Faces,
+                        _ => Vertices,
                     }
                 }
                 Vertices => {
@@ -206,19 +230,29 @@ impl Ply {
                     let mut xyz = [0.; 3];
                     let mut rgb = [0; 3];
                     let mut nrm = [0.; 3];
+                    let mut uv_ = [0.; 2];
 
                     for (fi, v) in l.split_whitespace().enumerate() {
+                        macro_rules! get {
+                            ($t: ty) => {{
+                                v.parse::<$t>().unwrap()
+                            }};
+                        }
                         match fields[fi] {
-                            Field::X => xyz[0] = v.parse::<F>().unwrap(),
-                            Field::Y => xyz[1] = v.parse::<F>().unwrap(),
-                            Field::Z => xyz[2] = v.parse::<F>().unwrap(),
-                            Field::NX => nrm[0] = v.parse::<F>().unwrap(),
-                            Field::NY => nrm[1] = v.parse::<F>().unwrap(),
-                            Field::NZ => nrm[2] = v.parse::<F>().unwrap(),
+                            Field::X => xyz[0] = get!(F),
+                            Field::Y => xyz[1] = get!(F),
+                            Field::Z => xyz[2] = get!(F),
 
-                            Field::Red => rgb[0] = v.parse::<u8>().unwrap(),
-                            Field::Green => rgb[1] = v.parse::<u8>().unwrap(),
-                            Field::Blue => rgb[2] = v.parse::<u8>().unwrap(),
+                            Field::NX => nrm[0] = get!(F),
+                            Field::NY => nrm[1] = get!(F),
+                            Field::NZ => nrm[2] = get!(F),
+
+                            Field::S => uv_[0] = get!(F),
+                            Field::T => uv_[1] = get!(F),
+
+                            Field::Red => rgb[0] = get!(u8),
+                            Field::Green => rgb[1] = get!(u8),
+                            Field::Blue => rgb[2] = get!(u8),
                             Field::Alpha => continue,
                         }
                     }
@@ -230,11 +264,14 @@ impl Ply {
                     if has_normal {
                         n.push(nrm);
                     }
+                    if has_uv {
+                        uv.push(uv_);
+                    }
 
-                    if num_v == 0 {
-                        Faces
-                    } else {
-                        Vertices
+                    match (num_v, num_f) {
+                        (0, 0) => Done,
+                        (0, _) => Faces,
+                        _ => Vertices,
                     }
                 }
                 Faces => {
@@ -271,7 +308,7 @@ impl Ply {
                 }
             }
         }
-        Ok(Ply { v, vc, n, f })
+        Ok(Ply { v, vc, uv, n, f })
     }
 
     /// Write this Ply file to a mesh.
@@ -293,7 +330,7 @@ impl Ply {
                 "Mismatch between number of vertices and vertex colors"
             );
             for p in ["nx", "ny", "nz"] {
-              writeln!(out, "property float {p}")?;
+                writeln!(out, "property float {p}")?;
             }
         }
 
@@ -304,7 +341,7 @@ impl Ply {
                 "Mismatch between number of vertices and vertex colors"
             );
             for p in ["red", "green", "blue"] {
-              writeln!(out, "property uchar {p}")?;
+                writeln!(out, "property uchar {p}")?;
             }
         }
 

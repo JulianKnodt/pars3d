@@ -32,11 +32,11 @@ fbx::export::export_fbx(fbx_scene, std::io::BufWriter::new(out)).expect("Failed 
 - .obj
 - .glb (with `feature = "gltf"`, binary only)
 - .fbx (experimental export, binary only)
+- .ply (ascii, vertex colors, normals, UV
 
 
 ##### Secondary Support
 - .stl
-- .ply
 - .off
 
 
