@@ -13,6 +13,8 @@ pub struct Ply {
     /// Vertex colors
     vc: Vec<[u8; 3]>,
 
+    n: Vec<[F; 3]>,
+
     f: Vec<FaceKind>,
 }
 
@@ -29,16 +31,20 @@ enum ReadExpect {
     Done,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 enum Type {
     UChar,
     Float,
 }
 
+#[derive(Copy, Clone, PartialEq, Eq)]
 enum Field {
     X,
     Y,
     Z,
+    NX,
+    NY,
+    NZ,
     Red,
     Green,
     Blue,
@@ -47,9 +53,10 @@ enum Field {
 
 impl Ply {
     /// Construct a new PLY mesh, with optional empty vertex colors.
-    pub fn new(v: Vec<[F; 3]>, vc: Vec<[u8; 3]>, f: Vec<FaceKind>) -> Self {
+    pub fn new(v: Vec<[F; 3]>, vc: Vec<[u8; 3]>, n: Vec<[F; 3]>, f: Vec<FaceKind>) -> Self {
         assert!(vc.is_empty() || v.len() == vc.len());
-        Self { v, vc, f }
+        assert!(n.is_empty() || n.len() == v.len());
+        Self { v, vc, n, f }
     }
 
     pub fn read_from_file(p: impl AsRef<Path>) -> io::Result<Self> {
@@ -64,9 +71,11 @@ impl Ply {
         let mut prop_set = vec![];
         let mut fields = vec![];
         let mut has_color = false;
+        let mut has_normal = false;
 
         let mut v = vec![];
         let mut vc = vec![];
+        let mut n = vec![];
         let mut f = vec![];
         let mut num_v = 0;
         let mut num_f = 0;
@@ -138,26 +147,35 @@ impl Ply {
                     if tokens.next() != Some("property") {
                         return parse_err!("Missing 'property'");
                     }
-                    match tokens.next() {
+                    let prop = match tokens.next() {
                         None => return parse_err!("Missing type of property"),
-                        Some("uchar") => prop_set.push(Type::UChar),
-                        Some("float") => prop_set.push(Type::Float),
+                        Some("uchar") => Type::UChar,
+                        Some("float") => Type::Float,
                         Some(_) => return parse_err!("Unknown property kind"),
-                    }
-                    match tokens.next() {
-                        None => return parse_err!("Missing property name"),
-                        Some("x") => fields.push(Field::X),
-                        Some("y") => fields.push(Field::Y),
-                        Some("z") => fields.push(Field::Z),
+                    };
+                    prop_set.push(prop);
 
-                        Some("red") => fields.push(Field::Red),
-                        Some("green") => fields.push(Field::Green),
-                        Some("blue") => fields.push(Field::Blue),
-                        Some("alpha") => fields.push(Field::Alpha),
+                    let field = match tokens.next() {
+                        None => return parse_err!("Missing property name"),
+                        Some("x") => Field::X,
+                        Some("y") => Field::Y,
+                        Some("z") => Field::Z,
+
+                        Some("nx") => Field::NX,
+                        Some("ny") => Field::NY,
+                        Some("nz") => Field::NZ,
+
+                        Some("red") => Field::Red,
+                        Some("green") => Field::Green,
+                        Some("blue") => Field::Blue,
+                        Some("alpha") => Field::Alpha,
+
                         Some(_) => return parse_err!("Unknown property name"),
-                    }
-                    let l = fields.last().unwrap();
-                    has_color = has_color || matches!(l, Field::Red | Field::Green | Field::Blue);
+                    };
+                    fields.push(field);
+                    has_color =
+                        has_color || matches!(field, Field::Red | Field::Green | Field::Blue);
+                    has_normal = has_normal || matches!(field, Field::NX | Field::NY | Field::NZ);
                     VertexProperty
                 }
                 PropertyList => {
@@ -187,12 +205,17 @@ impl Ply {
 
                     let mut xyz = [0.; 3];
                     let mut rgb = [0; 3];
+                    let mut nrm = [0.; 3];
 
                     for (fi, v) in l.split_whitespace().enumerate() {
                         match fields[fi] {
                             Field::X => xyz[0] = v.parse::<F>().unwrap(),
                             Field::Y => xyz[1] = v.parse::<F>().unwrap(),
                             Field::Z => xyz[2] = v.parse::<F>().unwrap(),
+                            Field::NX => nrm[0] = v.parse::<F>().unwrap(),
+                            Field::NY => nrm[1] = v.parse::<F>().unwrap(),
+                            Field::NZ => nrm[2] = v.parse::<F>().unwrap(),
+
                             Field::Red => rgb[0] = v.parse::<u8>().unwrap(),
                             Field::Green => rgb[1] = v.parse::<u8>().unwrap(),
                             Field::Blue => rgb[2] = v.parse::<u8>().unwrap(),
@@ -203,6 +226,9 @@ impl Ply {
                     v.push(xyz);
                     if has_color {
                         vc.push(rgb);
+                    }
+                    if has_normal {
+                        n.push(nrm);
                     }
 
                     if num_v == 0 {
@@ -245,12 +271,13 @@ impl Ply {
                 }
             }
         }
-        Ok(Ply { v, vc, f })
+        Ok(Ply { v, vc, n, f })
     }
 
     /// Write this Ply file to a mesh.
     pub fn write(&self, mut out: impl Write) -> std::io::Result<()> {
         let has_vc = !self.vc.is_empty();
+        let has_n = !self.n.is_empty();
 
         writeln!(out, "ply")?;
         writeln!(out, "format ascii 1.0")?;
@@ -258,15 +285,27 @@ impl Ply {
         writeln!(out, "property float x")?;
         writeln!(out, "property float y")?;
         writeln!(out, "property float z")?;
+
+        if has_n {
+            assert_eq!(
+                self.vc.len(),
+                self.v.len(),
+                "Mismatch between number of vertices and vertex colors"
+            );
+            for p in ["nx", "ny", "nz"] {
+              writeln!(out, "property float {p}")?;
+            }
+        }
+
         if has_vc {
             assert_eq!(
                 self.vc.len(),
                 self.v.len(),
                 "Mismatch between number of vertices and vertex colors"
             );
-            writeln!(out, "property uchar red")?;
-            writeln!(out, "property uchar green")?;
-            writeln!(out, "property uchar blue")?;
+            for p in ["red", "green", "blue"] {
+              writeln!(out, "property uchar {p}")?;
+            }
         }
 
         writeln!(out, "element face {}", self.f.len())?;
@@ -276,6 +315,9 @@ impl Ply {
         for vi in 0..self.v.len() {
             let [x, y, z] = self.v[vi];
             write!(out, "{x} {y} {z}")?;
+            if let Some([nx, ny, nz]) = self.n.get(vi) {
+                write!(out, " {nx} {ny} {nz}")?;
+            }
             if let Some([r, g, b]) = self.vc.get(vi) {
                 write!(out, " {r} {g} {b}")?;
             }
