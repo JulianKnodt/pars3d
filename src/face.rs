@@ -49,8 +49,8 @@ impl<T> FaceKind<T> {
         }
     }
 
-    /// Returns an empty face
-    pub(crate) fn empty() -> Self {
+    /// Returns an empty face. Can be used as a tombstone, or during construction of a face.
+    pub fn empty() -> Self {
         FaceKind::Poly(vec![])
     }
 
