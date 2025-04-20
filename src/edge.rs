@@ -16,9 +16,9 @@ impl EdgeKind {
     }
     pub fn insert(&mut self, v: usize) -> bool {
         let new = match self {
-            EdgeKind::Boundary(f) if *f != v => EdgeKind::Manifold([*f, v]),
-            EdgeKind::Manifold(fs) if !fs.contains(&v) => {
-                EdgeKind::NonManifold(vec![fs[0], fs[1], v])
+            &mut EdgeKind::Boundary(f) if f != v => EdgeKind::Manifold(std::cmp::minmax(f, v)),
+            &mut EdgeKind::Manifold([f0, f1]) if f0 != v && f1 != v => {
+                EdgeKind::NonManifold(vec![f0, f1, v])
             }
             EdgeKind::NonManifold(fs) if !fs.contains(&v) => match fs.len() {
                 0 => EdgeKind::Boundary(v),

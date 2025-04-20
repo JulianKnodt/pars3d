@@ -62,6 +62,28 @@ impl<T> FaceKind<T> {
     pub fn is_quad(&self) -> bool {
         matches!(self, FaceKind::Quad(_))
     }
+
+    /// Returns each edge in this face: [vi0, vi1], [vi1, vi2]... [viN, vi0]
+    pub fn edges(&self) -> impl Iterator<Item = [T; 2]> + '_
+    where
+        T: Copy,
+    {
+        edges(self.as_slice())
+    }
+    #[inline]
+    pub fn shared_edge(&self, o: &Self) -> Option<[T; 2]>
+    where
+        T: Eq + Copy,
+    {
+        for e in self.edges() {
+            for [oe0, oe1] in o.edges() {
+                if e == [oe0, oe1] || e == [oe1, oe0] {
+                    return Some(e);
+                }
+            }
+        }
+        return None;
+    }
 }
 
 impl FaceKind {
@@ -118,11 +140,6 @@ impl FaceKind {
             _ => None,
         }
     }
-
-    /// Returns each edge in this face: [vi0, vi1], [vi1, vi2]... [viN, vi0]
-    pub fn edges(&self) -> impl Iterator<Item = [usize; 2]> + '_ {
-        edges(self.as_slice())
-    }
     /// Returns each edge in sorted order in this face: minmax(vi0, vi1), minmax(vi1, vi2), ...
     pub fn edges_ord(&self) -> impl Iterator<Item = [usize; 2]> + '_ {
         self.edges().map(|[a, b]| std::cmp::minmax(a, b))
@@ -162,6 +179,36 @@ impl FaceKind {
     pub fn remap(&mut self, mut f: impl FnMut(usize) -> usize) {
         for v in self.as_mut_slice() {
             *v = f(*v);
+        }
+    }
+
+    pub fn is_degenerate(&self) -> bool {
+        use FaceKind::*;
+        match self {
+            Tri([a, b, c]) if a == b || b == c || a == c => return true,
+            Tri(_) => false,
+            &Quad([a, b, c, d] | [d, a, b, c] | [c, d, a, b] | [b, c, d, a]) if a == b => {
+                return Self::Tri([a, c, d]).is_degenerate()
+            }
+            Quad(_) => false,
+            Poly(v) => {
+                if v.is_empty() {
+                    return true;
+                }
+                let mut num_uniq = 1;
+                let mut end = v.len() - 1;
+                while end > 0 && v[end] == v[0] {
+                    end -= 1;
+                }
+                let mut prev_value = usize::MAX;
+                for i in 0..end {
+                    if v[i] != prev_value {
+                        num_uniq += 1;
+                    }
+                    prev_value = v[i];
+                }
+                num_uniq > 2
+            }
         }
     }
     /// Canonicalize this face, deleting duplicates and retaining order such that the lowest
