@@ -283,6 +283,9 @@ impl FaceKind {
             &FaceKind::Quad([a, b, c, d]) => cross(sub(v[c], v[a]), sub(v[d], v[b])),
             FaceKind::Poly(vs) => {
                 let n = vs.len();
+                if n == 0 {
+                    return [0.; 3];
+                }
                 let avg = (0..n)
                     .map(|i| {
                         let [p, c, n] = std::array::from_fn(|j| vs[(i + j) % n]);
@@ -403,6 +406,9 @@ impl FaceKind<[F; 3]> {
             &FaceKind::Quad([a, b, c, d]) => cross(sub(c, a), sub(d, b)),
             FaceKind::Poly(vs) => {
                 let n = vs.len();
+                if n == 0 {
+                    return [0.; 3];
+                }
                 let avg = (0..n)
                     .map(|i| {
                         let [p, c, n] = std::array::from_fn(|j| vs[(i + j) % n]);
