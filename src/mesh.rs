@@ -3,7 +3,7 @@ use super::{add, kmul, sub, FaceKind, F, U};
 
 use std::array::from_fn;
 use std::collections::hash_map::Entry;
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::ops::Range;
 
 /// Max number of supported UV channels
@@ -473,7 +473,6 @@ impl Mesh {
         }
     }
     pub fn num_boundary_edges(&self) -> usize {
-        use std::collections::BTreeMap;
         let mut edges: BTreeMap<[usize; 2], u32> = BTreeMap::new();
         for f in &self.f {
             for [e0, e1] in f.edges() {
@@ -482,6 +481,21 @@ impl Mesh {
             }
         }
         edges.values().filter(|&&v| v == 1).count()
+    }
+
+    /// Non-unique iterator over boundary vertices
+    pub fn boundary_vertices(&self) -> impl Iterator<Item = usize> + '_ {
+        let mut edges: BTreeMap<[usize; 2], u32> = BTreeMap::new();
+        for f in &self.f {
+            for [e0, e1] in f.edges() {
+                let cnt = edges.entry(std::cmp::minmax(e0, e1)).or_default();
+                *cnt = *cnt + 1u32;
+            }
+        }
+        edges
+            .into_iter()
+            .filter(|(_, v)| *v == 1)
+            .flat_map(|(k, _)| k.into_iter())
     }
 
     /// Normalize this mesh's geometry to lay within [-1, 1].
@@ -645,6 +659,15 @@ impl Mesh {
         self.face_mat_idx.append(&mut o.face_mat_idx);
         self.joint_idxs.append(&mut o.joint_idxs);
         self.joint_weights.append(&mut o.joint_weights);
+    }
+
+    /// Computes the number of vertices used in this mesh O(|V|).
+    pub fn num_used_vertices(&self) -> usize {
+        let mut used: BTreeSet<usize> = BTreeSet::new();
+        for f in &self.f {
+            used.extend(f.as_slice().iter());
+        }
+        used.len()
     }
 
     /// Deletes vertices present in this mesh, but which are not used in any faces.
