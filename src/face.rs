@@ -364,18 +364,20 @@ pub enum Barycentric {
     /// false if first tri, true if second tri. If not contained in either quad, gives the quad
     /// with the largest minimum value
     Quad(bool, [F; 3]),
-    /*
     /// Index of triangle which contains this barycentric coordinate.
     /// Assumes the input polygon is convex.
-    Poly(usize, [F;3]),
-    */
+    Poly(usize, [F; 3]),
 }
 impl Barycentric {
-    pub fn tri_idx_and_bary(&self) -> (usize, [F;3]) {
+    pub fn tri_idx_and_coords(&self) -> (usize, [F; 3]) {
         match *self {
             Barycentric::Tri(b) => (0, b),
             Barycentric::Quad(f, b) => (f as usize, b),
+            Barycentric::Poly(ti, b) => (ti, b),
         }
+    }
+    pub fn coords(&self) -> [F; 3] {
+        self.tri_idx_and_coords().1
     }
 }
 
@@ -402,9 +404,26 @@ macro_rules! impl_barycentrics {
                         Barycentric::Quad(true, b1)
                     }
                 }
-                FaceKind::Poly(_p) => unimplemented!(),
+                FaceKind::Poly(poly) => {
+                    assert!(!poly.is_empty());
+                    let (i, b, _) = self
+                        .as_triangle_fan()
+                        .enumerate()
+                        .map(|(i, t)| {
+                            let b = $barycentric_fn(p, t);
+                            (i, b, b[0].min(b[1]).min(b[2]))
+                        })
+                        .max_by(|(_, _, a), (_, _, b)| a.partial_cmp(&b).unwrap())
+                        .unwrap();
+
+                    Barycentric::Poly(i, b)
+                }
             }
         }
+        /// If it is known that this is a tri, can be used more efficiently than generic
+        /// `from_barycentric`.
+        ///
+        /// Panics if this is not a tri.
         pub fn from_barycentric_tri(&self, [b0, b1, b2]: [F; 3]) -> [F; $dim] {
             let &FaceKind::Tri([a, b, c]) = self else {
                 panic!("FaceKind::from_barycentric_tri requires tri, got {self:?}",);
@@ -413,7 +432,7 @@ macro_rules! impl_barycentrics {
         }
 
         pub fn from_barycentric(&self, b: Barycentric) -> [F; $dim] {
-            let (tri_idx, b) = b.tri_idx_and_bary();
+            let (tri_idx, b) = b.tri_idx_and_coords();
             let t = self.as_triangle_fan().nth(tri_idx).unwrap();
             t.iter()
                 .enumerate()
