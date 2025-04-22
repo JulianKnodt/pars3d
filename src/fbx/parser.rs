@@ -659,7 +659,10 @@ impl KVs {
               Data::F64(_), Data::F64(_)
             ] | [
               Data::String(_), Data::String(_), Data::String(_), Data::String(_),
-            ]=> |c: usize| {
+            ] | &[
+              Data::String(_), Data::String(_), Data::String(_), Data::String(_),
+              Data::F64(_), Data::F64(_), Data::F64(_), Data::F64(_)
+            ] => |c: usize| {
               let kv = &self.kvs[c];
               match kv.values[0].as_str().unwrap() {
                 "Diffuse" | "DiffuseColor" => out.diffuse_color = [4,5,6].map(
@@ -693,6 +696,7 @@ impl KVs {
 
                 // monopoly powers
                 x if x.starts_with("Maya") => {},
+                x if x.starts_with("3ds") => {},
 
                 x => todo_if_strict!("Unknown material property {x:?}"),
               }
@@ -1594,7 +1598,8 @@ impl KVs {
                   "FbxVideo" | "FbxAnimCurveNode" | "FbxFileTexture" | "FbxBindingTable" |
                   "FbxImplementation" | "FbxNull" | "FbxSurfaceLambert" | "FbxAnimLayer" |
                   "FbxAnimStack" | "FbxCamera" | "FbxMesh" | "FbxNode" | "FbxSurfacePhong" |
-                  "FbxDisplayLayer" | "FbxLayeredTexture" | "FbxLight" | "FbxSkeleton"
+                  "FbxDisplayLayer" | "FbxLayeredTexture" | "FbxLight" | "FbxSkeleton" |
+                  "FbxSurfaceMaterial"
                 );
                 match_children!(self, c,
                   "Properties70", &[] => |c| match_children!(self, c,
@@ -1670,6 +1675,10 @@ impl KVs {
                         ("FbxSurfaceLambert", "Bump" | "NormalMap" | "BumpFactor") => {}
                         ("FbxSurfaceLambert", _) => {},
 
+                        // SurfaceMaterial
+                        ("FbxSurfaceMaterial", "ShadingModel") => {},
+                        ("FbxSurfaceMaterial", "MultiLayer") => {},
+
                         // "Video"
                         ("FbxVideo", "Width" | "Height") => {},
                         ("FbxVideo", "Path" | "AccessMode") => {},
@@ -1694,6 +1703,18 @@ impl KVs {
 
                         // "AnimationCurveNode"
                         ("FbxAnimCurveNode", "d") => {},
+
+                        // Implementation
+                        ("FbxImplementation", "ShaderLanguage") => {},
+                        ("FbxImplementation", "ShaderLanguageVersion") => {},
+                        ("FbxImplementation", "RenderAPI") => {},
+                        ("FbxImplementation", "RenderAPIVersion") => {},
+                        ("FbxImplementation", "RootBindingName" | "Constants") => {},
+
+                        // BindingTable
+                        ("FbxBindingTable", "TargetName" | "TargetType")  => {},
+                        ("FbxBindingTable", "CodeAbsoluteURL" | "CodeRelativeURL" | "CodeTAG")  => {},
+                        ("FbxBindingTable", "DescAbsoluteURL" | "DescRelativeURL" | "DescTAG")  => {},
 
                         (_, p) => todo_if_strict!("{ty} {p:?} {vals:?}"),
                       }
@@ -1973,5 +1994,5 @@ fn test_parse_fbx() {
     let tokens = tokenize_binary(BufReader::new(f)).expect("Failed to tokenize FBX");
     let kvs = parse_tokens(tokens.into_iter());
 
-    let scene = kvs.to_scene();
+    let _scene = kvs.to_scene();
 }

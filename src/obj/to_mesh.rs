@@ -30,6 +30,9 @@ impl From<ObjObject> for Mesh {
         let mut uv = vec![];
         let mut n = vec![];
 
+        let must_match_uvs = obj.f.iter().any(|f| !f.vt.is_empty());
+        let must_match_nrm = obj.f.iter().any(|f| !f.vn.is_empty());
+
         for f in obj.f.into_iter() {
             if f.v.len() < 3 {
                 continue;
@@ -48,12 +51,16 @@ impl From<ObjObject> for Mesh {
                 let key = key_i!(i);
                 if !verts.contains_key(&key) {
                     v.push(obj.v[f.v[i]]);
-                    if let Some(_vt) = key.1 {
-                        uv.push(obj.vt[*f.vt.get(i).unwrap()]);
-                    };
+                    if let Some(vt) = key.1 {
+                        uv.push(obj.vt[vt]);
+                    } else if must_match_uvs {
+                        uv.push([0.; 2]);
+                    }
                     if let Some(&vn) = f.vn.get(i) {
                         n.push(obj.vn[vn]);
-                    };
+                    } else if must_match_nrm {
+                        n.push([0.; 3]);
+                    }
                     verts.insert(key, verts.len());
                 }
             }

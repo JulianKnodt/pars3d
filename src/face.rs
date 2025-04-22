@@ -92,6 +92,25 @@ impl<T> FaceKind<T> {
         let (&v0, rest) = self.as_slice().split_first().unwrap();
         rest.array_windows::<2>().map(move |&[v1, v2]| [v0, v1, v2])
     }
+    /// Iterates over all possible triangles rooted at each index.
+    pub fn all_triangle_splits(&self) -> impl Iterator<Item = [T; 3]> + '_
+    where
+        T: Copy,
+    {
+        let s = self.as_slice();
+        let num_vi = s.len();
+        (0..num_vi).flat_map(move |v0| {
+            ((v0 + 1)..num_vi).filter_map(move |v1| {
+                let n = (v1 + 1) % num_vi;
+                if v1 <= v0 || n + (num_vi - 3) < v0 || n == v0 {
+                    return None;
+                }
+                assert_ne!(v0, v1);
+                assert_ne!(v0, n, "{v0} {v1} {n}");
+                Some([v0, v1, n].map(|i| s[i]))
+            })
+        })
+    }
 }
 
 impl FaceKind {
@@ -253,6 +272,11 @@ impl FaceKind {
             .unwrap()
             .0;
         self.as_mut_slice().rotate_left(min_idx);
+        *self = match self.as_slice() {
+            &[a, b, c] => Self::Tri([a, b, c]),
+            &[a, b, c, d] => Self::Quad([a, b, c, d]),
+            _ => return false,
+        };
         false
     }
     pub(crate) fn insert(&mut self, v: usize) {
@@ -393,16 +417,17 @@ macro_rules! impl_barycentrics {
         pub fn barycentric(&self, p: [F; $dim]) -> Barycentric {
             match self {
                 &FaceKind::Tri(t) => Barycentric::Tri($barycentric_fn(p, t)),
-                &FaceKind::Quad([a, b, c, d]) => {
-                    let b0 @ [b00, b01, b02] = $barycentric_fn(p, [a, b, c]);
-                    let b1 @ [b10, b11, b12] = $barycentric_fn(p, [a, c, d]);
-                    let b0_min = b00.min(b01).min(b02);
-                    let b1_min = b10.min(b11).min(b12);
-                    if b0_min > b1_min {
-                        Barycentric::Quad(false, b0)
-                    } else {
-                        Barycentric::Quad(true, b1)
-                    }
+                &FaceKind::Quad(_) => {
+                    let (i, b, _) = self
+                        .as_triangle_fan()
+                        .enumerate()
+                        .map(|(i, t)| {
+                            let b = $barycentric_fn(p, t);
+                            (i, b, b[0].min(b[1]).min(b[2]))
+                        })
+                        .max_by(|(_, _, a), (_, _, b)| a.partial_cmp(&b).unwrap())
+                        .unwrap();
+                    Barycentric::Quad(i == 1, b)
                 }
                 FaceKind::Poly(poly) => {
                     assert!(!poly.is_empty());
@@ -565,4 +590,23 @@ fn test_normal_orientation() {
     let p = FaceKind::Poly(vec![0, 1, 2, 3, 4]);
     let d = dot(t.normal_with(|vi| vs[vi]), p.normal_with(|vi| vs[vi]));
     assert!(d > 0., "{d}");
+}
+
+#[test]
+fn test_all_tri_splits_quad() {
+    let q = FaceKind::Quad([0, 1, 2, 3]);
+    assert_eq!(
+        q.all_triangle_splits().count(),
+        4,
+        "{:?}",
+        q.all_triangle_splits().collect::<Vec<_>>()
+    );
+
+    let p = FaceKind::Poly(vec![0,1,2,3,4]);
+    assert_eq!(
+        p.all_triangle_splits().count(),
+        8,
+        "{:?}",
+        p.all_triangle_splits().collect::<Vec<_>>()
+    );
 }

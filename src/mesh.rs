@@ -1,5 +1,5 @@
 use super::anim::Animation;
-use super::{add, kmul, sub, FaceKind, F, U};
+use super::{add, cross, dot, kmul, normalize, sub, FaceKind, F, U};
 
 use std::array::from_fn;
 use std::collections::hash_map::Entry;
@@ -429,6 +429,38 @@ impl Mesh {
                 .chain(std::iter::once([*f_sl.last().unwrap(), f_sl[0]]))
                 .map(move |e| (e, fi))
         })
+    }
+    /// Splits non-planar faces into tris. Returns number of faces split.
+    pub fn split_non_planar_faces(&mut self, eps: F) -> usize {
+        assert!(eps > 0.);
+        let mut num_split = 0;
+        let m1eps = 1. - eps;
+        let curr_f = self.f.len();
+        for fi in 0..curr_f {
+            if self.f[fi].is_tri() {
+                continue;
+            }
+            let mut tri_fan = self.f[fi].as_triangle_fan();
+            let Some(t0) = tri_fan.next() else {
+                continue;
+            };
+            let get_normal = |t: [usize; 3]| {
+                let [v0, v1, v2] = t.map(|vi| self.v[vi]);
+                normalize(cross(sub(v2, v0), sub(v1, v0)))
+            };
+            let n0 = get_normal(t0);
+            let non_planar = tri_fan.any(|t| dot(get_normal(t), n0) < m1eps);
+            if !non_planar {
+                continue;
+            }
+            drop(tri_fan); // not sure why this is explicitly needed
+            let prev = std::mem::replace(&mut self.f[fi], FaceKind::empty());
+            let mut tris = prev.as_triangle_fan();
+            self.f[fi] = FaceKind::Tri(tris.next().unwrap());
+            self.f.extend(tris.map(FaceKind::Tri));
+            num_split += 1;
+        }
+        num_split
     }
     /// Returns the material for a given face if any.
     pub fn mat_for_face(&self, fi: usize) -> Option<usize> {

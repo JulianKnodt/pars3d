@@ -201,8 +201,12 @@ pub(crate) fn normalize<const N: usize>(v: [F; N]) -> [F; N] {
     v.map(|v| v / s)
 }
 
-pub(crate) fn dot([a, b, c]: [F; 3], [x, y, z]: [F; 3]) -> F {
-    a * x + b * y + c * z
+pub(crate) fn dot<const N: usize>(a: [F; N], b: [F; N]) -> F {
+    let mut out = 0.;
+    for i in 0..N {
+        out += a[i] * b[i];
+    }
+    out
 }
 
 pub(crate) fn append_one([a, b, c]: [F; 3]) -> [F; 4] {
@@ -229,16 +233,26 @@ pub fn ln_tri_area([a, b, c]: [[F; 3]; 3]) -> F {
 
 /// Given a triangle in 2d and a point p, compute the barycentric coordinate of point `p`.
 pub fn barycentric_2d(p: [F; 2], [a, b, c]: [[F; 2]; 3]) -> [F; 3] {
-    let a2 = tri_area_2d([a, b, p]);
-    let a1 = tri_area_2d([a, p, c]);
-    let a0 = tri_area_2d([p, b, c]);
+    barycentric_n(p, a, b, c)
+}
 
-    let total_area = a0 + a1 + a2;
-    if total_area.abs() < 1e-12 {
+#[inline]
+pub fn barycentric_n<const N: usize>(p: [F; N], a: [F; N], b: [F; N], c: [F; N]) -> [F; 3] {
+    let v0 = sub(b, a);
+    let v1 = sub(c, a);
+    let v2 = sub(p, a);
+    let d00 = dot(v0, v0);
+    let d01 = dot(v0, v1);
+    let d11 = dot(v1, v1);
+    let d20 = dot(v2, v0);
+    let d21 = dot(v2, v1);
+    let denom = d00 * d11 - d01 * d01;
+    if denom.abs() < 1e-20 {
         return [1., 0., 0.];
     }
-
-    [a0, a1, a2].map(|v| v / total_area)
+    let v = (d11 * d20 - d01 * d21) / denom;
+    let w = (d00 * d21 - d01 * d20) / denom;
+    [1.0 - v - w, v, w]
 }
 
 #[test]
@@ -251,16 +265,7 @@ fn test_bary_2d() {
 }
 
 pub fn barycentric_3d(p: [F; 3], [a, b, c]: [[F; 3]; 3]) -> [F; 3] {
-    let a2 = tri_area([a, b, p]);
-    let a1 = tri_area([a, p, c]);
-    let a0 = tri_area([p, b, c]);
-
-    let total_area = a0 + a1 + a2;
-    if total_area.abs() < 1e-12 {
-        return [1., 0., 0.];
-    }
-
-    [a0, a1, a2].map(|v| v / total_area)
+    barycentric_n(p, a, b, c)
 }
 
 #[test]
