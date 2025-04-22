@@ -472,7 +472,8 @@ impl Mesh {
             self.f.extend(f.as_triangle_fan().map(FaceKind::Tri));
         }
     }
-    pub fn num_boundary_edges(&self) -> usize {
+    /// Returns (#Boundary Edges, #Manifold Edges, #Nonmanifold Edges)
+    pub fn num_edge_kinds(&self) -> (usize, usize, usize) {
         let mut edges: BTreeMap<[usize; 2], u32> = BTreeMap::new();
         for f in &self.f {
             for [e0, e1] in f.edges() {
@@ -480,7 +481,21 @@ impl Mesh {
                 *cnt = *cnt + 1u32;
             }
         }
-        edges.values().filter(|&&v| v == 1).count()
+        let mut num_bd = 0;
+        let mut num_manifold = 0;
+        let mut num_nonmanifold = 0;
+        for v in edges.values() {
+            let cnt = match v {
+                1 => &mut num_bd,
+                2 => &mut num_manifold,
+                _ => &mut num_nonmanifold,
+            };
+            *cnt += 1;
+        }
+        (num_bd, num_manifold, num_nonmanifold)
+    }
+    pub fn num_boundary_edges(&self) -> usize {
+        self.num_edge_kinds().0
     }
 
     /// Non-unique iterator over boundary vertices

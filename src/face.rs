@@ -144,6 +144,12 @@ impl FaceKind {
     pub fn edges_ord(&self) -> impl Iterator<Item = [usize; 2]> + '_ {
         self.edges().map(|[a, b]| std::cmp::minmax(a, b))
     }
+    pub fn all_pairs_ord(&self) -> impl Iterator<Item = [usize; 2]> + '_ {
+        let s = self.as_slice();
+        s.iter()
+            .enumerate()
+            .flat_map(|(i, &v0)| s[(i + 1)..].iter().map(move |&v1| std::cmp::minmax(v0, v1)))
+    }
 
     /// Returns indices of each edge in this face:
     /// [0, 1], [1, 2]... [N, 0]
@@ -290,6 +296,27 @@ impl FaceKind {
                     .map(|i| {
                         let [p, c, n] = std::array::from_fn(|j| vs[(i + j) % n]);
                         cross(sub(v[n], v[c]), sub(v[p], v[c]))
+                    })
+                    .reduce(add)
+                    .unwrap();
+                kmul(1. / (n + 2) as F, avg)
+            }
+        }
+    }
+
+    pub fn normal_with(&self, v: impl Fn(usize) -> [F; 3]) -> [F; 3] {
+        match self {
+            &FaceKind::Tri([a, b, c]) => cross(sub(v(b), v(a)), sub(v(b), v(c))),
+            &FaceKind::Quad([a, b, c, d]) => cross(sub(v(c), v(a)), sub(v(d), v(b))),
+            FaceKind::Poly(vs) => {
+                let n = vs.len();
+                if n == 0 {
+                    return [0.; 3];
+                }
+                let avg = (0..n)
+                    .map(|i| {
+                        let [p, c, n] = std::array::from_fn(|j| vs[(i + j) % n]);
+                        cross(sub(v(n), v(c)), sub(v(p), v(c)))
                     })
                     .reduce(add)
                     .unwrap();
