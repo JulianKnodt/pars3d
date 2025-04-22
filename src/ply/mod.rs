@@ -387,6 +387,8 @@ fn test_ply_write() {
         let ply = Ply::new(
             vec![[0., 0., 0.], [1., 0., 0.], [0., 1., 0.]],
             vec![[255, 0, 0], [0, 255, 0], [0, 0, 255]],
+            vec![],
+            vec![],
             vec![FaceKind::Tri([0, 1, 2])],
         );
         ply.write(f).unwrap();

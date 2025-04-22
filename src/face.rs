@@ -84,6 +84,14 @@ impl<T> FaceKind<T> {
         }
         return None;
     }
+    /// Iterate over triangles in this face rooted at the 0th index.
+    pub fn as_triangle_fan(&self) -> impl Iterator<Item = [T; 3]> + '_
+    where
+        T: Copy,
+    {
+        let (&v0, rest) = self.as_slice().split_first().unwrap();
+        rest.array_windows::<2>().map(move |&[v1, v2]| [v0, v1, v2])
+    }
 }
 
 impl FaceKind {
@@ -174,11 +182,6 @@ impl FaceKind {
         } else {
             f[pos_v - 1]
         }
-    }
-    /// Iterate over triangles in this face rooted at the 0th index.
-    pub fn as_triangle_fan(&self) -> impl Iterator<Item = [usize; 3]> + '_ {
-        let (&v0, rest) = self.as_slice().split_first().unwrap();
-        rest.array_windows::<2>().map(move |&[v1, v2]| [v0, v1, v2])
     }
 
     /// Remaps each vertex in this face.
@@ -283,32 +286,17 @@ impl FaceKind {
             }
         }
     }
-    /// The non-normalized normal of this face.
+    /// The non-normalized normal of this face, using the given set of points
     pub fn normal(&self, v: &[[F; 3]]) -> [F; 3] {
-        match self {
-            &FaceKind::Tri([a, b, c]) => cross(sub(v[b], v[a]), sub(v[b], v[c])),
-            &FaceKind::Quad([a, b, c, d]) => cross(sub(v[c], v[a]), sub(v[d], v[b])),
-            FaceKind::Poly(vs) => {
-                let n = vs.len();
-                if n == 0 {
-                    return [0.; 3];
-                }
-                let avg = (0..n)
-                    .map(|i| {
-                        let [p, c, n] = std::array::from_fn(|j| vs[(i + j) % n]);
-                        cross(sub(v[n], v[c]), sub(v[p], v[c]))
-                    })
-                    .reduce(add)
-                    .unwrap();
-                kmul(1. / (n + 2) as F, avg)
-            }
-        }
+        self.normal_with(|vi| v[vi])
     }
 
+    /// The non-normalized normal of this face, using the provided function for each vertex's
+    /// position.
     pub fn normal_with(&self, v: impl Fn(usize) -> [F; 3]) -> [F; 3] {
         match self {
             &FaceKind::Tri([a, b, c]) => cross(sub(v(b), v(a)), sub(v(b), v(c))),
-            &FaceKind::Quad([a, b, c, d]) => cross(sub(v(c), v(a)), sub(v(d), v(b))),
+            &FaceKind::Quad([a, b, c, d]) => cross(sub(v(d), v(b)), sub(v(c), v(a))),
             FaceKind::Poly(vs) => {
                 let n = vs.len();
                 if n == 0 {
@@ -321,7 +309,7 @@ impl FaceKind {
                     })
                     .reduce(add)
                     .unwrap();
-                kmul(1. / (n + 2) as F, avg)
+                kmul(-1. / (n + 2) as F, avg)
             }
         }
     }
@@ -369,25 +357,74 @@ impl From<Vec<usize>> for FaceKind {
     }
 }
 
-impl FaceKind<[F; 2]> {
-    /// Computes the barycentric coordinate of a 2D point p.
-    pub fn barycentric(&self, p: [F; 2]) -> [F; 3] {
-        match self {
-            FaceKind::Tri(t) => barycentric_2d(p, *t),
-            FaceKind::Quad(_) => todo!(),
-            FaceKind::Poly(_p) => unimplemented!(),
+/// A barycentric coordinate on a given face, may be a tri, quad or (TODO) polygon,
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub enum Barycentric {
+    Tri([F; 3]),
+    /// false if first tri, true if second tri. If not contained in either quad, gives the quad
+    /// with the largest minimum value
+    Quad(bool, [F; 3]),
+    /*
+    /// Index of triangle which contains this barycentric coordinate.
+    /// Assumes the input polygon is convex.
+    Poly(usize, [F;3]),
+    */
+}
+impl Barycentric {
+    pub fn tri_idx_and_bary(&self) -> (usize, [F;3]) {
+        match *self {
+            Barycentric::Tri(b) => (0, b),
+            Barycentric::Quad(f, b) => (f as usize, b),
         }
     }
-    pub fn from_barycentric(&self, bs: [F; 3]) -> [F; 2] {
-        match self {
-            FaceKind::Tri(ps) => ps
-                .iter()
+}
+
+macro_rules! impl_barycentrics {
+    ($barycentric_fn: tt, $dim: tt) => {
+        pub fn barycentric_tri(&self, p: [F; $dim]) -> [F; 3] {
+            let &FaceKind::Tri(t) = self else {
+                panic!("FaceKind::barycentric_tri requires tri, got {self:?}");
+            };
+            $barycentric_fn(p, t)
+        }
+        /// Computes the barycentric coordinate of a 2D point p.
+        pub fn barycentric(&self, p: [F; $dim]) -> Barycentric {
+            match self {
+                &FaceKind::Tri(t) => Barycentric::Tri($barycentric_fn(p, t)),
+                &FaceKind::Quad([a, b, c, d]) => {
+                    let b0 @ [b00, b01, b02] = $barycentric_fn(p, [a, b, c]);
+                    let b1 @ [b10, b11, b12] = $barycentric_fn(p, [a, c, d]);
+                    let b0_min = b00.min(b01).min(b02);
+                    let b1_min = b10.min(b11).min(b12);
+                    if b0_min > b1_min {
+                        Barycentric::Quad(false, b0)
+                    } else {
+                        Barycentric::Quad(true, b1)
+                    }
+                }
+                FaceKind::Poly(_p) => unimplemented!(),
+            }
+        }
+        pub fn from_barycentric_tri(&self, [b0, b1, b2]: [F; 3]) -> [F; $dim] {
+            let &FaceKind::Tri([a, b, c]) = self else {
+                panic!("FaceKind::from_barycentric_tri requires tri, got {self:?}",);
+            };
+            add(kmul(b0, a), add(kmul(b1, b), kmul(b2, c)))
+        }
+
+        pub fn from_barycentric(&self, b: Barycentric) -> [F; $dim] {
+            let (tri_idx, b) = b.tri_idx_and_bary();
+            let t = self.as_triangle_fan().nth(tri_idx).unwrap();
+            t.iter()
                 .enumerate()
-                .fold([0., 0.], |acc, (i, n)| add(acc, kmul(bs[i], *n))),
-            FaceKind::Quad(_) => todo!(),
-            FaceKind::Poly(_) => unimplemented!(),
+                .map(|(i, n)| kmul(b[i], *n))
+                .fold([0.; _], add)
         }
-    }
+    };
+}
+
+impl FaceKind<[F; 2]> {
+    impl_barycentrics!(barycentric_2d, 2);
     pub fn scale_by(&mut self, x: F, y: F) {
         for p in self.as_mut_slice() {
             p[0] *= x;
@@ -410,28 +447,13 @@ impl FaceKind<[F; 2]> {
 }
 
 impl FaceKind<[F; 3]> {
-    pub fn barycentric(&self, p: [F; 3]) -> [F; 3] {
-        match self {
-            FaceKind::Tri(t) => barycentric_3d(p, *t),
-            FaceKind::Quad(_) => todo!(),
-            FaceKind::Poly(_p) => unimplemented!(),
-        }
-    }
-    pub fn from_barycentric(&self, bs: [F; 3]) -> [F; 3] {
-        match self {
-            FaceKind::Tri(ps) => ps
-                .iter()
-                .enumerate()
-                .fold([0.; 3], |acc, (i, n)| add(acc, kmul(bs[i], *n))),
-            FaceKind::Quad(_) => todo!(),
-            FaceKind::Poly(_) => unimplemented!(),
-        }
-    }
+    impl_barycentrics!(barycentric_3d, 3);
+
     /// The non-normalized normal of this face.
     pub fn normal(&self) -> [F; 3] {
         match self {
             &FaceKind::Tri([a, b, c]) => cross(sub(b, a), sub(b, c)),
-            &FaceKind::Quad([a, b, c, d]) => cross(sub(c, a), sub(d, b)),
+            &FaceKind::Quad([a, b, c, d]) => cross(sub(d, b), sub(c, a)),
             FaceKind::Poly(vs) => {
                 let n = vs.len();
                 if n == 0 {
@@ -444,7 +466,7 @@ impl FaceKind<[F; 3]> {
                     })
                     .reduce(add)
                     .unwrap();
-                kmul(1. / (n + 2) as F, avg)
+                kmul(-1. / (n + 2) as F, avg)
             }
         }
     }
@@ -476,4 +498,52 @@ impl FaceKind<[F; 3]> {
         };
         None
     }
+}
+
+#[test]
+fn test_normal_orientation() {
+    // T = [F; 3]
+    use super::dot;
+    let t = FaceKind::Tri([[0., 0., 0.], [1., 0., 0.], [1., 1., 0.]]);
+    let q = FaceKind::Quad([[0., 0., 0.], [1., 0., 0.], [1., 1., 0.], [0., 1., 0.]]);
+    let d = dot(t.normal(), q.normal());
+    assert!(d > 0., "{d}");
+    let p = FaceKind::Poly(vec![
+        [0., 0., 0.],
+        [1., 0., 0.],
+        [1., 1., 0.],
+        [0., 1., 0.],
+        [-0.1, 0.5, 0.],
+    ]);
+    let d = dot(t.normal(), p.normal());
+    assert!(d > 0., "{d}");
+
+    // T = [F; 2]
+    let t = FaceKind::Tri([[0., 0.], [1., 0.], [1., 1.]]);
+    let q = FaceKind::Quad([[0., 0.], [1., 0.], [1., 1.], [0., 1.]]);
+    assert_eq!(t.area().signum(), q.area().signum());
+    // No check for polygons yet
+
+    // Indexed
+    let vs = [
+        [0., 0., 0.],
+        [1., 0., 0.],
+        [1., 1., 0.],
+        [0., 1., 0.],
+        [-0.1, 0.5, 0.],
+    ];
+    let t = FaceKind::Tri([0, 1, 2]);
+    let q = FaceKind::Quad([0, 1, 2, 3]);
+    let d = dot(t.normal(&vs), q.normal(&vs));
+    assert!(d > 0., "{d}");
+    let p = FaceKind::Poly(vec![0, 1, 2, 3, 4]);
+    let d = dot(t.normal(&vs), p.normal(&vs));
+    assert!(d > 0., "{d}");
+
+    // Closure fn
+    let d = dot(t.normal_with(|vi| vs[vi]), q.normal_with(|vi| vs[vi]));
+    assert!(d > 0., "{d}");
+    let p = FaceKind::Poly(vec![0, 1, 2, 3, 4]);
+    let d = dot(t.normal_with(|vi| vs[vi]), p.normal_with(|vi| vs[vi]));
+    assert!(d > 0., "{d}");
 }

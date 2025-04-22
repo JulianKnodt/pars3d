@@ -183,7 +183,7 @@ pub(crate) fn tri_area_2d([a, b, c]: [[F; 2]; 3]) -> F {
 }
 
 pub(crate) fn quad_area_2d([a, b, c, d]: [[F; 2]; 4]) -> F {
-    cross_2d(sub(b, d), sub(a, c)) / 2.
+    cross_2d(sub(a, c), sub(b, d)) / 2.
 }
 
 pub fn length<const N: usize>(v: [F; N]) -> F {
@@ -210,7 +210,7 @@ pub(crate) fn append_one([a, b, c]: [F; 3]) -> [F; 4] {
 }
 
 pub fn quad_area([a, b, c, d]: [[F; 3]; 4]) -> F {
-    0.5 * length(cross(sub(a, c), sub(b, d)))
+    0.5 * length(cross(sub(b, d), sub(a, c)))
 }
 
 pub fn tri_area([a, b, c]: [[F; 3]; 3]) -> F {

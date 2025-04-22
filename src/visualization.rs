@@ -320,7 +320,7 @@ fn test_edge_vis() {
 
     let fs = fs.into_iter().map(super::FaceKind::Tri).collect::<Vec<_>>();
 
-    let ply = Ply::new(vs, vc, fs);
+    let ply = Ply::new(vs, vc, vec![], vec![], fs);
     use std::fs::File;
     let f = File::create("edge_vis.ply").unwrap();
     ply.write(f).unwrap();
@@ -348,7 +348,7 @@ fn test_raw_edge_vis() {
         .map(super::FaceKind::Quad)
         .collect::<Vec<_>>();
 
-    let ply = Ply::new(vs, vc, fs);
+    let ply = Ply::new(vs, vc, vec![], vec![], fs);
     use std::fs::File;
     let f = File::create("raw_edge_vis.ply").unwrap();
     ply.write(f).unwrap();
