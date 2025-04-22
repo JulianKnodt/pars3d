@@ -196,6 +196,7 @@ impl FaceKind {
             &Quad([a, b, c, d] | [d, a, b, c] | [c, d, a, b] | [b, c, d, a]) if a == b => {
                 return Self::Tri([a, c, d]).is_degenerate()
             }
+            &Quad([a, _, c, _] | [_, a, _, c]) if a == c => return true,
             Quad(_) => false,
             Poly(v) => {
                 if v.is_empty() {
