@@ -1654,6 +1654,11 @@ impl KVs {
                         ("FbxNode", "Lcl Rotation") => {},
                         ("FbxNode", "Lcl Scaling") => {},
 
+                        // Skeleton
+                        ("FbxSkeleton", "Color") => {},
+                        ("FbxSkeleton", "Size") => {},
+                        ("FbxSkeleton", "LimbLength") => {},
+
                         // "Material" properties
                         ("FbxSurfacePhong", _) => {},
                         // "Texture"
