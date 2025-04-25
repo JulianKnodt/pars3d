@@ -325,7 +325,7 @@ impl Ply {
 
         if has_n {
             assert_eq!(
-                self.vc.len(),
+                self.n.len(),
                 self.v.len(),
                 "Mismatch between number of vertices and vertex colors"
             );
