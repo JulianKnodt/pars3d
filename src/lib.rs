@@ -68,11 +68,14 @@ pub mod gltf;
 /// Animation related structs
 pub mod anim;
 
-/// Unified mesh representation.
+/// Unified mesh representation
 pub mod mesh;
 
 /// Edge representations
 pub mod edge;
+
+/// Vertex Adjacency utilities
+pub mod adjacency;
 
 pub use mesh::Mesh;
 pub use mesh::Scene;
