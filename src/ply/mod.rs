@@ -315,6 +315,7 @@ impl Ply {
     pub fn write(&self, mut out: impl Write) -> std::io::Result<()> {
         let has_vc = !self.vc.is_empty();
         let has_n = !self.n.is_empty();
+        let has_uv = !self.uv.is_empty();
 
         writeln!(out, "ply")?;
         writeln!(out, "format ascii 1.0")?;
@@ -327,9 +328,19 @@ impl Ply {
             assert_eq!(
                 self.n.len(),
                 self.v.len(),
-                "Mismatch between number of vertices and vertex colors"
+                "Mismatch between #vertices and #normals"
             );
             for p in ["nx", "ny", "nz"] {
+                writeln!(out, "property float {p}")?;
+            }
+        }
+        if has_uv {
+            assert_eq!(
+                self.uv.len(),
+                self.v.len(),
+                "Mismatch between #uv and #vertices",
+            );
+            for p in ["s", "t"] {
                 writeln!(out, "property float {p}")?;
             }
         }
@@ -338,7 +349,7 @@ impl Ply {
             assert_eq!(
                 self.vc.len(),
                 self.v.len(),
-                "Mismatch between number of vertices and vertex colors"
+                "Mismatch between #vertices and #vertex colors"
             );
             for p in ["red", "green", "blue"] {
                 writeln!(out, "property uchar {p}")?;
@@ -354,6 +365,9 @@ impl Ply {
             write!(out, "{x} {y} {z}")?;
             if let Some([nx, ny, nz]) = self.n.get(vi) {
                 write!(out, " {nx} {ny} {nz}")?;
+            }
+            if let Some([u, v]) = self.uv.get(vi) {
+                write!(out, " {u} {v}")?;
             }
             if let Some([r, g, b]) = self.vc.get(vi) {
                 write!(out, " {r} {g} {b}")?;
