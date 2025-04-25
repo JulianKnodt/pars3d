@@ -651,6 +651,7 @@ impl Mesh {
     }
 
     /// Strips all non-geometry attributes from this mesh, leaving only the geometry.
+    /// Note that vertices at identical positions will be unified.
     pub fn geometry_only(&mut self) {
         let v = std::mem::take(&mut self.v);
 

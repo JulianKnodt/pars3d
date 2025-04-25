@@ -252,9 +252,11 @@ impl FaceKind {
                 *self = Self::Tri([a, c, d]);
                 return self.canonicalize();
             }
+            &mut Quad([a, _, c, _] | [_, a, _, c]) if a == c => return true,
             Quad(_) => {}
             Poly(ref mut v) => {
                 v.dedup();
+                // TODO here also needs to handle the case where repeats are separated by 1.
                 while !v.is_empty() && v.last() == v.first() {
                     v.pop();
                 }
@@ -331,8 +333,7 @@ impl FaceKind {
                         let [p, c, n] = std::array::from_fn(|j| vs[(i + j) % n]);
                         cross(sub(v(n), v(c)), sub(v(p), v(c)))
                     })
-                    .reduce(add)
-                    .unwrap();
+                    .fold([0.; 3], add);
                 kmul(-1. / (n + 2) as F, avg)
             }
         }
@@ -602,7 +603,7 @@ fn test_all_tri_splits_quad() {
         q.all_triangle_splits().collect::<Vec<_>>()
     );
 
-    let p = FaceKind::Poly(vec![0,1,2,3,4]);
+    let p = FaceKind::Poly(vec![0, 1, 2, 3, 4]);
     assert_eq!(
         p.all_triangle_splits().count(),
         8,

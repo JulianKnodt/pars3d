@@ -400,7 +400,7 @@ pub struct FBXMesh {
 
     pub n: VertexAttribute<3>,
     pub uv: VertexAttribute<2>,
-    color: VertexAttribute<3>,
+    pub color: VertexAttribute<3>,
 
     skin: Option<usize>,
 
@@ -442,6 +442,11 @@ impl<T, const N: usize> VertexAttribute<N, T> {
             }
         };
         Some(*v)
+    }
+
+    /// Whether indices are required for this vertex attribute
+    pub fn requires_indices(&self) -> bool {
+        !(self.map_kind.is_by_vertices() && self.ref_kind.is_direct())
     }
 }
 
