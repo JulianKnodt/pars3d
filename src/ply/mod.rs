@@ -105,6 +105,9 @@ impl Ply {
 
         for l in r.lines() {
             let l = l?;
+            if l.trim().starts_with("comment") {
+                continue;
+            }
             use ReadExpect::*;
             state = match state {
                 Header => {
