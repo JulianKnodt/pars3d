@@ -549,71 +549,18 @@ impl Mesh {
     /// Normalize this mesh's geometry to lay within [-1, 1].
     /// Outputs scale and translation to reposition back to the original dimension.
     pub fn normalize(&mut self) -> (F, [F; 3]) {
-        // Normalize the geometry of this mesh to lay in the unit box.
-        let [l, h] = self
-            .v
-            .iter()
-            .fold([[F::INFINITY; 3], [F::NEG_INFINITY; 3]], |[l, h], n| {
-                [from_fn(|i| l[i].min(n[i])), from_fn(|i| h[i].max(n[i]))]
-            });
-        let center = kmul(0.5, add(l, h));
-        for v in &mut self.v {
-            *v = sub(*v, center);
-        }
-        let largest_val = self
-            .v
-            .iter()
-            .fold(0., |m, v| v.iter().fold(m, |m, c| c.abs().max(m)));
-        let scale = if largest_val == 0. {
-            1.
-        } else {
-            largest_val.recip()
-        };
-        for v in &mut self.v {
-            *v = kmul(scale, *v);
-        }
-        (scale, center)
+        normalize_transform(&mut self.v)
     }
     pub fn normalize_colors(&mut self) -> (F, [F; 3]) {
-        let [l, h] = self
-            .vert_colors
-            .iter()
-            .fold([[F::INFINITY; 3], [F::NEG_INFINITY; 3]], |[l, h], n| {
-                [from_fn(|i| l[i].min(n[i])), from_fn(|i| h[i].max(n[i]))]
-            });
-        let center = kmul(0.5, add(l, h));
-        for vc in &mut self.vert_colors {
-            *vc = sub(*vc, center);
-        }
-        let largest_val = self
-            .vert_colors
-            .iter()
-            .fold(0., |m, vc| vc.iter().fold(m, |m, c| c.abs().max(m)));
-        let scale = if largest_val == 0. {
-            1.
-        } else {
-            largest_val.recip()
-        };
-        for vc in &mut self.vert_colors {
-            *vc = kmul(scale, *vc);
-        }
-        (scale, center)
+        normalize_transform(&mut self.vert_colors)
     }
     /// Given a scale and translation output from normalization, reset the geometry to its
     /// original position.
     pub fn denormalize(&mut self, scale: F, trans: [F; 3]) {
-        assert_ne!(scale, 0.);
-        let inv_scale = scale.recip();
-        for v in &mut self.v {
-            *v = add(kmul(inv_scale, *v), trans);
-        }
+        denormalize_transform(&mut self.v, scale, trans)
     }
     pub fn denormalize_colors(&mut self, scale: F, trans: [F; 3]) {
-        assert_ne!(scale, 0.);
-        let inv_scale = scale.recip();
-        for vc in &mut self.vert_colors {
-            *vc = add(kmul(inv_scale, *vc), trans);
-        }
+        denormalize_transform(&mut self.vert_colors, scale, trans)
     }
     /// After flattening a scene into a mesh, repopulate the original scene with a modified
     /// flattened mesh.
@@ -926,5 +873,42 @@ impl CoordSystem {
             }
         }
         out
+    }
+}
+
+/// Normalizes a vector of N-dim arrays so that they fit in [-1; N] to [1; N], with uniform
+/// scaling. Returns the transformation and scale applied.
+pub fn normalize_transform<const N: usize>(v: &mut [[F; N]]) -> (F, [F; N]) {
+    // Normalize the geometry of this mesh to lay in the unit box.
+    let [l, h] = v
+        .iter()
+        .fold([[F::INFINITY; N], [F::NEG_INFINITY; N]], |[l, h], n| {
+            [from_fn(|i| l[i].min(n[i])), from_fn(|i| h[i].max(n[i]))]
+        });
+    let center = kmul(0.5, add(l, h));
+    for v in v.iter_mut() {
+        *v = sub(*v, center);
+    }
+    let largest_val = v
+        .iter()
+        .fold(0., |m, v| v.iter().fold(m, |m, c| c.abs().max(m)));
+    let scale = if largest_val == 0. {
+        1.
+    } else {
+        largest_val.recip()
+    };
+    for v in v.iter_mut() {
+        *v = kmul(scale, *v);
+    }
+    (scale, center)
+}
+
+/// Returns a scaled and transformed set of N-dim arrays with a given scale and transformation
+/// back to their original position.
+pub fn denormalize_transform<const N: usize>(v: &mut [[F; N]], scale: F, trans: [F; N]) {
+    assert_ne!(scale, 0.);
+    let inv_scale = scale.recip();
+    for v in v {
+        *v = add(kmul(inv_scale, *v), trans);
     }
 }

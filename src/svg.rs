@@ -5,7 +5,7 @@ use svg::{
 };
 
 /// Save a 2D SVG of a UV map
-pub fn save_svg(
+pub fn save_uv(
     dst: impl AsRef<std::path::Path>,
     uvs: &[[F; 2]],
     // TODO figure out how to add colors to this
