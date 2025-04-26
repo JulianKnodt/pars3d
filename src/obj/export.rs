@@ -63,8 +63,9 @@ fn write_mtls(
         let mtl_file = File::options()
             .create(true)
             .append(true)
-            .truncate(false)
-            .open(&mtl_path)?;
+            .truncate(!out.contains(&mtl_path))
+            .open(&mtl_path)
+            .expect("Failed to save mtl");
         let mut mtl_file = BufWriter::new(mtl_file);
 
         for (mi, mat) in s.materials.iter().enumerate() {
