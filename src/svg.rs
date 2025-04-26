@@ -10,6 +10,7 @@ pub fn save_uv(
     uvs: &[[F; 2]],
     // TODO figure out how to add colors to this
     faces: &[FaceKind],
+    stroke_width: F,
 ) -> std::io::Result<()> {
     let mut doc = Document::new().set("viewBox", (0., 0., 1., 1.));
 
@@ -29,7 +30,7 @@ pub fn save_uv(
         let path = Path::new()
             .set("fill", "none")
             .set("stroke", "black")
-            .set("stroke-width", 3)
+            .set("stroke-width", stroke_width)
             .set("d", data);
 
         doc = doc.add(path);
