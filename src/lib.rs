@@ -89,6 +89,13 @@ pub mod fbx;
 
 pub mod util;
 
+pub mod face;
+pub use face::FaceKind;
+
+/// SVG image saving for UV texture maps
+#[cfg(feature = "svg")]
+pub mod svg;
+
 /// Re-exported for materials.
 pub use image;
 
@@ -157,9 +164,6 @@ pub fn save(v: impl AsRef<Path>, scene: &mesh::Scene) -> std::io::Result<()> {
         Unknown => Err(std::io::Error::other("Don't know how to save")),
     }
 }
-
-pub mod face;
-pub use face::FaceKind;
 
 pub(crate) fn kmul<const N: usize>(k: F, v: [F; N]) -> [F; N] {
     v.map(|v| v * k)
