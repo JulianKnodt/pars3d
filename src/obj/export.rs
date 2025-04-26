@@ -60,12 +60,15 @@ fn write_mtls(
             }
         };
 
-        let mtl_file = File::options()
-            .create(true)
-            .append(true)
-            .truncate(!out.contains(&mtl_path))
-            .open(&mtl_path)
-            .expect("Failed to save mtl");
+        let mut mtl_file = File::options();
+        mtl_file.write(true).create(true);
+        if out.contains(&mtl_path) {
+            mtl_file.append(true);
+        } else {
+            mtl_file.truncate(true);
+        }
+        let mtl_file = mtl_file.open(&mtl_path).expect("Failed to save mtl");
+
         let mut mtl_file = BufWriter::new(mtl_file);
 
         for (mi, mat) in s.materials.iter().enumerate() {
@@ -80,7 +83,8 @@ fn write_mtls(
                 macro_rules! save_img {
                     ($img: expr) => {{
                         let img = $img;
-                        match img_dsts(tex.kind, &tex.original_path) {
+                        let output_kind = img_dsts(tex.kind, &tex.original_path);
+                        match output_kind {
                             OutputKind::None => continue,
                             OutputKind::ReuseAbsolute
                                 if exists(&tex.original_path).unwrap_or(false) =>
@@ -100,9 +104,16 @@ fn write_mtls(
                                 let f: &Path = f.as_ref();
                                 let mtl_p: &Path = mtl_path.as_ref();
                                 let img_dst = mtl_p.with_file_name(f);
-                                match img.save(&mtl_p.with_file_name(f)) {
+                                let img_path = mtl_p.with_file_name(f);
+                                match img.save(&img_path) {
                                     Ok(()) => {}
-                                    Err(image::ImageError::IoError(err)) => return Err(err),
+                                    Err(image::ImageError::IoError(err)) => {
+                                      eprintln!(
+                                        "Failed to save output image (should be specified just as file name, got {})",
+                                        img_path.display()
+                                      );
+                                      return Err(err)
+                                    },
                                     Err(e) => panic!("Failed to save image in OBJ: {e:?}"),
                                 }
                                 rel_path_btwn(&mtl_path, &img_dst)?
@@ -136,6 +147,8 @@ fn write_mtls(
                     }
                     // OBJ cannot handle other kinds of textures
                     _ => continue,
+                    // TODO handle PBR extensions
+                    // (https://github.com/tinyobjloader/tinyobjloader/blob/release/pbr-mtl.md)
                 }
             }
         }
@@ -155,7 +168,8 @@ pub fn save_obj(
     // given texture kind & original path, output new path to write to
     img_dsts: impl Fn(TextureKind, &str) -> OutputKind,
 ) -> io::Result<()> {
-    let geom_dst = File::create(&geom_path)?;
+    let geom_dst = File::create(&geom_path)
+        .map_err(|e| io::Error::other(format!("Failed to create OBJ file, due to {e:?}")))?;
     let mut geom_dst = BufWriter::new(geom_dst);
 
     let has_materials =
