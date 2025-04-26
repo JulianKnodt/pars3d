@@ -134,6 +134,8 @@ impl<D> VertexAdj<D> {
         self.all_pairs().filter(|([e0, e1], _)| e0 < e1)
     }
 
+    // TODO this should return another struct which also contains the vertices enclosed within
+    // each boundary loop.
     /// Connectivity between boundary vertices (vert -> [prev, next])
     /// Also returns the number of boundary loops present in this mesh.
     pub fn boundary_loops(&self, m: &Mesh) -> (usize, BTreeMap<usize, [usize; 2]>) {

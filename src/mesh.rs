@@ -518,6 +518,7 @@ impl Mesh {
         let mut num_nonmanifold = 0;
         for v in edges.values() {
             let cnt = match v {
+                0 => continue,
                 1 => &mut num_bd,
                 2 => &mut num_manifold,
                 _ => &mut num_nonmanifold,
@@ -573,6 +574,31 @@ impl Mesh {
         }
         (scale, center)
     }
+    pub fn normalize_colors(&mut self) -> (F, [F; 3]) {
+        let [l, h] = self
+            .vert_colors
+            .iter()
+            .fold([[F::INFINITY; 3], [F::NEG_INFINITY; 3]], |[l, h], n| {
+                [from_fn(|i| l[i].min(n[i])), from_fn(|i| h[i].max(n[i]))]
+            });
+        let center = kmul(0.5, add(l, h));
+        for vc in &mut self.vert_colors {
+            *vc = sub(*vc, center);
+        }
+        let largest_val = self
+            .vert_colors
+            .iter()
+            .fold(0., |m, vc| vc.iter().fold(m, |m, c| c.abs().max(m)));
+        let scale = if largest_val == 0. {
+            1.
+        } else {
+            largest_val.recip()
+        };
+        for vc in &mut self.vert_colors {
+            *vc = kmul(scale, *vc);
+        }
+        (scale, center)
+    }
     /// Given a scale and translation output from normalization, reset the geometry to its
     /// original position.
     pub fn denormalize(&mut self, scale: F, trans: [F; 3]) {
@@ -580,6 +606,13 @@ impl Mesh {
         let inv_scale = scale.recip();
         for v in &mut self.v {
             *v = add(kmul(inv_scale, *v), trans);
+        }
+    }
+    pub fn denormalize_colors(&mut self, scale: F, trans: [F; 3]) {
+        assert_ne!(scale, 0.);
+        let inv_scale = scale.recip();
+        for vc in &mut self.vert_colors {
+            *vc = add(kmul(inv_scale, *vc), trans);
         }
     }
     /// After flattening a scene into a mesh, repopulate the original scene with a modified
