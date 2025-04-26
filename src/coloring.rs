@@ -316,3 +316,62 @@ const MAGMA: [[F; 3]; 256] = [
     [0.987387, 0.984288, 0.742002],
     [0.987053, 0.991438, 0.749504],
 ];
+
+use image::Rgb;
+
+/// Converts vertex colors to an image by sampling
+pub fn bake_vertex_colors_to_texture(
+    [w, h]: [u32; 2],
+    uvs: &[[F; 2]],
+    faces: &[super::FaceKind],
+    colors: &[[F; 3]],
+) -> image::ImageBuffer<Rgb<u8>, Vec<u8>> {
+    use crate::aabb::AABB;
+    use std::collections::BTreeMap;
+    assert_eq!(
+        uvs.len(),
+        colors.len(),
+        "Expected identical length for UV & Vertex Colors"
+    );
+
+    let mut tri_per_pix: BTreeMap<_, Vec<_>> = BTreeMap::new();
+    for (fi, f) in faces.iter().enumerate() {
+        let mut aabb = AABB::new();
+        for &vi in f.as_slice() {
+            aabb.add_point(uvs[vi]);
+        }
+        // TODO could cull some of these points
+        for uvi in aabb.round_to_i32().iter_coords() {
+            tri_per_pix.entry(uvi).or_default().push(fi);
+        }
+    }
+
+    image::ImageBuffer::from_fn(w, h, |x, y| {
+        let Some(cands) = tri_per_pix.get(&[x as i32, y as i32]) else {
+            return Rgb([0; 3]);
+        };
+        assert!(!cands.is_empty());
+
+        let u = (x as F + 0.5) / (w as F);
+        let v = (y as F + 0.5) / (h as F);
+
+        let mut count = 0;
+        let mut all_color = [0.; 3];
+        for &fi in cands {
+            let f = &faces[fi];
+            let bary = f.map_kind(|vi| uvs[vi]).barycentric([u, v]);
+            if bary.is_outside() {
+                continue;
+            }
+            let color = f.map_kind(|vi| colors[vi]).from_barycentric(bary);
+            all_color = add(all_color, color);
+
+            count += 1;
+        }
+        if count == 0 {
+            return Rgb([0; 3]);
+        }
+        let rgb = kmul((count as F).recip(), all_color);
+        Rgb(rgb.map(|v| (v.clamp(0., 1.) * 255.) as u8))
+    })
+}

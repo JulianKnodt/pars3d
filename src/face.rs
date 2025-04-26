@@ -404,6 +404,10 @@ impl Barycentric {
     pub fn coords(&self) -> [F; 3] {
         self.tri_idx_and_coords().1
     }
+    /// Returns true if any value is negative for the barycentric.
+    pub fn is_outside(&self) -> bool {
+        self.coords().iter().any(|&v| v < 0.)
+    }
 }
 
 macro_rules! impl_barycentrics {

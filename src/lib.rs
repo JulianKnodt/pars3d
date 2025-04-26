@@ -89,6 +89,10 @@ pub mod fbx;
 
 pub mod util;
 
+/// AABB (mostly for UVs)
+pub mod aabb;
+
+/// Face Representation
 pub mod face;
 pub use face::FaceKind;
 
