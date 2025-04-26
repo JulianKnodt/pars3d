@@ -94,8 +94,16 @@ impl From<Obj> for Scene {
     fn from(obj: Obj) -> Self {
         let mut out = Self::default();
         for (name, mtl) in obj.mtls {
-            let mut mat = Material::from(mtl);
-            mat.name = name;
+            let textures = mtl.to_textures().map(|txt| {
+                let ti = out.textures.len();
+                out.textures.push(txt);
+                ti
+            });
+            let mat = Material {
+                textures: textures.to_vec(),
+                name,
+                ..Default::default()
+            };
             out.materials.push(mat);
         }
         for (i, o) in obj.objects.into_iter().enumerate() {
@@ -123,6 +131,28 @@ fn to_parts(img: Option<ObjImage>) -> (Option<DynamicImage>, String) {
     (Some(img.img), img.path)
 }
 
+impl MTL {
+    pub fn to_textures(self) -> [Texture; 4] {
+        let texture = |kind, mul, image, original_path| Texture {
+            kind,
+            mul,
+            image,
+            original_path,
+        };
+        let (kd, kd_path) = to_parts(self.map_kd);
+        let (ks, ks_path) = to_parts(self.map_ks);
+        let (ke, ke_path) = to_parts(self.map_ke);
+        let (normals, normals_path) = to_parts(self.bump_normal);
+        [
+            texture(TextureKind::Diffuse, append_one(self.kd), kd, kd_path),
+            texture(TextureKind::Specular, append_one(self.ks), ks, ks_path),
+            texture(TextureKind::Emissive, append_one(self.ke), ke, ke_path),
+            texture(TextureKind::Normal, [1.; 4], normals, normals_path),
+        ]
+    }
+}
+
+/*
 impl From<MTL> for Material {
     fn from(mtl: MTL) -> Self {
         let mut mat = Material::default();
@@ -157,3 +187,4 @@ impl From<MTL> for Material {
         mat
     }
 }
+*/

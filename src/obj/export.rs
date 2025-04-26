@@ -70,7 +70,8 @@ fn write_mtls(
             format!("mat_{mi}")
         };
         writeln!(mtl_file, "newmtl {mat_name}")?;
-        for tex in &mat.textures {
+        for &ti in &mat.textures {
+            let tex = &s.textures[ti];
             macro_rules! save_img {
                 ($img: expr) => {{
                     let img = $img;

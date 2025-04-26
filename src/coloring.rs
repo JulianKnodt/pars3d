@@ -340,6 +340,7 @@ pub fn bake_vertex_colors_to_texture(
         for &vi in f.as_slice() {
             aabb.add_point(uvs[vi]);
         }
+        aabb.scale_by(w as F, h as F);
         // TODO could cull some of these points
         for uvi in aabb.round_to_i32().iter_coords() {
             tri_per_pix.entry(uvi).or_default().push(fi);
@@ -358,6 +359,7 @@ pub fn bake_vertex_colors_to_texture(
         let mut count = 0;
         let mut all_color = [0.; 3];
         for &fi in cands {
+            // TODO multiple samples here
             let f = &faces[fi];
             let bary = f.map_kind(|vi| uvs[vi]).barycentric([u, v]);
             if bary.is_outside() {

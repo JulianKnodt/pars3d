@@ -156,6 +156,7 @@ pub struct FBXMaterial {
     name: String,
     diffuse_color: [F; 3],
     specular_color: [F; 3],
+    // TODO link this to an FBX texture?
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]

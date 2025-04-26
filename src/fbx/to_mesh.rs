@@ -5,7 +5,7 @@ use super::{
 use crate::mesh::{
     Axis, Material, Mesh, Node, Scene, Settings, Skin, Texture, TextureKind, Transform,
 };
-use crate::{FaceKind, F};
+use crate::{append_one, FaceKind, F};
 
 use std::ops::Range;
 
@@ -404,6 +404,20 @@ impl From<(FBXSkin, &[FBXCluster])> for Skin {
     }
 }
 
+impl FBXMaterial {
+    pub fn to_textures(&self) -> [Option<Texture>; 1] {
+        [(self.diffuse_color != [0.; 3]).then(|| {
+            Texture::new(
+                TextureKind::Diffuse,
+                append_one(self.diffuse_color),
+                None,
+                String::new(),
+            )
+        })]
+    }
+}
+
+/*
 impl From<FBXMaterial> for Material {
     fn from(mat: FBXMaterial) -> Self {
         let mut textures = vec![];
@@ -426,6 +440,7 @@ impl From<FBXMaterial> for Material {
         }
     }
 }
+*/
 
 impl From<FBXScene> for Scene {
     fn from(fbx_scene: FBXScene) -> Self {
@@ -504,6 +519,27 @@ impl From<FBXScene> for Scene {
                 .map(|skin| (skin, fbx_scene.clusters.as_slice()))
                 .map(Into::into),
         );
+
+        for mat in &fbx_scene.materials {
+            let textures = mat.to_textures();
+
+            let textures = textures
+                .into_iter()
+                .flatten()
+                .map(|txt| {
+                    let ti = out.textures.len();
+                    out.textures.push(txt);
+                    ti
+                })
+                .collect::<Vec<_>>();
+
+            let mat = Material {
+                textures,
+                name: mat.name.clone(),
+                path: String::new(),
+            };
+            out.materials.push(mat);
+        }
 
         out.root_nodes.extend_from_slice(&fbx_scene.root_nodes);
         out.settings = fbx_scene.global_settings.into();

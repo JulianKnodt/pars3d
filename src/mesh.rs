@@ -65,17 +65,40 @@ pub struct Texture {
     pub original_path: String,
 }
 
+impl Texture {
+    pub fn new(
+        kind: TextureKind,
+        mul: [F; 4],
+        image: Option<image::DynamicImage>,
+        original_path: String,
+    ) -> Self {
+        Texture {
+            kind,
+            mul,
+            image,
+            original_path,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Material {
-    pub textures: Vec<Texture>,
+    pub textures: Vec<usize>,
     pub name: String,
     pub path: String,
 }
 
 impl Material {
     /// Gets the texture from this material of a given kind.
-    pub fn textures_by_kind(&self, kind: TextureKind) -> impl Iterator<Item = &Texture> + '_ {
-        self.textures.iter().filter(move |t| t.kind == kind)
+    pub fn textures_by_kind<'a: 'c, 'b: 'c, 'c>(
+        &'a self,
+        scene: &'b Scene,
+        kind: TextureKind,
+    ) -> impl Iterator<Item = &'c Texture> + 'c {
+        self.textures
+            .iter()
+            .map(|&ti| &scene.textures[ti])
+            .filter(move |t| t.kind == kind)
     }
 }
 
@@ -197,6 +220,8 @@ pub struct Scene {
     pub nodes: Vec<Node>,
     /// Meshes in this scene, order is not relevant for rendering
     pub meshes: Vec<Mesh>,
+    /// Textures which can be reused by materials,
+    pub textures: Vec<Texture>,
     /// Materials
     pub materials: Vec<Material>,
     /// Bone structures
