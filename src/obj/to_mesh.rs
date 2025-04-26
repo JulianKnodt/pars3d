@@ -94,6 +94,7 @@ impl From<Obj> for Scene {
     fn from(obj: Obj) -> Self {
         let mut out = Self::default();
         for (name, mtl) in obj.mtls {
+            let mtllib_idx = mtl.mtllib_idx;
             let textures = mtl.to_textures().map(|txt| {
                 let ti = out.textures.len();
                 out.textures.push(txt);
@@ -102,7 +103,7 @@ impl From<Obj> for Scene {
             let mat = Material {
                 textures: textures.to_vec(),
                 name,
-                ..Default::default()
+                path: obj.mtllibs[mtllib_idx].clone(),
             };
             out.materials.push(mat);
         }
@@ -118,7 +119,6 @@ impl From<Obj> for Scene {
                 hidden: false,
             });
         }
-        out.mtllibs = obj.mtllibs;
         out.input_file = obj.input_file;
         out
     }
@@ -151,40 +151,3 @@ impl MTL {
         ]
     }
 }
-
-/*
-impl From<MTL> for Material {
-    fn from(mtl: MTL) -> Self {
-        let mut mat = Material::default();
-        let (kd, kd_path) = to_parts(mtl.map_kd);
-        mat.textures.push(Texture {
-            kind: TextureKind::Diffuse,
-            mul: append_one(mtl.kd),
-            image: kd,
-            original_path: kd_path,
-        });
-        let (ks, ks_path) = to_parts(mtl.map_ks);
-        mat.textures.push(Texture {
-            kind: TextureKind::Specular,
-            mul: append_one(mtl.ks),
-            image: ks,
-            original_path: ks_path,
-        });
-        let (ke, ke_path) = to_parts(mtl.map_ke);
-        mat.textures.push(Texture {
-            kind: TextureKind::Emissive,
-            mul: append_one(mtl.ke),
-            image: ke,
-            original_path: ke_path,
-        });
-        let (normals, normals_path) = to_parts(mtl.bump_normal);
-        mat.textures.push(Texture {
-            kind: TextureKind::Normal,
-            mul: [1.; 4],
-            image: normals,
-            original_path: normals_path,
-        });
-        mat
-    }
-}
-*/

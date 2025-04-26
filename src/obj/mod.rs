@@ -155,6 +155,8 @@ pub struct MTL {
     pub d: f32,
 
     pub illum: u8,
+
+    pub mtllib_idx: usize,
 }
 
 impl Default for MTL {
@@ -178,6 +180,8 @@ impl Default for MTL {
             // IMPORTANT set this to 1 otherwise it will be transparent.
             d: 1.,
             illum: 0,
+
+            mtllib_idx: usize::MAX,
         }
     }
 }
@@ -379,29 +383,30 @@ pub fn parse(p: impl AsRef<Path>, split_by_object: bool, split_by_group: bool) -
                 let Some(mtl_file) = iter.remainder() else {
                     panic!("Missing mtl file in {l}")
                 };
+                let mtllib_idx = obj.mtllibs.len();
                 // Try a bunch of different attempts
-                match parse_mtl(mtl_file) {
+                match parse_mtl(mtl_file, mtllib_idx) {
                     Ok(mtls) => {
-                        obj.mtllibs.push(String::from(mtl_file));
                         obj.mtls.extend(mtls);
+                        obj.mtllibs.push(String::from(mtl_file));
                         continue;
                     }
                     Err(_e) => {}
                 };
                 let appended = p.with_file_name(mtl_file);
-                match parse_mtl(&appended) {
+                match parse_mtl(&appended, mtllib_idx) {
                     Ok(mtls) => {
-                        obj.mtllibs.push(String::from(appended.to_str().unwrap()));
                         obj.mtls.extend(mtls);
+                        obj.mtllibs.push(String::from(appended.to_str().unwrap()));
                         continue;
                     }
                     Err(_e) => {}
                 };
                 if let Some(file) = PathBuf::from(mtl_file).file_name() {
-                    match parse_mtl(file) {
+                    match parse_mtl(file, mtllib_idx) {
                         Ok(mtls) => {
-                            obj.mtllibs.push(String::from(file.to_str().unwrap()));
                             obj.mtls.extend(mtls);
+                            obj.mtllibs.push(String::from(file.to_str().unwrap()));
                             continue;
                         }
                         Err(_e) => {}
@@ -462,10 +467,13 @@ pub fn parse(p: impl AsRef<Path>, split_by_object: bool, split_by_group: bool) -
     Ok(obj)
 }
 
-pub fn parse_mtl(p: impl AsRef<Path>) -> io::Result<Vec<(String, MTL)>> {
+pub fn parse_mtl(p: impl AsRef<Path>, idx: usize) -> io::Result<Vec<(String, MTL)>> {
     let f = File::open(p.as_ref())?;
     let buf_read = BufReader::new(f);
-    let mut curr_mtl = MTL::default();
+    let mut curr_mtl = MTL {
+        mtllib_idx: idx,
+        ..MTL::default()
+    };
     let mut curr_name = String::new();
 
     let pf = |v: &str| v.parse::<F>().unwrap();

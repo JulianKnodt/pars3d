@@ -92,12 +92,12 @@ impl Material {
     /// Gets the texture from this material of a given kind.
     pub fn textures_by_kind<'a: 'c, 'b: 'c, 'c>(
         &'a self,
-        scene: &'b Scene,
+        textures: &'b [Texture],
         kind: TextureKind,
     ) -> impl Iterator<Item = &'c Texture> + 'c {
         self.textures
             .iter()
-            .map(|&ti| &scene.textures[ti])
+            .map(|&ti| &textures[ti])
             .filter(move |t| t.kind == kind)
     }
 }
@@ -229,9 +229,8 @@ pub struct Scene {
     /// Set of animations
     pub animations: Vec<Animation>,
 
-    /// For an OBJ input, where are the MTL files
-    pub(crate) mtllibs: Vec<String>,
-
+    // /// For an OBJ input, where are the MTL files
+    //pub(crate) mtllibs: Vec<String>,
     /// Path to the input file
     /// Needed for saving output later
     pub(crate) input_file: String,
