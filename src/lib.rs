@@ -49,8 +49,23 @@ pub mod stl;
 /// PLY parsing
 pub mod ply;
 
+#[cfg(feature = "fbx")]
+/// FBX parsing.
+pub mod fbx;
+
+/// Load GLTF meshes.
+#[cfg(feature = "gltf")]
+pub mod gltf;
+
+/// Use with caution (.wrl files)
+pub mod vrml;
+
+// BRDF ---
+
 /// MERL dataset loading.
 pub mod merl;
+
+// UTILITIES ---
 
 /// Fuse vertices of a mesh together by distance.
 pub mod fuse;
@@ -61,9 +76,7 @@ pub mod coloring;
 /// Visualize per-element attributes.
 pub mod visualization;
 
-/// Load GLTF meshes.
-#[cfg(feature = "gltf")]
-pub mod gltf;
+// GEOMETRY PROCESSING ---
 
 /// Animation related structs
 pub mod anim;
@@ -82,10 +95,6 @@ pub use mesh::Scene;
 
 /// Approximately convert a triangle mesh to a mixed tri/quad mesh.
 pub mod tri_to_quad;
-
-#[cfg(feature = "fbx")]
-/// FBX parsing.
-pub mod fbx;
 
 pub mod util;
 

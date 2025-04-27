@@ -70,6 +70,7 @@ impl<D> VertexAdj<D> {
             idx_count,
         }
     }
+
     /// Returns the degree of a given vertex
     pub fn degree(&self, v: usize) -> usize {
         self.idx_count[v].1 as usize

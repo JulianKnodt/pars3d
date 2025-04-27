@@ -723,7 +723,9 @@ impl Mesh {
     }
 
     /// Deletes vertices present in this mesh, but which are not used in any faces.
-    pub fn delete_unused_vertices(&mut self) -> usize {
+    /// Also returns the mapping from original vertices -> new_vertex, where usize::MAX
+    /// indicates no mapping.
+    pub fn delete_unused_vertices(&mut self) -> (usize, Vec<usize>) {
         let curr_len = self.v.len();
         // use BTreeSet to retain order
         let mut used: BTreeSet<usize> = BTreeSet::new();
@@ -761,7 +763,7 @@ impl Mesh {
         clear_vec!(&mut self.joint_weights);
         clear_vec!(&mut self.vert_colors);
 
-        curr_len - used.len()
+        (curr_len - used.len(), remap)
     }
 }
 
