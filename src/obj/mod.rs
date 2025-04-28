@@ -567,6 +567,7 @@ pub fn parse_mtl(p: impl AsRef<Path>, idx: usize) -> io::Result<Vec<(String, MTL
             }
             "newmtl" => {
                 let old = std::mem::take(&mut curr_mtl);
+                curr_mtl.mtllib_idx = idx;
                 let new_name = iter.next().expect("missing name");
                 let old_name = std::mem::replace(&mut curr_name, new_name.to_string());
                 if !old.is_empty() {
