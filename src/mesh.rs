@@ -1,9 +1,9 @@
 use super::anim::Animation;
-use super::{add, cross, dot, kmul, normalize, sub, FaceKind, F, U};
+use super::{add, kmul, sub, FaceKind, F, U};
 
 use std::array::from_fn;
 use std::collections::hash_map::Entry;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::ops::Range;
 
 /// Max number of supported UV channels
@@ -454,38 +454,6 @@ impl Mesh {
                 .map(move |e| (e, fi))
         })
     }
-    /// Splits non-planar faces into tris. Returns number of faces split.
-    pub fn split_non_planar_faces(&mut self, eps: F) -> usize {
-        assert!(eps > 0.);
-        let mut num_split = 0;
-        let m1eps = 1. - eps;
-        let curr_f = self.f.len();
-        for fi in 0..curr_f {
-            if self.f[fi].is_tri() {
-                continue;
-            }
-            let mut tri_fan = self.f[fi].as_triangle_fan();
-            let Some(t0) = tri_fan.next() else {
-                continue;
-            };
-            let get_normal = |t: [usize; 3]| {
-                let [v0, v1, v2] = t.map(|vi| self.v[vi]);
-                normalize(cross(sub(v2, v0), sub(v1, v0)))
-            };
-            let n0 = get_normal(t0);
-            let non_planar = tri_fan.any(|t| dot(get_normal(t), n0) < m1eps);
-            if !non_planar {
-                continue;
-            }
-            drop(tri_fan); // not sure why this is explicitly needed
-            let prev = std::mem::replace(&mut self.f[fi], FaceKind::empty());
-            let mut tris = prev.as_triangle_fan();
-            self.f[fi] = FaceKind::Tri(tris.next().unwrap());
-            self.f.extend(tris.map(FaceKind::Tri));
-            num_split += 1;
-        }
-        num_split
-    }
     /// Returns the material for a given face if any.
     pub fn mat_for_face(&self, fi: usize) -> Option<usize> {
         self.face_mat_idx
@@ -527,47 +495,6 @@ impl Mesh {
             let f = self.f.swap_remove(i);
             self.f.extend(f.as_triangle_fan().map(FaceKind::Tri));
         }
-    }
-    /// Returns (#Boundary Edges, #Manifold Edges, #Nonmanifold Edges)
-    pub fn num_edge_kinds(&self) -> (usize, usize, usize) {
-        let mut edges: BTreeMap<[usize; 2], u32> = BTreeMap::new();
-        for f in &self.f {
-            for [e0, e1] in f.edges() {
-                let cnt = edges.entry(std::cmp::minmax(e0, e1)).or_default();
-                *cnt = *cnt + 1u32;
-            }
-        }
-        let mut num_bd = 0;
-        let mut num_manifold = 0;
-        let mut num_nonmanifold = 0;
-        for v in edges.values() {
-            let cnt = match v {
-                0 => continue,
-                1 => &mut num_bd,
-                2 => &mut num_manifold,
-                _ => &mut num_nonmanifold,
-            };
-            *cnt += 1;
-        }
-        (num_bd, num_manifold, num_nonmanifold)
-    }
-    pub fn num_boundary_edges(&self) -> usize {
-        self.num_edge_kinds().0
-    }
-
-    /// Non-unique iterator over boundary vertices
-    pub fn boundary_vertices(&self) -> impl Iterator<Item = usize> + '_ {
-        let mut edges: BTreeMap<[usize; 2], u32> = BTreeMap::new();
-        for f in &self.f {
-            for [e0, e1] in f.edges() {
-                let cnt = edges.entry(std::cmp::minmax(e0, e1)).or_default();
-                *cnt = *cnt + 1u32;
-            }
-        }
-        edges
-            .into_iter()
-            .filter(|(_, v)| *v == 1)
-            .flat_map(|(k, _)| k.into_iter())
     }
 
     /// Normalize this mesh's geometry to lay within [-1, 1].

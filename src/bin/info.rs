@@ -49,6 +49,11 @@ fn main() -> std::io::Result<()> {
         sum_of_all_chord_lens as f64 / num_chords as f64
     );
 
+    for m in &scene.meshes {
+        let (_, bd_e, nm_e) = m.num_edge_kinds();
+        println!("{bd_e} {nm_e}");
+    }
+
     let Some(dst_json) = dst_json else {
         return Ok(());
     };

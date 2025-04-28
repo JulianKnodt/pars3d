@@ -84,6 +84,9 @@ pub mod anim;
 /// Unified mesh representation
 pub mod mesh;
 
+/// Geometry processing on meshes. Often allocates.
+pub mod geom_processing;
+
 /// Edge representations
 pub mod edge;
 
