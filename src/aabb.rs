@@ -1,11 +1,12 @@
 use super::F;
 use core::ops::Range;
+use std::array::from_fn;
 
 /// An axis-aligned bounding box
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AABB<T, const N: usize> {
-    min: [T; N],
-    max: [T; N],
+    pub min: [T; N],
+    pub max: [T; N],
 }
 
 impl<const N: usize> Default for AABB<F, N> {
@@ -55,8 +56,8 @@ impl<const N: usize> AABB<F, N> {
 impl From<[[F; 2]; 2]> for AABB<F, 2> {
     fn from([a, b]: [[F; 2]; 2]) -> Self {
         AABB {
-            min: std::array::from_fn(|i| a[i].min(b[i])),
-            max: std::array::from_fn(|i| a[i].max(b[i])),
+            min: from_fn(|i| a[i].min(b[i])),
+            max: from_fn(|i| a[i].max(b[i])),
         }
     }
 }
@@ -101,5 +102,11 @@ impl AABB<i32, 2> {
     pub fn expand_by(&mut self, v: i32) {
         self.min = self.min.map(|val| val - v);
         self.max = self.max.map(|val| val + v);
+    }
+    pub fn intersect(&self, o: &Self) -> Self {
+        Self {
+            min: from_fn(|i| self.min[i].max(o.min[i])),
+            max: from_fn(|i| self.max[i].min(o.max[i])),
+        }
     }
 }

@@ -92,6 +92,7 @@ impl<T> FaceKind<T> {
         let (&v0, rest) = self.as_slice().split_first().unwrap();
         rest.array_windows::<2>().map(move |&[v1, v2]| [v0, v1, v2])
     }
+
     /// Iterates over all possible triangles rooted at each index.
     pub fn all_triangle_splits(&self) -> impl Iterator<Item = [T; 3]> + '_
     where

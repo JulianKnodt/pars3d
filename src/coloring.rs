@@ -335,6 +335,10 @@ pub fn bake_vertex_colors_to_texture(
     );
 
     let mut tri_per_pix: BTreeMap<_, Vec<_>> = BTreeMap::new();
+    let image_aabb = AABB {
+        min: [0i32; 2],
+        max: [w as i32, h as i32],
+    };
     for (fi, f) in faces.iter().enumerate() {
         let mut aabb = AABB::new();
         for &vi in f.as_slice() {
@@ -342,7 +346,7 @@ pub fn bake_vertex_colors_to_texture(
         }
         aabb.scale_by(w as F, h as F);
         // TODO could cull some of these points
-        for uvi in aabb.round_to_i32().iter_coords() {
+        for uvi in aabb.round_to_i32().intersect(&image_aabb).iter_coords() {
             tri_per_pix.entry(uvi).or_default().push(fi);
         }
     }

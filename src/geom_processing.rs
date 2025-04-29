@@ -1,8 +1,27 @@
-use super::{cross, dot, normalize, sub, F};
+use super::{cross, dot, normalize, sub, F, U};
 use super::{FaceKind, Mesh};
 use std::collections::BTreeMap;
 
 impl Mesh {
+    #[inline]
+    pub fn triangulate_with_new_edges(&mut self, mut cb: impl FnMut([usize; 2])) {
+        let nf = self.f.len();
+        // nifty little method which doesn't require an extra buffer
+        let mut i = 0;
+        while i < nf {
+            if self.f[i].len() <= 3 {
+                i += 1;
+                continue;
+            }
+            let f = self.f.swap_remove(i);
+            let s = f.as_slice();
+            let first = s[0];
+            for &v in &s[2..s.len() - 2] {
+                cb([first, v])
+            }
+            self.f.extend(f.as_triangle_fan().map(FaceKind::Tri));
+        }
+    }
     /// Splits non-planar faces into tris. Returns number of faces split.
     pub fn split_non_planar_faces(&mut self, eps: F) -> usize {
         assert!(eps > 0.);
@@ -111,7 +130,31 @@ impl Mesh {
     pub fn num_edge_kinds(&self) -> (usize, usize, usize) {
         let mut edges: BTreeMap<[usize; 2], u32> = BTreeMap::new();
         for f in &self.f {
-            for [e0, e1] in f.edges() {
+            for e in f.edges_ord() {
+                let cnt = edges.entry(e).or_default();
+                *cnt = *cnt + 1u32;
+            }
+        }
+        let mut num_bd = 0;
+        let mut num_manifold = 0;
+        let mut num_nonmanifold = 0;
+        for v in edges.values() {
+            let cnt = match v {
+                0 => continue,
+                1 => &mut num_bd,
+                2 => &mut num_manifold,
+                _ => &mut num_nonmanifold,
+            };
+            *cnt += 1;
+        }
+        (num_bd, num_manifold, num_nonmanifold)
+    }
+    /// Returns (#Boundary Edges, #Manifold Edges, #Nonmanifold Edges)
+    pub fn num_edge_kinds_by_position(&self) -> (usize, usize, usize) {
+        let mut edges: BTreeMap<[[U; 3]; 2], u32> = BTreeMap::new();
+        for f in &self.f {
+            for e in f.edges_ord() {
+                let [e0, e1] = e.map(|vi| self.v[vi].map(F::to_bits));
                 let cnt = edges.entry(std::cmp::minmax(e0, e1)).or_default();
                 *cnt = *cnt + 1u32;
             }

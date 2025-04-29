@@ -485,16 +485,7 @@ impl Mesh {
     /// Will allocate if not all faces are triangles.
     /// Order of faces may not be preserved.
     pub fn triangulate(&mut self) {
-        let mut i = 0;
-        // nifty little method which doesn't require an extra buffer
-        while i < self.f.len() {
-            if self.f[i].len() <= 3 {
-                i += 1;
-                continue;
-            }
-            let f = self.f.swap_remove(i);
-            self.f.extend(f.as_triangle_fan().map(FaceKind::Tri));
-        }
+        self.triangulate_with_new_edges(|_| {});
     }
 
     /// Normalize this mesh's geometry to lay within [-1, 1].

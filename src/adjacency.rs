@@ -20,14 +20,21 @@ impl Mesh {
         for f in &self.f {
             for [e0, e1] in f.edges() {
                 assert_ne!(e0, e1);
-                nbrs.entry(e0).or_default().push(e1 as u32);
-                nbrs.entry(e1).or_default().push(e0 as u32);
+                let e0_nbrs = nbrs.entry(e0).or_default();
+                if !e0_nbrs.contains(&(e1 as u32)) {
+                    e0_nbrs.push(e1 as u32);
+                }
+                let e1_nbrs = nbrs.entry(e1).or_default();
+                if !e1_nbrs.contains(&(e0 as u32)) {
+                    e1_nbrs.push(e0 as u32);
+                }
             }
         }
         let mut idx_count = vec![];
         let mut adj = vec![];
         for vi in 0..self.v.len() {
             let Some(n) = nbrs.get_mut(&vi) else {
+                // no neighbors
                 idx_count.push((0, 0));
                 continue;
             };
@@ -105,9 +112,21 @@ impl<D> VertexAdj<D> {
         let (idx, cnt) = self.idx_count[v];
         (idx..idx + cnt as u32).map(|i| {
             let i = i as usize;
-            (self.adj[i], self.data[i])
+            unsafe { (*self.adj.get_unchecked(i), *self.data.get_unchecked(i)) }
         })
     }
+
+    pub fn adj_data_mut(&mut self, v: usize) -> (&[u32], &mut [D]) {
+        let (idx, cnt) = self.idx_count[v];
+        if cnt == 0 {
+            return (&[], &mut []);
+        }
+        let idx = idx as usize;
+        let cnt = cnt as usize;
+
+        (&self.adj[idx..idx + cnt], &mut self.data[idx..idx + cnt])
+    }
+
     /// Returns all pairs of edges (both e0->e1 and e1->e0)
     pub fn all_pairs(&self) -> impl Iterator<Item = ([usize; 2], D)> + '_
     where
@@ -154,7 +173,7 @@ impl<D> VertexAdj<D> {
             let mut prev = *nbrs
                 .iter()
                 .find(|&&v| bd_verts.contains(&(v as usize)) && v != next)
-                .unwrap() as usize;
+                .unwrap_or_else(|| panic!("No previous (!= {next}) in {:?}", nbrs)) as usize;
             let next = next as usize;
             assert_eq!(out.insert(s as usize, [prev, next]), None);
             assert_eq!(out.insert(next, [s, usize::MAX]), None);
