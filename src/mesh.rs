@@ -285,8 +285,13 @@ impl Scene {
     pub fn num_vertices(&self) -> usize {
         self.meshes.iter().map(|m| m.v.len()).sum::<usize>()
     }
+    /// Number of faces in this scene
     pub fn num_faces(&self) -> usize {
         self.meshes.iter().map(|m| m.f.len()).sum::<usize>()
+    }
+    /// Number of triangles in this scene
+    pub fn num_tris(&self) -> usize {
+        self.meshes.iter().map(Mesh::num_tris).sum::<usize>()
     }
 
     pub fn set_axis_to(&mut self, tgt_axes: &CoordSystem) {
