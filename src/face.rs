@@ -395,6 +395,14 @@ pub enum Barycentric {
     Poly(usize, [F; 3]),
 }
 impl Barycentric {
+    pub(crate) fn new(f: &FaceKind, ti: usize, b: [F; 3]) -> Self {
+        assert!(ti < f.len() - 2);
+        match f {
+            FaceKind::Tri(_) => Barycentric::Tri(b),
+            FaceKind::Quad(_) => Barycentric::Quad(ti == 1, b),
+            FaceKind::Poly(_) => Barycentric::Poly(ti, b),
+        }
+    }
     pub fn tri_idx_and_coords(&self) -> (usize, [F; 3]) {
         match *self {
             Barycentric::Tri(b) => (0, b),
@@ -431,7 +439,9 @@ macro_rules! impl_barycentrics {
                             let b = $barycentric_fn(p, t);
                             (i, b, b[0].min(b[1]).min(b[2]))
                         })
-                        .max_by(|(_, _, a), (_, _, b)| a.partial_cmp(&b).unwrap())
+                        .max_by(|(_, _, a), (_, _, b)| {
+                            a.partial_cmp(&b).expect("Quad Barycentric was not finite")
+                        })
                         .unwrap();
                     Barycentric::Quad(i == 1, b)
                 }
@@ -444,7 +454,9 @@ macro_rules! impl_barycentrics {
                             let b = $barycentric_fn(p, t);
                             (i, b, b[0].min(b[1]).min(b[2]))
                         })
-                        .max_by(|(_, _, a), (_, _, b)| a.partial_cmp(&b).unwrap())
+                        .max_by(|(_, _, a), (_, _, b)| {
+                            a.partial_cmp(&b).expect("Poly Barycentric was not finite")
+                        })
                         .unwrap();
 
                     Barycentric::Poly(i, b)

@@ -1,4 +1,4 @@
-use super::F;
+use super::{sub, F};
 use core::ops::Range;
 use std::array::from_fn;
 
@@ -28,6 +28,9 @@ impl<const N: usize> AABB<F, N> {
             self.max[i] = self.max[i].max(p[i]);
         }
     }
+    pub fn diag(&self) -> [F; N] {
+        sub(self.max, self.min)
+    }
     pub fn round_to_i32(&self) -> AABB<i32, N> {
         AABB {
             min: self.min.map(|i| i.floor() as i32),
@@ -50,6 +53,18 @@ impl<const N: usize> AABB<F, N> {
     #[inline]
     fn within_dim(&self, dim: usize, v: F) -> bool {
         (self.min[dim]..=self.max[dim]).contains(&v)
+    }
+    pub fn intersection(&self, o: &Self) -> Self {
+        Self {
+            min: from_fn(|i| self.min[i].max(o.min[i])),
+            max: from_fn(|i| self.max[i].min(o.max[i])),
+        }
+    }
+    pub fn union(&self, o: &Self) -> Self {
+        Self {
+            min: from_fn(|i| self.min[i].min(o.min[i])),
+            max: from_fn(|i| self.max[i].max(o.max[i])),
+        }
     }
 }
 
