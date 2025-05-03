@@ -21,7 +21,7 @@ fn main() {
               eprintln!($extra);
             )?
             eprintln!(
-                r#"Usage: <bin> <mesh a> <mesh b> <#samples:int> <stat file>
+                r#"Usage: <bin> <mesh a> <mesh b> <#samples:int>
 - A tool for evaluating the distance between two meshes including their attributes."#
             );
             return;
@@ -30,10 +30,9 @@ fn main() {
     let mut src = None;
     let mut dst = None;
     let mut num_samples = None;
-    let mut stat = None;
     for v in std::env::args().skip(1) {
         let mut any = false;
-        for arg in [&mut src, &mut dst, &mut num_samples, &mut stat] {
+        for arg in [&mut src, &mut dst, &mut num_samples] {
             if arg.is_some() {
                 continue;
             }
@@ -110,4 +109,32 @@ fn main() {
         let (&nearest, _d, ()) = a_kdtree.nearest(&p).unwrap();
         b_to_a_dists.push(dist(p, nearest) / diag_len);
     }
+
+    let hausdorff_a_to_b = a_to_b_dists
+        .iter()
+        .copied()
+        .max_by(|a, b| a.partial_cmp(&b).unwrap())
+        .unwrap();
+    let chamfer_a_to_b = a_to_b_dists.iter().copied().sum::<F>() / a_to_b_dists.len() as F;
+
+    let hausdorff_b_to_a = b_to_a_dists
+        .iter()
+        .copied()
+        .max_by(|a, b| a.partial_cmp(&b).unwrap())
+        .unwrap();
+    let chamfer_b_to_a = b_to_a_dists.iter().copied().sum::<F>() / b_to_a_dists.len() as F;
+
+    let hausdorff = hausdorff_a_to_b.max(hausdorff_b_to_a);
+    let chamfer = chamfer_a_to_b + chamfer_b_to_a;
+
+    println!(
+        r#"{{
+  "hausdorff": {hausdorff},
+  "chamfer": {chamfer},
+  "hausdorff_a_to_b": {hausdorff_a_to_b},
+  "hausdorff_b_to_a": {hausdorff_b_to_a},
+  "chamfer_a_to_b": {chamfer_a_to_b},
+  "chamfer_b_to_a": {chamfer_b_to_a}
+}}"#
+    );
 }

@@ -1691,6 +1691,9 @@ impl KVs {
                         ("FbxVideo", "FreeRunning" | "Loop" | "InterlaceMode") => {},
                         ("FbxVideo", "ImageSequence" | "ImageSequenceOffset") => {},
 
+                        // Camera
+                        ("FbxCamera", _) => {},
+
                         // "AnimationStack"
                         ("FbxAnimStack", "Description") => {}
 
