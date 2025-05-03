@@ -193,6 +193,10 @@ pub(crate) fn sub<const N: usize>(a: [F; N], b: [F; N]) -> [F; N] {
     std::array::from_fn(|i| a[i] - b[i])
 }
 
+pub fn dist<const N: usize>(a: [F; N], b: [F; N]) -> F {
+    length(sub(b, a))
+}
+
 pub(crate) fn cross([x, y, z]: [F; 3], [a, b, c]: [F; 3]) -> [F; 3] {
     [y * c - z * b, z * a - x * c, x * b - y * a]
 }
@@ -244,8 +248,17 @@ pub fn tri_area([a, b, c]: [[F; 3]; 3]) -> F {
     0.5 * length(cross(sub(a, b), sub(b, c)))
 }
 
+/// Heron's formula for computing the area of triangles in N-dimensional space.
+pub fn tri_area_nd<const N: usize>([a, b, c]: [[F; N]; 3]) -> F {
+    let e0 = length(sub(b, a));
+    let e1 = length(sub(c, b));
+    let e2 = length(sub(a, c));
+    let s = (e0 + e1 + e2) / 2.;
+    (s * (s - e0) * (s - e1) * (s - e2)).sqrt()
+}
+
 /// More robust ln triangle area.
-pub fn ln_tri_area([a, b, c]: [[F; 3]; 3]) -> F {
+pub fn ln_tri_area<const N: usize>([a, b, c]: [[F; N]; 3]) -> F {
     let e0 = length(sub(a, b));
     let e1 = length(sub(b, c));
     let e2 = length(sub(c, a));

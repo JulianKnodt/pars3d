@@ -12,17 +12,18 @@ pub fn save_uv(
     faces: &[FaceKind],
     stroke_width: F,
 ) -> std::io::Result<()> {
-    let mut doc = Document::new().set("viewBox", (0., 0., 1., 1.));
+    let sz = 1024.;
+    let mut doc = Document::new().set("viewBox", (0., 0., sz, sz));
 
     for f in faces {
         if f.is_empty() {
             continue;
         }
         let s = f.as_slice();
-        let [u0, v0] = uvs[s[0]];
+        let [u0, v0] = uvs[s[0]].map(|v| v * sz);
         let mut data = Data::new().move_to((u0, v0));
         for &vi in &s[1..] {
-            let [u, v] = uvs[vi];
+            let [u, v] = uvs[vi].map(|v| v * sz);
             data = data.line_to((u, v));
         }
         data = data.line_to((u0, v0)).close();
