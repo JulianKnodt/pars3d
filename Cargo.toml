@@ -12,11 +12,13 @@ gltf = { version = "1.4.1", features = ["utils", "KHR_materials_pbrSpecularGloss
 gltf-json = { version = "1.4.1", optional = true, features = ["names"] }
 zune-inflate = { version = "0.2", default-features = false, features = ["zlib"] }
 svg = { version = "0.18.0", optional = true }
+kdtree = { git = "https://github.com/JulianKnodt/kdtree", version = "0.1.0", optional = true }
 
 [features]
-default = ["gltf", "fbx", "strict_fbx"]
+default = ["gltf", "fbx", "strict_fbx", "kdtree"]
 f64 = []
 gltf = ["dep:gltf", "dep:gltf-json"]
 fbx = []
 strict_fbx = []
 svg = ["dep:svg"]
+kdtree = ["dep:kdtree"]
