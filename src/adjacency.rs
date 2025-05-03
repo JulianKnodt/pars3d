@@ -159,49 +159,43 @@ impl<D> VertexAdj<D> {
     /// Connectivity between boundary vertices (vert -> [prev, next])
     /// Also returns the number of boundary loops present in this mesh.
     pub fn boundary_loops(&self, m: &Mesh) -> (usize, BTreeMap<usize, [usize; 2]>) {
-        let mut bd_verts = m.boundary_vertices().collect::<BTreeSet<_>>();
-
-        let mut out = BTreeMap::new();
-        let mut num_loops = 0;
-        while let Some(s) = bd_verts.pop_first() {
-            num_loops += 1;
-            let nbrs = self.adj(s);
-            let next = *nbrs
-                .iter()
-                .find(|&&v| bd_verts.contains(&(v as usize)))
-                .unwrap();
-            let mut prev = *nbrs
-                .iter()
-                .find(|&&v| bd_verts.contains(&(v as usize)) && v != next)
-                .unwrap_or_else(|| panic!("No previous (!= {next}) in {:?}", nbrs)) as usize;
-            let next = next as usize;
-            assert_eq!(out.insert(s as usize, [prev, next]), None);
-            assert_eq!(out.insert(next, [s, usize::MAX]), None);
-            assert_eq!(out.insert(prev, [usize::MAX, s]), None);
-            prev = s;
-            let mut curr = next;
-            loop {
-                assert!(bd_verts.remove(&curr));
-                let nbrs = self.adj(curr);
-                let Some(&next) = nbrs.iter().find(|&&v| bd_verts.contains(&(v as usize))) else {
-                    break;
-                };
-                let next = next as usize;
-
-                assert_ne!(next, prev);
-                out.entry(curr).or_insert([usize::MAX; 2])[1] = next;
-                out.entry(next)
-                    .and_modify(|v| {
-                        v[0] = curr;
-                    })
-                    .or_insert([curr, usize::MAX]);
-                prev = curr;
-                curr = next;
-            }
+        let mut out: BTreeMap<usize, [usize; 2]> = BTreeMap::new();
+        for [e0, e1] in m.boundary_edges() {
+            let slot = out
+                .entry(e0)
+                .or_insert([usize::MAX; 2])
+                .iter_mut()
+                .find(|v| **v == usize::MAX)
+                .expect("Multiple boundary edges meet");
+            *slot = e1;
+            let slot = out
+                .entry(e1)
+                .or_insert([usize::MAX; 2])
+                .iter_mut()
+                .find(|v| **v == usize::MAX)
+                .expect("Multiple boundary edges meet");
+            *slot = e0;
         }
+
         assert!(out
             .values()
             .all(|&[v0, v1]| v0 != usize::MAX && v1 != usize::MAX));
+
+        // Fix up the loop order
+        let mut num_loops = 0;
+        let mut not_visited = out.keys().copied().collect::<BTreeSet<_>>();
+        while let Some(first) = not_visited.pop_first() {
+            num_loops += 1;
+            let mut prev: usize = first;
+            let mut curr: usize = out[&first][1];
+            while curr != first {
+                if out[&curr][1] == prev {
+                    out.get_mut(&curr).unwrap().swap(0, 1);
+                }
+                prev = curr;
+                curr = out[&curr][1];
+            }
+        }
 
         (num_loops, out)
     }
