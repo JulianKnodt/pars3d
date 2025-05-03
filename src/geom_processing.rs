@@ -1,5 +1,6 @@
-use super::{cross, dot, normalize, sub, F, U};
-use super::{FaceKind, Mesh};
+use super::aabb::AABB;
+use super::{cross, dot, normalize, sub, tri_area, F, U};
+use super::{face::Barycentric, FaceKind, Mesh, Scene};
 use std::collections::BTreeMap;
 
 impl Mesh {
@@ -16,7 +17,7 @@ impl Mesh {
             let f = self.f.swap_remove(i);
             let s = f.as_slice();
             let first = s[0];
-            for &v in &s[2..s.len() - 2] {
+            for &v in &s[2..s.len() - 1] {
                 cb([first, v])
             }
             self.f.extend(f.as_triangle_fan().map(FaceKind::Tri));
@@ -178,19 +179,16 @@ impl Mesh {
     }
 
     /// Non-unique iterator over boundary vertices
-    pub fn boundary_vertices(&self) -> impl Iterator<Item = usize> + '_ {
+    pub fn boundary_edges(&self) -> impl Iterator<Item = [usize; 2]> + '_ {
         let mut edges: BTreeMap<[usize; 2], u32> = BTreeMap::new();
         for f in &self.f {
-            for [e0, e1] in f.edges() {
-                let cnt = edges.entry(std::cmp::minmax(e0, e1)).or_default();
-                *cnt = *cnt + 1u32;
+            for e in f.edges_ord() {
+                *edges.entry(e).or_default() += 1;
             }
         }
-        edges
-            .into_iter()
-            .filter(|(_, v)| *v == 1)
-            .flat_map(|(k, _)| k.into_iter())
+        edges.into_iter().filter(|(_, v)| *v == 1).map(|(e, _)| e)
     }
+
     /// Non-unique iterator over boundary vertices
     pub fn non_manifold_faces(&self) -> impl Iterator<Item = ([usize; 2], Vec<usize>)> + '_ {
         let mut edges: BTreeMap<[usize; 2], Vec<usize>> = BTreeMap::new();
@@ -201,5 +199,63 @@ impl Mesh {
             }
         }
         edges.into_iter().filter(|(_, v)| v.len() > 2)
+    }
+
+    /// Given a lower bound on how many points should be returned, samples from each face based
+    /// on its area. Must provide a sufficient RNG function which returns values in 0..1.
+    pub fn random_points_on_mesh<'a>(
+        &'a self,
+        n: usize,
+        mut rng: impl FnMut() -> F + 'a,
+    ) -> impl Iterator<Item = (usize, Barycentric)> + 'a {
+        let total_area = self.f.iter().map(|f| f.area(&self.v)).sum::<F>();
+
+        let areas = self
+            .f
+            .iter()
+            .enumerate()
+            .flat_map(|(fi, f)| {
+                f.as_triangle_fan().enumerate().map(move |(ti, t)| {
+                    let ta = tri_area(t.map(|vi| self.v[vi])) / total_area;
+                    (ta, fi, ti)
+                })
+            })
+            .collect::<Vec<_>>();
+
+        (0..n).map(move |_| {
+            let p = rng().fract().abs();
+            let idx = match areas.binary_search_by(move |a_rest| a_rest.0.partial_cmp(&p).unwrap())
+            {
+                Ok(i) => i,
+                Err(e) => e.saturating_sub(1),
+            };
+            let (_, fi, ti) = &areas[idx];
+            let b0 = rng().fract().abs();
+            let b1 = rng().fract().abs();
+            let [b0, b1] = if b0 + b1 > 1. {
+                [1. - b0, 1. - b1]
+            } else {
+                [b0, b1]
+            };
+            let b2 = (1. - b0 - b1).max(0.);
+            (*fi, Barycentric::new(&self.f[*fi], *ti, [b0, b1, b2]))
+        })
+    }
+
+    pub fn aabb(&self) -> AABB<F, 3> {
+        let mut aabb = AABB::new();
+        for &v in &self.v {
+            aabb.add_point(v);
+        }
+        aabb
+    }
+}
+
+impl Scene {
+    pub fn aabb(&self) -> AABB<F, 3> {
+        self.meshes
+            .iter()
+            .map(Mesh::aabb)
+            .fold(AABB::new(), |a, n| a.union(&n))
     }
 }
