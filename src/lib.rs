@@ -73,6 +73,9 @@ pub mod fuse;
 /// Coloring data for visualizing features.
 pub mod coloring;
 
+/// Utilities for generating noise.
+pub mod noise;
+
 /// Visualize per-element attributes.
 pub mod visualization;
 
@@ -214,7 +217,7 @@ pub(crate) fn quad_area_2d([a, b, c, d]: [[F; 2]; 4]) -> F {
 }
 
 pub fn length<const N: usize>(v: [F; N]) -> F {
-    v.iter().map(|v| v * v).sum::<F>().max(0.)
+    v.iter().map(|v| v * v).sum::<F>().max(0.).sqrt()
 }
 
 /// Normalizes a vector, returning a zero vector if it has 0 norm

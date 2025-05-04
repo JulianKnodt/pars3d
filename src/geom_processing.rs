@@ -208,30 +208,39 @@ impl Mesh {
         n: usize,
         mut rng: impl FnMut() -> F + 'a,
     ) -> impl Iterator<Item = (usize, Barycentric)> + 'a {
-        let total_area = self.f.iter().map(|f| f.area(&self.v)).sum::<F>();
-
-        let areas = self
+        assert!(
+            !self.f.is_empty(),
+            "Cannot sample random points without faces"
+        );
+        let mut areas = self
             .f
             .iter()
             .enumerate()
             .flat_map(|(fi, f)| {
                 f.as_triangle_fan().enumerate().map(move |(ti, t)| {
-                    let ta = tri_area(t.map(|vi| self.v[vi])) / total_area;
+                    let ta = tri_area(t.map(|vi| self.v[vi]));
                     (ta, fi, ti)
                 })
             })
             .collect::<Vec<_>>();
+        cumulative_sum(areas.iter_mut().map(|a| &mut a.0));
+        assert!(areas.is_sorted());
+        let max_area = areas.last().unwrap().0;
+        for (a, _, _) in areas.iter_mut() {
+            *a /= max_area;
+        }
 
         (0..n).map(move |_| {
-            let p = rng().fract().abs();
+            let p = rng();
+            assert!((0.0..=1.0).contains(&p));
             let idx = match areas.binary_search_by(move |a_rest| a_rest.0.partial_cmp(&p).unwrap())
             {
                 Ok(i) => i,
-                Err(e) => e.saturating_sub(1),
+                Err(e) => e.min(self.f.len() - 1),
             };
             let (_, fi, ti) = &areas[idx];
-            let b0 = rng().fract().abs();
-            let b1 = rng().fract().abs();
+            let b0 = rng();
+            let b1 = rng();
             let [b0, b1] = if b0 + b1 > 1. {
                 [1. - b0, 1. - b1]
             } else {
@@ -257,5 +266,13 @@ impl Scene {
             .iter()
             .map(Mesh::aabb)
             .fold(AABB::new(), |a, n| a.union(&n))
+    }
+}
+
+fn cumulative_sum<'a>(vs: impl Iterator<Item = &'a mut F>) {
+    let mut agg = 0.;
+    for v in vs {
+        *v = *v + agg;
+        agg = *v;
     }
 }
