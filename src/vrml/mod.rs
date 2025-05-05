@@ -77,15 +77,28 @@ impl VRMLGeometryOnly {
                 continue;
             }
             let mut tokens = l.split_whitespace();
-            let Some(t0) = tokens.next() else {
+            let Some(mut t0) = tokens.next() else {
                 continue;
             };
-            let Some(t1) = tokens.next() else {
+            while t0.ends_with(",") {
+              t0 = &t0[..t0.len()-1];
+            }
+            let Some(mut t1) = tokens.next() else {
                 continue;
             };
-            let Some(t2) = tokens.next() else {
+            while t1.ends_with(",") {
+              t1 = &t1[..t1.len()-1];
+            }
+            let Some(mut t2) = tokens.next() else {
                 continue;
             };
+            while t2.ends_with(",") {
+              t2 = &t2[..t2.len()-1];
+            }
+            let t2 = t2;
+            if [t0, t1, t2].iter().any(|v| v.parse::<F>().is_err()) {
+                continue;
+            }
             let is_float = t0.contains(".") || t1.contains(".") || t2.contains(".");
             if is_float {
                 if !prev_was_float {

@@ -15,6 +15,7 @@ pub struct VertexAdj<D = ()> {
 }
 
 impl Mesh {
+    /// Returns vertices adjacent to each vertex in the input mesh
     pub fn vertex_adj(&self) -> VertexAdj<()> {
         let mut nbrs: BTreeMap<usize, Vec<u32>> = BTreeMap::new();
         for f in &self.f {
@@ -43,6 +44,39 @@ impl Mesh {
             adj.append(n);
         }
 
+        let data = vec![(); adj.len()];
+        VertexAdj {
+            idx_count,
+            adj,
+            data,
+        }
+    }
+    /// Returns faces adjacent to each vertex in the input mesh
+    pub fn face_adj(&self) -> VertexAdj<()> {
+        let mut nbrs: BTreeMap<usize, Vec<u32>> = BTreeMap::new();
+        for (fi, f) in self.f.iter().enumerate() {
+            let fi = fi as u32;
+            for e in f.edges() {
+                for vi in e {
+                    let vi_nbr = nbrs.entry(vi).or_default();
+                    if !vi_nbr.contains(&fi) {
+                        vi_nbr.push(fi);
+                    }
+                }
+            }
+        }
+
+        let mut idx_count = vec![];
+        let mut adj = vec![];
+        for vi in 0..self.v.len() {
+            let Some(n) = nbrs.get_mut(&vi) else {
+                idx_count.push((0, 0));
+                continue;
+            };
+            assert!(n.len() < u16::MAX as usize);
+            idx_count.push((adj.len() as u32, n.len() as u16));
+            adj.append(n);
+        }
         let data = vec![(); adj.len()];
         VertexAdj {
             idx_count,

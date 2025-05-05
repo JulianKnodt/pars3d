@@ -257,7 +257,6 @@ impl FaceKind {
             Quad(_) => {}
             Poly(ref mut v) => {
                 v.dedup();
-                // TODO here also needs to handle the case where repeats are separated by 1.
                 while !v.is_empty() && v.last() == v.first() {
                     v.pop();
                 }

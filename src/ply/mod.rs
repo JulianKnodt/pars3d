@@ -56,6 +56,8 @@ enum Field {
     Green,
     Blue,
     Alpha,
+    // Allow for storing arbitrary values
+    //Arbitrary(String),
 }
 
 impl Ply {
