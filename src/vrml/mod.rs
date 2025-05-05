@@ -29,8 +29,8 @@ pub struct Shape {
     ccw: bool,
     solid: bool,
     convex: bool,
-    points: Vec<[F; 3]>,
-    indices: Vec<FaceKind>,
+    pub points: Vec<[F; 3]>,
+    pub indices: Vec<FaceKind>,
 }
 
 /*
