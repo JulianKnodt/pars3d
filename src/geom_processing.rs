@@ -33,6 +33,38 @@ impl Mesh {
             if self.f[fi].is_tri() {
                 continue;
             }
+            // special case quads
+            if let FaceKind::Quad([f0, f1, f2, f3]) = self.f[fi] {
+                use super::tri_normal;
+                let [ti0, ti1] = [[f0, f1, f2], [f0, f2, f3]];
+                let t01 = [ti0, ti1].map(|ti| ti.map(|vi| self.v[vi]));
+                let [n0, n1] = t01.map(tri_normal).map(normalize);
+
+                let [ti2, ti3] = [[f1, f2, f3], [f1, f3, f0]];
+                let t23 = [ti2, ti3].map(|ti| ti.map(|vi| self.v[vi]));
+                let [n2, n3] = t23.map(tri_normal);
+
+                // actually probably only need one of these checks
+                if dot(n0, n1) > m1eps && dot(n2, n3) > m1eps {
+                    continue;
+                }
+
+                // split with largest min area
+                let a01_min_area = t01.map(tri_area).into_iter().min_by(F::total_cmp).unwrap();
+                let a23_min_area = t23.map(tri_area).into_iter().min_by(F::total_cmp).unwrap();
+
+                if a01_min_area > a23_min_area {
+                    self.f[fi] = FaceKind::Tri(ti0);
+                    self.f.push(FaceKind::Tri(ti1));
+                } else {
+                    self.f[fi] = FaceKind::Tri(ti2);
+                    self.f.push(FaceKind::Tri(ti3));
+                }
+
+                num_split += 1;
+                continue;
+            }
+
             let mut tri_fan = self.f[fi].as_triangle_fan();
             let Some(t0) = tri_fan.next() else {
                 continue;

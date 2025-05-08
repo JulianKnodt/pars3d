@@ -81,19 +81,19 @@ impl VRMLGeometryOnly {
                 continue;
             };
             while t0.ends_with(",") {
-              t0 = &t0[..t0.len()-1];
+                t0 = &t0[..t0.len() - 1];
             }
             let Some(mut t1) = tokens.next() else {
                 continue;
             };
             while t1.ends_with(",") {
-              t1 = &t1[..t1.len()-1];
+                t1 = &t1[..t1.len() - 1];
             }
             let Some(mut t2) = tokens.next() else {
                 continue;
             };
             while t2.ends_with(",") {
-              t2 = &t2[..t2.len()-1];
+                t2 = &t2[..t2.len() - 1];
             }
             let t2 = t2;
             if [t0, t1, t2].iter().any(|v| v.parse::<F>().is_err()) {

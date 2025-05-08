@@ -250,6 +250,9 @@ pub fn quad_area([a, b, c, d]: [[F; 3]; 4]) -> F {
 pub fn tri_area([a, b, c]: [[F; 3]; 3]) -> F {
     0.5 * length(cross(sub(a, b), sub(b, c)))
 }
+pub(crate) fn tri_normal([a, b, c]: [[F; 3]; 3]) -> [F; 3] {
+    cross(sub(a, b), sub(b, c))
+}
 
 /// Heron's formula for computing the area of triangles in N-dimensional space.
 pub fn tri_area_nd<const N: usize>([a, b, c]: [[F; N]; 3]) -> F {

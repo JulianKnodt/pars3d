@@ -84,9 +84,13 @@ pub fn face_coloring<'a>(face_group: impl Fn(usize) -> usize, num_fs: usize) -> 
 /// Mesh::with_face_coloring. `palette` can be arbitrary, but one example is
 /// pars3d::coloring::HIGH_CONTRAST.
 pub fn greedy_face_coloring(
+    // Fn(Face) -> Group#
     face_group: impl Fn(usize) -> usize,
+    // #Faces
     num_fs: usize,
+    // Whether two groups are adjacent
     group_adj: impl Fn(usize, usize) -> bool,
+    // Palette to use for coloring
     palette: &[[u8; 3]],
 ) -> Vec<[F; 3]> {
     const fn to_rgbf([r, g, b]: [u8; 3]) -> [F; 3] {
