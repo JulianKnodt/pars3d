@@ -52,6 +52,18 @@ fn main() -> std::io::Result<()> {
     for m in &scene.meshes {
         let (_, bd_e, nm_e) = m.num_edge_kinds();
         println!("#Boundary Edges: {bd_e}\n#Non-Manifold Edges {nm_e}");
+        if nm_e != 0 {
+            let eks = m.edge_kinds();
+            for (_, ek) in eks.into_iter() {
+                if !ek.is_non_manifold() {
+                    continue;
+                }
+                for &fi in ek.as_slice() {
+                    print!("{:?}, ", m.f[fi]);
+                }
+                println!();
+            }
+        }
     }
 
     let Some(dst_json) = dst_json else {

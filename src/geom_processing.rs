@@ -1,4 +1,5 @@
 use super::aabb::AABB;
+use super::edge::EdgeKind;
 use super::{cross, dot, normalize, sub, tri_area, F, U};
 use super::{face::Barycentric, FaceKind, Mesh, Scene};
 use std::collections::BTreeMap;
@@ -219,6 +220,22 @@ impl Mesh {
             }
         }
         edges.into_iter().filter(|(_, v)| *v == 1).map(|(e, _)| e)
+    }
+
+    /// Returns the associated face set with each edge.
+    pub fn edge_kinds(&self) -> BTreeMap<[usize; 2], EdgeKind> {
+        let mut edges: BTreeMap<[usize; 2], EdgeKind> = BTreeMap::new();
+        for (fi, f) in self.f.iter().enumerate() {
+            for e in f.edges_ord() {
+                edges
+                    .entry(e)
+                    .and_modify(|ek| {
+                        ek.insert(fi);
+                    })
+                    .or_insert_with(|| EdgeKind::Boundary(fi));
+            }
+        }
+        edges
     }
 
     /// Non-unique iterator over boundary vertices

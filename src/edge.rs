@@ -36,7 +36,7 @@ impl EdgeKind {
     pub fn is_boundary(&self) -> bool {
         matches!(self, EdgeKind::Boundary(_))
     }
-    pub fn is_nonmanifold(&self) -> bool {
+    pub fn is_non_manifold(&self) -> bool {
         matches!(self, EdgeKind::NonManifold(_))
     }
     pub fn is_manifold(&self) -> bool {

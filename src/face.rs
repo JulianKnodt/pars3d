@@ -87,9 +87,13 @@ impl<T> FaceKind<T> {
     /// Iterate over triangles in this face rooted at the 0th index.
     pub fn as_triangle_fan(&self) -> impl Iterator<Item = [T; 3]> + '_
     where
-        T: Copy,
+        T: Copy + Default,
     {
-        let (&v0, rest) = self.as_slice().split_first().unwrap();
+        let (v0, rest) = if let Some((&v0, rest)) = self.as_slice().split_first() {
+            (v0, rest)
+        } else {
+            (T::default(), [].as_slice())
+        };
         rest.array_windows::<2>().map(move |&[v1, v2]| [v0, v1, v2])
     }
 
@@ -214,12 +218,12 @@ impl FaceKind {
     pub fn is_degenerate(&self) -> bool {
         use FaceKind::*;
         match self {
-            Tri([a, b, c]) if a == b || b == c || a == c => return true,
+            Tri([a, b, c]) if a == b || b == c || a == c => true,
             Tri(_) => false,
             &Quad([a, b, c, d] | [d, a, b, c] | [c, d, a, b] | [b, c, d, a]) if a == b => {
                 return Self::Tri([a, c, d]).is_degenerate()
             }
-            &Quad([a, _, c, _] | [_, a, _, c]) if a == c => return true,
+            &Quad([a, _, c, _] | [_, a, _, c]) if a == c => true,
             Quad(_) => false,
             Poly(v) => {
                 if v.is_empty() {
@@ -241,10 +245,11 @@ impl FaceKind {
             }
         }
     }
+
     /// Canonicalize this face, deleting duplicates and retaining order such that the lowest
     /// index vertex is first.
     /// Returns true if this face is now degenerate.
-    pub fn canonicalize(&mut self) -> bool {
+    fn _canonicalize<const ROT: bool>(&mut self) -> bool {
         use FaceKind::*;
         match self {
             Tri([a, b, c]) if a == b || b == c || a == c => return true,
@@ -266,20 +271,31 @@ impl FaceKind {
             }
         }
         assert!(self.as_slice().len() > 2);
-        let min_idx = self
-            .as_slice()
-            .iter()
-            .enumerate()
-            .min_by_key(|&(_, &v)| v)
-            .unwrap()
-            .0;
-        self.as_mut_slice().rotate_left(min_idx);
+        if ROT {
+            let min_idx = self
+                .as_slice()
+                .iter()
+                .enumerate()
+                .min_by_key(|&(_, &v)| v)
+                .unwrap()
+                .0;
+            self.as_mut_slice().rotate_left(min_idx);
+        }
         *self = match self.as_slice() {
             &[a, b, c] => Self::Tri([a, b, c]),
             &[a, b, c, d] => Self::Quad([a, b, c, d]),
             _ => return false,
         };
         false
+    }
+    pub fn canonicalize(&mut self) -> bool {
+        self._canonicalize::<true>()
+    }
+    /// Canonicalize this face, deleting duplicates and retaining order such that the lowest
+    /// index vertex is first.
+    /// Returns true if this face is now degenerate.
+    pub fn canonicalize_no_rotate(&mut self) -> bool {
+        self._canonicalize::<false>()
     }
     pub(crate) fn insert(&mut self, v: usize) {
         use FaceKind::*;
