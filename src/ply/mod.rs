@@ -353,6 +353,10 @@ impl Ply {
         let has_vc = !self.vc.is_empty();
         let has_n = !self.n.is_empty();
         let has_uv = !self.uv.is_empty();
+        let h = self.extra_vertex_attrs.iter().find_map(|v| {
+            let ArbitraryAttr::Height(h) = v;
+            Some(h)
+        });
 
         writeln!(out, "ply")?;
         writeln!(out, "format ascii 1.0")?;
@@ -393,6 +397,15 @@ impl Ply {
             }
         }
 
+        if let Some(h) = h.as_ref() {
+            assert_eq!(
+                self.vc.len(),
+                h.len(),
+                "Mismatch between #vertices and #height"
+            );
+            writeln!(out, "property float height")?;
+        }
+
         writeln!(out, "element face {}", self.f.len())?;
         writeln!(out, "property list uchar int vertex_indices")?;
         writeln!(out, "end_header")?;
@@ -408,6 +421,9 @@ impl Ply {
             }
             if let Some([r, g, b]) = self.vc.get(vi) {
                 write!(out, " {r} {g} {b}")?;
+            }
+            if let Some(h) = h.and_then(|h| h.get(vi)) {
+                write!(out, " {h}")?;
             }
             writeln!(out)?;
         }

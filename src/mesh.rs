@@ -355,7 +355,9 @@ impl Scene {
 
 /// Arbitrary attributes for storing extra data on each vertex of a mesh
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum ArbitraryAttr {
+    /// Displacement of each vertex from the surface
     Height(Vec<F>),
 }
 
