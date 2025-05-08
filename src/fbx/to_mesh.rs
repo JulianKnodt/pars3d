@@ -264,6 +264,8 @@ impl From<FBXMesh> for (Mesh, Vec<usize>) {
             joint_idxs: vec![],
 
             joint_weights: vec![],
+
+            extra_vertex_attrs: vec![],
         };
         (mesh, remapping)
     }
@@ -285,6 +287,7 @@ impl From<Mesh> for FBXMesh {
             vert_colors: _,
 
             joint_weights: _,
+            extra_vertex_attrs: _,
         } = mesh;
 
         // FIXME? can change the output format if there are no repeats

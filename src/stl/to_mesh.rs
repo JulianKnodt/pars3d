@@ -31,6 +31,7 @@ impl From<STL> for Mesh {
             face_mat_idx: vec![],
             joint_idxs: vec![],
             joint_weights: vec![],
+            extra_vertex_attrs: vec![],
         }
     }
 }

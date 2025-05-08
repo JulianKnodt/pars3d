@@ -1,3 +1,4 @@
+use super::mesh::ArbitraryAttr;
 use super::{FaceKind, F};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Error, ErrorKind, Read, Write};
@@ -21,6 +22,8 @@ pub struct Ply {
 
     /// Faces for this mesh
     f: Vec<FaceKind>,
+
+    extra_vertex_attrs: Vec<ArbitraryAttr>,
 }
 
 #[derive(PartialEq)]
@@ -56,6 +59,7 @@ enum Field {
     Green,
     Blue,
     Alpha,
+    Height,
     // Allow for storing arbitrary values
     //Arbitrary(String),
 }
@@ -72,7 +76,14 @@ impl Ply {
         assert!(vc.is_empty() || v.len() == vc.len());
         assert!(n.is_empty() || n.len() == v.len());
         assert!(uv.is_empty() || uv.len() == v.len());
-        Self { v, vc, n, uv, f }
+        Self {
+            v,
+            vc,
+            n,
+            uv,
+            f,
+            extra_vertex_attrs: vec![],
+        }
     }
 
     pub fn read_from_file(p: impl AsRef<Path>) -> io::Result<Self> {
@@ -90,11 +101,13 @@ impl Ply {
         let mut has_color = false;
         let mut has_normal = false;
         let mut has_uv = false;
+        let mut has_height = false;
 
         let mut v = vec![];
         let mut vc = vec![];
         let mut n = vec![];
         let mut uv: Vec<[F; 2]> = vec![];
+        let mut height: Vec<F> = vec![];
         let mut f = vec![];
 
         let mut num_v = 0;
@@ -195,6 +208,7 @@ impl Ply {
                         Some("green") => Field::Green,
                         Some("blue") => Field::Blue,
                         Some("alpha") => Field::Alpha,
+                        Some("height") => Field::Height,
 
                         Some(_) => return parse_err!("Unknown property name"),
                     };
@@ -203,6 +217,7 @@ impl Ply {
                         has_color || matches!(field, Field::Red | Field::Green | Field::Blue);
                     has_normal = has_normal || matches!(field, Field::NX | Field::NY | Field::NZ);
                     has_uv = has_uv || matches!(field, Field::S | Field::T);
+                    has_height = has_height || matches!(field, Field::Height);
                     VertexProperty
                 }
                 PropertyList => {
@@ -236,6 +251,7 @@ impl Ply {
                     let mut rgb = [0; 3];
                     let mut nrm = [0.; 3];
                     let mut uv_ = [0.; 2];
+                    let mut h = 0.;
 
                     for (fi, v) in l.split_whitespace().enumerate() {
                         macro_rules! get {
@@ -258,6 +274,7 @@ impl Ply {
                             Field::Red => rgb[0] = get!(u8),
                             Field::Green => rgb[1] = get!(u8),
                             Field::Blue => rgb[2] = get!(u8),
+                            Field::Height => h = get!(F),
                             Field::Alpha => continue,
                         }
                     }
@@ -271,6 +288,9 @@ impl Ply {
                     }
                     if has_uv {
                         uv.push(uv_);
+                    }
+                    if has_height {
+                        height.push(h);
                     }
 
                     match (num_v, num_f) {
@@ -313,7 +333,19 @@ impl Ply {
                 }
             }
         }
-        Ok(Ply { v, vc, uv, n, f })
+
+        let mut extra_vertex_attrs = vec![];
+        if has_height {
+            extra_vertex_attrs.push(ArbitraryAttr::Height(height));
+        }
+        Ok(Ply {
+            v,
+            vc,
+            uv,
+            n,
+            f,
+            extra_vertex_attrs,
+        })
     }
 
     /// Write this Ply file to a mesh.

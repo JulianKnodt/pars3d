@@ -84,6 +84,7 @@ impl From<ObjObject> for Mesh {
 
             joint_idxs: vec![],
             joint_weights: vec![],
+            extra_vertex_attrs: vec![],
             name: String::new(),
             face_mat_idx: obj.mat,
         }

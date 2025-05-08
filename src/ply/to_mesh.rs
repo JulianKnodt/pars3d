@@ -4,7 +4,14 @@ use crate::F;
 
 impl From<Ply> for Mesh {
     fn from(ply: Ply) -> Self {
-        let Ply { v, f, n, uv, vc } = ply;
+        let Ply {
+            v,
+            f,
+            n,
+            uv,
+            vc,
+            extra_vertex_attrs,
+        } = ply;
         let vert_colors = vc
             .into_iter()
             .map(|rgb| rgb.map(|v| v as F / 255.))
@@ -20,7 +27,9 @@ impl From<Ply> for Mesh {
             face_mat_idx: vec![],
             joint_idxs: vec![],
             joint_weights: vec![],
+
             name: String::new(),
+            extra_vertex_attrs,
         }
     }
 }
@@ -33,12 +42,20 @@ impl From<Mesh> for Ply {
             n,
             vert_colors: vc,
             uv: [uv, _, _, _],
+            extra_vertex_attrs,
             ..
         } = mesh;
         let vc = vc
             .into_iter()
             .map(|c| c.map(|v| (v.clamp(0., 1.) * 255.) as u8))
             .collect::<Vec<_>>();
-        Ply { v, f, vc, uv, n }
+        Ply {
+            v,
+            f,
+            vc,
+            uv,
+            n,
+            extra_vertex_attrs,
+        }
     }
 }

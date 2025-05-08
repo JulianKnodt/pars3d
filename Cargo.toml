@@ -21,6 +21,8 @@ f64 = []
 gltf = ["dep:gltf", "dep:gltf-json"]
 fbx = []
 strict_fbx = []
+extended_attrs = []
+
 svg = ["dep:svg"]
 kdtree = ["dep:kdtree"]
 rand = ["dep:rand"]

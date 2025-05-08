@@ -29,6 +29,7 @@ impl From<GLTFMesh> for Mesh {
 
             name: String::new(),
             vert_colors: vec![],
+            extra_vertex_attrs: vec![],
         }
     }
 }
