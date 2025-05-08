@@ -353,12 +353,9 @@ impl Scene {
     }
 }
 
-/// Arbitrary attributes for storing extra data on each vertex of a mesh
-#[derive(Debug, Clone, PartialEq)]
-#[non_exhaustive]
-pub enum ArbitraryAttr {
-    /// Displacement of each vertex from the surface
-    Height(Vec<F>),
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct VertexAttrs {
+    pub height: Vec<F>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
@@ -389,7 +386,8 @@ pub struct Mesh {
     /// The weight of each bone's influence. 0 indicates no influence.
     pub joint_weights: Vec<[F; 4]>,
 
-    pub extra_vertex_attrs: Vec<ArbitraryAttr>,
+    /// Additional vertex attributes to store on each vertex of a mesh
+    pub vertex_attrs: VertexAttrs,
 
     /// Name of this mesh.
     pub name: String,

@@ -10,7 +10,7 @@ impl From<Ply> for Mesh {
             n,
             uv,
             vc,
-            extra_vertex_attrs,
+            vertex_attrs,
         } = ply;
         let vert_colors = vc
             .into_iter()
@@ -29,7 +29,7 @@ impl From<Ply> for Mesh {
             joint_weights: vec![],
 
             name: String::new(),
-            extra_vertex_attrs,
+            vertex_attrs,
         }
     }
 }
@@ -42,7 +42,7 @@ impl From<Mesh> for Ply {
             n,
             vert_colors: vc,
             uv: [uv, _, _, _],
-            extra_vertex_attrs,
+            vertex_attrs,
             ..
         } = mesh;
         let vc = vc
@@ -55,7 +55,7 @@ impl From<Mesh> for Ply {
             vc,
             uv,
             n,
-            extra_vertex_attrs,
+            vertex_attrs,
         }
     }
 }

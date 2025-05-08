@@ -1,4 +1,4 @@
-use super::mesh::ArbitraryAttr;
+use super::mesh::VertexAttrs;
 use super::{FaceKind, F};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Error, ErrorKind, Read, Write};
@@ -23,7 +23,7 @@ pub struct Ply {
     /// Faces for this mesh
     f: Vec<FaceKind>,
 
-    extra_vertex_attrs: Vec<ArbitraryAttr>,
+    vertex_attrs: VertexAttrs,
 }
 
 #[derive(PartialEq)]
@@ -82,7 +82,7 @@ impl Ply {
             n,
             uv,
             f,
-            extra_vertex_attrs: vec![],
+            vertex_attrs: Default::default(),
         }
     }
 
@@ -107,7 +107,8 @@ impl Ply {
         let mut vc = vec![];
         let mut n = vec![];
         let mut uv: Vec<[F; 2]> = vec![];
-        let mut height: Vec<F> = vec![];
+        let mut vertex_attrs = VertexAttrs::default();
+        let height = &mut vertex_attrs.height;
         let mut f = vec![];
 
         let mut num_v = 0;
@@ -334,17 +335,13 @@ impl Ply {
             }
         }
 
-        let mut extra_vertex_attrs = vec![];
-        if has_height {
-            extra_vertex_attrs.push(ArbitraryAttr::Height(height));
-        }
         Ok(Ply {
             v,
             vc,
             uv,
             n,
             f,
-            extra_vertex_attrs,
+            vertex_attrs,
         })
     }
 
@@ -353,10 +350,7 @@ impl Ply {
         let has_vc = !self.vc.is_empty();
         let has_n = !self.n.is_empty();
         let has_uv = !self.uv.is_empty();
-        let h = self.extra_vertex_attrs.iter().find_map(|v| {
-            let ArbitraryAttr::Height(h) = v;
-            Some(h)
-        });
+        let has_h = !self.vertex_attrs.height.is_empty();
 
         writeln!(out, "ply")?;
         writeln!(out, "format ascii 1.0")?;
@@ -397,10 +391,10 @@ impl Ply {
             }
         }
 
-        if let Some(h) = h.as_ref() {
+        if has_h {
             assert_eq!(
                 self.vc.len(),
-                h.len(),
+                self.vertex_attrs.height.len(),
                 "Mismatch between #vertices and #height"
             );
             writeln!(out, "property float height")?;
@@ -422,7 +416,7 @@ impl Ply {
             if let Some([r, g, b]) = self.vc.get(vi) {
                 write!(out, " {r} {g} {b}")?;
             }
-            if let Some(h) = h.and_then(|h| h.get(vi)) {
+            if let Some(h) = self.vertex_attrs.height.get(vi) {
                 write!(out, " {h}")?;
             }
             writeln!(out)?;
