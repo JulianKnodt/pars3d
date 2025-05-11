@@ -356,6 +356,16 @@ impl Scene {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct VertexAttrs {
     pub height: Vec<F>,
+    pub tangent: Vec<[F; 3]>,
+    pub bitangent: Vec<[F; 3]>,
+}
+impl VertexAttrs {
+    /// Truncates all associated attributes
+    pub fn truncate(&mut self, l: usize) {
+        self.height.truncate(l);
+        self.tangent.truncate(l);
+        self.bitangent.truncate(l);
+    }
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
@@ -617,9 +627,11 @@ impl Mesh {
         *self = Mesh {
             v: new_v,
             f: std::mem::take(&mut self.f),
+            face_mesh_idx: std::mem::take(&mut self.face_mesh_idx),
             ..Default::default()
         }
     }
+
     pub fn normalize_joint_weights(&mut self) {
         for ws in &mut self.joint_weights {
             let sum = ws.iter().sum::<F>();
@@ -695,6 +707,24 @@ impl Mesh {
         clear_vec!(&mut self.vert_colors);
 
         (curr_len - used.len(), remap)
+    }
+
+    /// Deletes empty faces from this mesh.
+    pub fn delete_empty_faces(&mut self) {
+        let mut fi = 0;
+        while fi < self.f.len() {
+            if !self.f[fi].is_empty() {
+                fi += 1;
+                continue;
+            }
+            self.f.swap_remove(fi);
+            if fi < self.face_mesh_idx.len() {
+                self.face_mesh_idx.swap_remove(fi);
+            }
+            if fi < self.face_mat_idx.len() {
+                self.face_mat_idx.swap_remove(fi);
+            }
+        }
     }
 }
 
