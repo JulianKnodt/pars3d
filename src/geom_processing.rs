@@ -1,8 +1,15 @@
 use super::aabb::AABB;
 use super::edge::EdgeKind;
-use super::{cross, dot, normalize, sub, tri_area, F, U};
+use super::{add, cross, dot, kmul, length, normalize, sub, tri_area, F, U};
 use super::{face::Barycentric, FaceKind, Mesh, Scene};
 use std::collections::BTreeMap;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum VertexNormalWeightingKind {
+    Uniform,
+    #[default]
+    Area,
+}
 
 impl Mesh {
     #[inline]
@@ -23,6 +30,34 @@ impl Mesh {
             }
             self.f.extend(f.as_triangle_fan().map(FaceKind::Tri));
         }
+    }
+
+    /// Computes vertex normals into dst for a set of faces and vertices
+    pub fn vertex_normals(
+        fs: &[FaceKind],
+        vs: &[[F; 3]],
+        dst: &mut Vec<[F; 3]>,
+        kind: VertexNormalWeightingKind,
+    ) -> bool {
+        dst.resize(vs.len(), [0.; 3]);
+        dst.fill([0.; 3]);
+        for f in fs {
+            let normal = f.normal(&vs);
+            if length(normal) < 1e-10 {
+                continue;
+            }
+            let area = match kind {
+                VertexNormalWeightingKind::Uniform => 1.,
+                VertexNormalWeightingKind::Area => f.area(&vs),
+            };
+            for &vi in f.as_slice() {
+                dst[vi] = add(dst[vi], kmul(area, normal));
+            }
+        }
+        for n in dst {
+            *n = normalize(*n);
+        }
+        true
     }
     /// Splits non-planar faces into tris. Returns number of faces split.
     pub fn split_non_planar_faces(&mut self, eps: F) -> usize {
