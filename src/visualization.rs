@@ -211,6 +211,16 @@ pub fn optional_edge_value_visualization<'a>(
     edge_value: impl Fn([usize; 2]) -> Option<F>,
     default_color: [F; 3],
 ) -> (Vec<[F; 3]>, Vec<[F; 3]>, Vec<[usize; 3]>) {
+    optional_edge_vector_visualization(fs, nf, vs, |e| {
+        edge_value(e).map(magma).unwrap_or(default_color)
+    })
+}
+pub fn optional_edge_vector_visualization<'a>(
+    fs: impl Fn(usize) -> &'a [usize],
+    nf: usize,
+    vs: &[[F; 3]],
+    edge_value: impl Fn([usize; 2]) -> [F; 3],
+) -> (Vec<[F; 3]>, Vec<[F; 3]>, Vec<[usize; 3]>) {
     let mut new_vs = vec![];
     let mut new_vc = vec![];
 
@@ -232,7 +242,7 @@ pub fn optional_edge_value_visualization<'a>(
             let midi = new_vs.len();
             new_vs.push(midpoint);
 
-            let edge_color = edge_value([e0, e1]).map(magma).unwrap_or(default_color);
+            let edge_color = edge_value([e0, e1]);
             new_vc.push(edge_color);
             new_vc.push(edge_color);
             new_vc.push(edge_color);
@@ -252,12 +262,26 @@ pub fn opt_raw_edge_visualization(
     default_color: [F; 3],
     width: F,
 ) -> (Vec<[F; 3]>, Vec<[F; 3]>, Vec<[usize; 4]>) {
+    opt_raw_edge_vector_visualization(
+        edges,
+        vs,
+        |e| edge_value(e).map(magma).unwrap_or(default_color),
+        width,
+    )
+}
+
+pub fn opt_raw_edge_vector_visualization(
+    edges: impl Iterator<Item = [usize; 2]>,
+    vs: impl Fn(usize) -> [F; 3],
+    edge_value: impl Fn([usize; 2]) -> [F; 3],
+    width: F,
+) -> (Vec<[F; 3]>, Vec<[F; 3]>, Vec<[usize; 4]>) {
     let mut new_vs = vec![];
     let mut new_vc = vec![];
     let mut new_fs = vec![];
 
     for [e0, e1] in edges {
-        let color = edge_value([e0, e1]).map(magma).unwrap_or(default_color);
+        let color = edge_value([e0, e1]);
         let e0 = vs(e0);
         let e1 = vs(e1);
         let e_dir = normalize(sub(e1, e0));
