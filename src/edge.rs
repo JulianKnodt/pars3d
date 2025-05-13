@@ -14,6 +14,13 @@ impl EdgeKind {
             EdgeKind::NonManifold(fs) => fs.as_slice(),
         }
     }
+    pub fn as_mut_slice(&mut self) -> &mut [usize] {
+        match self {
+            EdgeKind::Boundary(f) => std::slice::from_mut(f),
+            EdgeKind::Manifold(fs) => fs.as_mut_slice(),
+            EdgeKind::NonManifold(fs) => fs.as_mut_slice(),
+        }
+    }
     pub fn insert(&mut self, v: usize) -> bool {
         let new = match self {
             &mut EdgeKind::Boundary(f) if f != v => EdgeKind::Manifold(std::cmp::minmax(f, v)),
@@ -32,6 +39,9 @@ impl EdgeKind {
         };
         *self = new;
         true
+    }
+    pub(crate) fn empty() -> Self {
+        EdgeKind::NonManifold(vec![])
     }
     pub fn is_boundary(&self) -> bool {
         matches!(self, EdgeKind::Boundary(_))

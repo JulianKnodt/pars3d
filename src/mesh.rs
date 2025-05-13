@@ -643,12 +643,18 @@ impl Mesh {
     }
     /// For all values from the other mesh, append them to this mesh.
     pub fn append(&mut self, o: &mut Self) {
+        let vert_offset = self.v.len();
         self.v.append(&mut o.v);
         self.n.append(&mut o.n);
         for i in 0..MAX_UV {
             self.uv[i].append(&mut o.uv[i]);
         }
         self.vert_colors.append(&mut o.vert_colors);
+        for f in o.f.iter_mut() {
+            for vi in f.as_mut_slice() {
+                *vi += vert_offset
+            }
+        }
         self.f.append(&mut o.f);
         self.face_mesh_idx.append(&mut o.face_mesh_idx);
         self.face_mat_idx.append(&mut o.face_mat_idx);
