@@ -3,6 +3,7 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
 use super::coloring::magma;
+use super::edge::EdgeKind;
 use super::{add, cross, edges, kmul, normalize, sub, F};
 
 /// Returns a coherent vertex coloring for a mesh with joint influences.
@@ -67,7 +68,7 @@ pub fn vertex_scalar_coloring(
 }
 
 /// Constructs a coloring for each face, based on some classification function.
-pub fn face_coloring<'a>(face_group: impl Fn(usize) -> usize, num_fs: usize) -> Vec<[F; 3]> {
+pub fn face_coloring(face_group: impl Fn(usize) -> usize, num_fs: usize) -> Vec<[F; 3]> {
     // note that `sin` below is a cheap way to make it pseudo random
     (0..num_fs)
         // also add num_fs to make it more random.
@@ -77,6 +78,45 @@ pub fn face_coloring<'a>(face_group: impl Fn(usize) -> usize, num_fs: usize) -> 
             })
         })
         .collect()
+}
+
+/// When segmenting faces into groups, emit a black wireframe along boundaries between
+/// clusterings.
+pub fn face_segmentation_wireframes<'a>(
+    fs: impl Fn(usize) -> &'a [usize],
+    face_group: impl Fn(usize) -> usize,
+    nf: usize,
+    vertices: &[[F; 3]],
+    width: F,
+) -> (Vec<[F; 3]>, Vec<[F; 3]>, Vec<[usize; 4]>) {
+    let mut edge_face_adj: HashMap<[usize; 2], EdgeKind> = HashMap::new();
+    for fi in 0..nf {
+        let f = fs(fi);
+        for [e0, e1] in edges(f) {
+            let e = std::cmp::minmax(e0, e1);
+            edge_face_adj
+                .entry(e)
+                .or_insert_with(EdgeKind::empty)
+                .insert(fi);
+        }
+    }
+
+    let mut edges = vec![];
+    'outer: for (&[e0, e1], ek) in edge_face_adj.iter() {
+        let eks = ek.as_slice();
+        for i in 0..eks.len() {
+            let fi = eks[i];
+            let fi_group = face_group(fi);
+            for &fj in &eks[i + 1..eks.len()] {
+                if fi_group != face_group(fj) {
+                    // emit a cylinder here
+                    edges.push([e0, e1]);
+                    continue 'outer;
+                }
+            }
+        }
+    }
+    opt_raw_edge_vector_visualization(edges.into_iter(), |vi| vertices[vi], |_| [0.; 3], width)
 }
 
 /// Uses a fixed set of high contrast colors to color each face group.
@@ -255,6 +295,7 @@ pub fn optional_edge_vector_visualization<'a>(
     (new_vs, new_vc, new_fs)
 }
 
+// TODO rename this to wireframe visualization
 pub fn opt_raw_edge_visualization(
     edges: impl Iterator<Item = [usize; 2]>,
     vs: impl Fn(usize) -> [F; 3],
@@ -270,6 +311,7 @@ pub fn opt_raw_edge_visualization(
     )
 }
 
+/// emit a cylindrical wireframe of a given color for a set of edges
 pub fn opt_raw_edge_vector_visualization(
     edges: impl Iterator<Item = [usize; 2]>,
     vs: impl Fn(usize) -> [F; 3],
