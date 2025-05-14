@@ -72,7 +72,7 @@ impl<T> FaceKind<T> {
     }
 
     /// Returns [prev, curr, next] for each vertex in a face.
-    pub(crate) fn incident_edges(&self) -> impl Iterator<Item = [T; 3]> + '_
+    pub fn incident_edges(&self) -> impl Iterator<Item = [T; 3]> + '_
     where
         T: Copy,
     {
