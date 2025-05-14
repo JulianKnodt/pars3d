@@ -16,7 +16,7 @@ pub struct VertexAdj<D = ()> {
 
 impl Mesh {
     /// Returns vertices adjacent to each vertex in the input mesh
-    pub fn vertex_adj(&self) -> VertexAdj<()> {
+    pub fn vertex_vertex_adj(&self) -> VertexAdj<()> {
         let mut nbrs: BTreeMap<usize, Vec<u32>> = BTreeMap::new();
         for f in &self.f {
             for [e0, e1] in f.edges() {
@@ -52,7 +52,7 @@ impl Mesh {
         }
     }
     /// Returns faces adjacent to each vertex in the input mesh
-    pub fn face_adj(&self) -> VertexAdj<()> {
+    pub fn vertex_face_adj(&self) -> VertexAdj<()> {
         let mut nbrs: BTreeMap<usize, Vec<u32>> = BTreeMap::new();
         for (fi, f) in self.f.iter().enumerate() {
             let fi = fi as u32;
@@ -178,6 +178,9 @@ impl<D> VertexAdj<D> {
                 (idx..idx + cnt as u32)
                     .map(move |i| ([v0, self.adj[i as usize] as usize], i as usize))
             })
+    }
+    pub fn all_adj_data(&self) -> impl Iterator<Item = (usize, &[u32], &[D])> + '_ {
+        (0..self.idx_count.len()).map(|vi| (vi, self.adj(vi), self.data(vi)))
     }
 
     /// Returns all pairs of edges once, such that e0 < e1
