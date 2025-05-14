@@ -70,6 +70,16 @@ impl<T> FaceKind<T> {
     {
         edges(self.as_slice())
     }
+
+    /// Returns [prev, curr, next] for each vertex in a face.
+    pub(crate) fn incident_edges(&self) -> impl Iterator<Item = [T; 3]> + '_
+    where
+        T: Copy,
+    {
+        let f = self.as_slice();
+        let n = f.len();
+        (0..n).map(move |i| [f[(i + n - 1) % n], f[i], f[(i + 1) % n]])
+    }
     #[inline]
     pub fn shared_edge(&self, o: &Self) -> Option<[T; 2]>
     where

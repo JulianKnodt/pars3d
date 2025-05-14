@@ -4,11 +4,27 @@ use super::{add, cross, dot, kmul, length, normalize, sub, tri_area, F, U};
 use super::{face::Barycentric, FaceKind, Mesh, Scene};
 use std::collections::BTreeMap;
 
+/// Curvature related functions
+pub mod curvature;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum VertexNormalWeightingKind {
     Uniform,
     #[default]
     Area,
+}
+
+pub fn barycentric_areas(fs: &[FaceKind], vs: &[[F; 3]], dst: &mut Vec<F>) {
+    dst.fill(0.);
+    dst.resize(vs.len(), 0.);
+    for f in fs {
+        for t in f.as_triangle_fan() {
+            let area = tri_area(t.map(|vi| vs[vi])) / 3.;
+            for v in t {
+                dst[v] += area;
+            }
+        }
+    }
 }
 
 impl Mesh {
@@ -341,19 +357,6 @@ impl Mesh {
             aabb.add_point(v);
         }
         aabb
-    }
-
-    pub fn barycentric_areas(&self) -> Vec<F> {
-        let mut out = vec![0.; self.v.len()];
-        for f in &self.f {
-            for t in f.as_triangle_fan() {
-                let area = tri_area(t.map(|vi| self.v[vi])) / 3.;
-                for v in t {
-                    out[v] += area;
-                }
-            }
-        }
-        out
     }
 
     /// Implementation from: https://mobile.rodolphe-vaillant.fr/entry/20/compute-harmonic-weights-on-a-triangular-mesh
