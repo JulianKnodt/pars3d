@@ -85,14 +85,20 @@ impl<T> FaceKind<T> {
     where
         T: Eq + Copy,
     {
-        for e in self.edges() {
-            for [oe0, oe1] in o.edges() {
-                if e == [oe0, oe1] || e == [oe1, oe0] {
-                    return Some(e);
-                }
-            }
-        }
-        return None;
+      self.shared_edges(o).next()
+    }
+    /// Returns all shared edges between `self` and `o`.
+    pub fn shared_edges<'a: 'c, 'b: 'c, 'c>(
+        &'a self,
+        o: &'b Self,
+    ) -> impl Iterator<Item = [T; 2]> + 'c
+    where
+        T: Eq + Copy,
+    {
+        self.edges().filter(|&e| {
+            o.edges()
+                .any(move |[oe0, oe1]| e == [oe0, oe1] || e == [oe1, oe0])
+        })
     }
     /// Iterate over triangles in this face rooted at the 0th index.
     pub fn as_triangle_fan(&self) -> impl Iterator<Item = [T; 3]> + '_

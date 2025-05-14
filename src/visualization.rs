@@ -184,6 +184,11 @@ impl super::mesh::Mesh {
     /// Constructs a new mesh with a given face coloring.
     /// Does not retain any information from the original mesh.
     pub fn with_face_coloring(&self, fc: &[[F; 3]]) -> Self {
+        assert_eq!(
+            fc.len(),
+            self.f.len(),
+            "There should be 1 face color per face"
+        );
         use super::FaceKind;
         let mut new_v = vec![];
         let mut new_fs = vec![];
