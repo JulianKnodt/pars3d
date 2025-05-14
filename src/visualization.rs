@@ -116,7 +116,7 @@ pub fn face_segmentation_wireframes<'a>(
             }
         }
     }
-    opt_raw_edge_vector_visualization(edges.into_iter(), |vi| vertices[vi], |_| [0.; 3], width)
+    colored_wireframe(edges.into_iter(), |vi| vertices[vi], |_| [0.; 3], width)
 }
 
 /// Uses a fixed set of high contrast colors to color each face group.
@@ -296,14 +296,14 @@ pub fn optional_edge_vector_visualization<'a>(
 }
 
 // TODO rename this to wireframe visualization
-pub fn opt_raw_edge_visualization(
+pub fn opt_colored_wireframe(
     edges: impl Iterator<Item = [usize; 2]>,
     vs: impl Fn(usize) -> [F; 3],
     edge_value: impl Fn([usize; 2]) -> Option<F>,
     default_color: [F; 3],
     width: F,
 ) -> (Vec<[F; 3]>, Vec<[F; 3]>, Vec<[usize; 4]>) {
-    opt_raw_edge_vector_visualization(
+    colored_wireframe(
         edges,
         vs,
         |e| edge_value(e).map(magma).unwrap_or(default_color),
@@ -312,7 +312,7 @@ pub fn opt_raw_edge_visualization(
 }
 
 /// emit a cylindrical wireframe of a given color for a set of edges
-pub fn opt_raw_edge_vector_visualization(
+pub fn colored_wireframe(
     edges: impl Iterator<Item = [usize; 2]>,
     vs: impl Fn(usize) -> [F; 3],
     edge_value: impl Fn([usize; 2]) -> [F; 3],
@@ -359,6 +359,21 @@ pub fn opt_raw_edge_vector_visualization(
     }
 
     (new_vs, new_vc, new_fs)
+}
+
+pub fn wireframe_to_mesh(
+    (v, vert_colors, faces): (Vec<[F; 3]>, Vec<[F; 3]>, Vec<[usize; 4]>),
+) -> super::Mesh {
+    let f = faces
+        .into_iter()
+        .map(super::FaceKind::Quad)
+        .collect::<Vec<_>>();
+    super::Mesh {
+        v,
+        vert_colors,
+        f,
+        ..Default::default()
+    }
 }
 
 fn non_parallel([x, y, z]: [F; 3]) -> [F; 3] {
