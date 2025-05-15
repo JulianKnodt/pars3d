@@ -1,4 +1,4 @@
-use super::Mesh;
+use super::{dot, normalize, sub, FaceKind, Mesh, F};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Structure for maintaining vertex adjacencies of a mesh with fixed topology.
@@ -14,11 +14,10 @@ pub struct VertexAdj<D = ()> {
     data: Vec<D>,
 }
 
-impl Mesh {
-    /// Returns vertices adjacent to each vertex in the input mesh
-    pub fn vertex_vertex_adj(&self) -> VertexAdj<()> {
+impl VertexAdj {
+    pub fn new(fs: &[FaceKind], nv: usize) -> Self {
         let mut nbrs: BTreeMap<usize, Vec<u32>> = BTreeMap::new();
-        for f in &self.f {
+        for f in fs {
             for [e0, e1] in f.edges() {
                 assert_ne!(e0, e1);
                 let e0_nbrs = nbrs.entry(e0).or_default();
@@ -33,7 +32,7 @@ impl Mesh {
         }
         let mut idx_count = vec![];
         let mut adj = vec![];
-        for vi in 0..self.v.len() {
+        for vi in 0..nv {
             let Some(n) = nbrs.get_mut(&vi) else {
                 // no neighbors
                 idx_count.push((0, 0));
@@ -50,6 +49,13 @@ impl Mesh {
             adj,
             data,
         }
+    }
+}
+
+impl Mesh {
+    /// Returns vertices adjacent to each vertex in the input mesh
+    pub fn vertex_vertex_adj(&self) -> VertexAdj<()> {
+        VertexAdj::new(&self.f, self.v.len())
     }
     /// Returns faces adjacent to each vertex in the input mesh
     pub fn vertex_face_adj(&self) -> VertexAdj<()> {
@@ -181,6 +187,53 @@ impl<D> VertexAdj<D> {
     }
     pub fn all_adj_data(&self) -> impl Iterator<Item = (usize, &[u32], &[D])> + '_ {
         (0..self.idx_count.len()).map(|vi| (vi, self.adj(vi), self.data(vi)))
+    }
+
+    /// Given an incoming edge to this vertex, return the edge that is closest to being
+    /// opposite. Returns none if vertex does not share any faces
+    pub fn regular_quad_vertex_opposing(
+        &self,
+        vert_face: &Self,
+        vi: usize,
+        prev: usize,
+    ) -> Option<usize> {
+        if self.degree(vi) != 4 {
+            return None;
+        }
+        for v_adj in self.adj(vi) {
+            let v_adj = *v_adj as usize;
+            if v_adj == prev {
+                continue;
+            }
+            let shares_face = vert_face
+                .adj(v_adj)
+                .iter()
+                .any(|vif| vert_face.adj(prev).iter().any(|ovif| vif == ovif));
+            if shares_face {
+                continue;
+            }
+            return Some(v_adj);
+        }
+        None
+    }
+    /// Returns the approximate opposing vertex for a given previous vertex to
+    /// vi. That is, which vertex is approximately going in the other direction
+    /// (closest to 180 degrees). Returns the cos theta between the two of them
+    pub fn approximate_opposing_vertex(&self, vs: &[[F; 3]], vi: usize, prev: usize) -> (usize, F) {
+        let e_dir = normalize(sub(vs[vi], vs[prev]));
+        let mut best = F::NEG_INFINITY;
+        let mut best_vi = 0;
+        for &adj in self.adj(vi) {
+            let adj = adj as usize;
+            let n_dir = normalize(sub(vs[adj], vs[vi]));
+            let cos_theta = dot(e_dir, n_dir).clamp(-1., 1.);
+            if cos_theta > best {
+                best_vi = adj;
+                best = cos_theta;
+            }
+        }
+        assert_ne!(best, F::NEG_INFINITY);
+        return (best_vi, best);
     }
 
     /// Returns all pairs of edges once, such that e0 < e1

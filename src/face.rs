@@ -85,7 +85,7 @@ impl<T> FaceKind<T> {
     where
         T: Eq + Copy,
     {
-      self.shared_edges(o).next()
+        self.shared_edges(o).next()
     }
     /// Returns all shared edges between `self` and `o`.
     pub fn shared_edges<'a: 'c, 'b: 'c, 'c>(
