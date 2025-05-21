@@ -79,6 +79,9 @@ pub mod noise;
 /// Visualize per-element attributes.
 pub mod visualization;
 
+/// Trace lines on the surface of a mesh
+pub mod tracing;
+
 // GEOMETRY PROCESSING ---
 
 /// Animation related structs
@@ -103,6 +106,9 @@ pub use mesh::Scene;
 pub mod tri_to_quad;
 
 pub mod util;
+
+/// Quaternion related stuff
+pub mod quat;
 
 /// AABB (mostly for UVs)
 pub mod aabb;
@@ -308,6 +314,23 @@ fn test_bary_2d() {
 
 pub fn barycentric_3d(p: [F; 3], [a, b, c]: [[F; 3]; 3]) -> [F; 3] {
     barycentric_n(p, a, b, c)
+}
+
+/// For a given direction in world space, convert it to a direction lying in the plane of the
+/// triangle using basis defined by the barycentric coordinates.
+pub fn dir_to_barycentric(dir: [F; 3], abc: [[F; 3]; 3]) -> [F; 2] {
+    let p = add(abc[2], kmul(1e-5, dir));
+    let [b0, b1, _] = barycentric_3d(p, abc);
+    normalize([b0, b1])
+}
+
+/// Construct a 2D rotation matrix with rotation theta
+pub(crate) fn rot_matrix_2d(theta: F) -> [[F; 2]; 2] {
+    [[theta.cos(), -theta.sin()], [theta.sin(), theta.cos()]]
+}
+
+pub fn matmul_2d([r0, r1]: [[F; 2]; 2], xy: [F; 2]) -> [F; 2] {
+    [dot(r0, xy), dot(r1, xy)]
 }
 
 #[test]

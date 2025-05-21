@@ -139,17 +139,21 @@ impl Mesh {
         }
         num_split
     }
-    /// Removes doublets (faces which share more than 1 edge)
-    /// CAUTION: Allocates
-    pub fn remove_doublets(&mut self) {
-        // TODO maybe easier to describe as degree 2 non border vertex
+
+    /// Edge to adjacent faces
+    pub(crate) fn edge_adj_map(&self) -> BTreeMap<[usize; 2], Vec<usize>> {
         let mut edge_adj: BTreeMap<[usize; 2], Vec<usize>> = BTreeMap::new();
-        // face index -> Vec<usize> (adjacent faces)
         for (fi, f) in self.f.iter().enumerate() {
             for e in f.edges_ord() {
                 edge_adj.entry(e).or_default().push(fi);
             }
         }
+        edge_adj
+    }
+    /// Removes doublets (faces which share more than 1 edge)
+    /// CAUTION: Allocates
+    pub fn remove_doublets(&mut self) {
+        let edge_adj = self.edge_adj_map();
 
         let mut shared_edges: BTreeMap<usize, Vec<[usize; 2]>> = BTreeMap::new();
         let curr_f_len = self.f.len();

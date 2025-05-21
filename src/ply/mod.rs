@@ -361,8 +361,8 @@ impl Ply {
 
         if has_n {
             assert_eq!(
-                self.n.len(),
                 self.v.len(),
+                self.n.len(),
                 "Mismatch between #vertices and #normals"
             );
             for p in ["nx", "ny", "nz"] {
@@ -382,8 +382,8 @@ impl Ply {
 
         if has_vc {
             assert_eq!(
-                self.vc.len(),
                 self.v.len(),
+                self.vc.len(),
                 "Mismatch between #vertices and #vertex colors"
             );
             for p in ["red", "green", "blue"] {
@@ -393,7 +393,7 @@ impl Ply {
 
         if has_h {
             assert_eq!(
-                self.vc.len(),
+                self.v.len(),
                 self.vertex_attrs.height.len(),
                 "Mismatch between #vertices and #height"
             );

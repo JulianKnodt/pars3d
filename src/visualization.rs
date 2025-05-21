@@ -420,7 +420,7 @@ fn test_edge_vis() {
 #[test]
 fn test_raw_edge_vis() {
     let vs = [[0.; 3], [1., 0., 0.], [1., 1., 0.], [0., 1., 0.]];
-    let (vs, vc, fs) = opt_raw_edge_visualization(
+    let (vs, vc, fs) = opt_colored_wireframe(
         [[0, 1], [1, 2], [2, 3], [3, 0]].into_iter(),
         |vi| vs[vi],
         |[i, _j]| Some((i + 1) as F / 4.),
