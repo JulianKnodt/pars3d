@@ -211,12 +211,15 @@ impl Mesh {
         vert_count.into_iter().filter(|&cnt| cnt == 4).count()
     }
 
-    /// Returns (#Boundary Edges, #Manifold Edges, #Nonmanifold Edges)
+    /// Returns (#Manifold Edges, #Boundary Edges, #Nonmanifold Edges)
     pub fn num_edge_kinds(&self) -> (usize, usize, usize) {
         let mut edges: BTreeMap<[usize; 2], u32> = BTreeMap::new();
         for f in &self.f {
             for e in f.edges_ord() {
-                let cnt = edges.entry(e).or_default();
+                if e[0] == e[1] {
+                    continue;
+                }
+                let cnt = edges.entry(e).or_insert(0);
                 *cnt = *cnt + 1u32;
             }
         }
@@ -232,7 +235,7 @@ impl Mesh {
             };
             *cnt += 1;
         }
-        (num_bd, num_manifold, num_nonmanifold)
+        (num_manifold, num_bd, num_nonmanifold)
     }
     /// Returns (#Boundary Edges, #Manifold Edges, #Nonmanifold Edges)
     pub fn num_edge_kinds_by_position(&self) -> (usize, usize, usize) {
@@ -259,7 +262,7 @@ impl Mesh {
         (num_bd, num_manifold, num_nonmanifold)
     }
     pub fn num_boundary_edges(&self) -> usize {
-        self.num_edge_kinds().0
+        self.num_edge_kinds().1
     }
 
     /// Non-unique iterator over boundary vertices
