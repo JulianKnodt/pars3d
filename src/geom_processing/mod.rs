@@ -241,7 +241,7 @@ impl Mesh {
         }
         (num_manifold, num_bd, num_nonmanifold)
     }
-    /// Returns (#Boundary Edges, #Manifold Edges, #Nonmanifold Edges)
+    /// Returns (#Manifold Edges, #Boundary Edges, #Nonmanifold Edges)
     pub fn num_edge_kinds_by_position(&self) -> (usize, usize, usize) {
         let mut edges: BTreeMap<[[U; 3]; 2], u32> = BTreeMap::new();
         for f in &self.f {
@@ -263,7 +263,7 @@ impl Mesh {
             };
             *cnt += 1;
         }
-        (num_bd, num_manifold, num_nonmanifold)
+        (num_manifold, num_bd, num_nonmanifold)
     }
     pub fn num_boundary_edges(&self) -> usize {
         self.num_edge_kinds().1
