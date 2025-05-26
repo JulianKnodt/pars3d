@@ -1724,6 +1724,9 @@ impl KVs {
                         ("FbxBindingTable", "CodeAbsoluteURL" | "CodeRelativeURL" | "CodeTAG")  => {},
                         ("FbxBindingTable", "DescAbsoluteURL" | "DescRelativeURL" | "DescTAG")  => {},
 
+                        // Null
+                        ("FbxNull", "Color" | "Size" | "Look") => {},
+
                         (_, p) => todo_if_strict!("{ty} {p:?} {vals:?}"),
                       }
                     }
