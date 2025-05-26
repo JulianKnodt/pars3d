@@ -366,9 +366,10 @@ pub fn parse(p: impl AsRef<Path>, split_by_object: bool, split_by_group: bool) -
                 }
             }
             "s" => {
-                let Some(rem) = iter.remainder() else {
-                    panic!("Missing smoothing group number in smoothing group: s <missing>");
-                };
+                let rem = iter.remainder().unwrap_or_else(|| {
+                    eprintln!("Missing smoothing group number in smoothing group: s <missing>");
+                    ""
+                });
 
                 let s = rem.trim() == "0";
                 let curr_f = curr_obj.f.len();
