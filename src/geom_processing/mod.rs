@@ -85,7 +85,11 @@ impl Mesh {
             if self.f[fi].is_tri() {
                 continue;
             }
+
+            let mesh_idx = self.face_mesh_idx.get(fi);
+            let mat_idx = self.mat_for_face(fi);
             // special case quads
+            let curr_nfs = self.f.len();
             if let FaceKind::Quad([f0, f1, f2, f3]) = self.f[fi] {
                 use super::tri_normal;
                 let [ti0, ti1] = [[f0, f1, f2], [f0, f2, f3]];
@@ -113,6 +117,18 @@ impl Mesh {
                     self.f.push(FaceKind::Tri(ti3));
                 }
 
+                if let Some(&mesh_idx) = mesh_idx {
+                    self.face_mesh_idx.push(mesh_idx);
+                }
+                if let Some(mi) = mat_idx {
+                    let last_range = self.face_mat_idx.last_mut().unwrap();
+                    if last_range.1 == mi {
+                        last_range.0.end += 1;
+                    } else {
+                        self.face_mat_idx.push((curr_nfs..curr_nfs + 1, mi));
+                    }
+                }
+
                 num_split += 1;
                 continue;
             }
@@ -135,33 +151,39 @@ impl Mesh {
             let mut tris = prev.as_triangle_fan();
             self.f[fi] = FaceKind::Tri(tris.next().unwrap());
             self.f.extend(tris.map(FaceKind::Tri));
+            let new_nfs = self.f.len();
+            if let Some(&mesh_idx) = mesh_idx {
+                self.face_mesh_idx
+                    .extend((curr_nfs..new_nfs).map(|_| mesh_idx));
+            }
+            if let Some(mi) = mat_idx {
+                let last_range = self.face_mat_idx.last_mut().unwrap();
+                if last_range.1 == mi {
+                    last_range.0.end = new_nfs;
+                } else {
+                    self.face_mat_idx.push((curr_nfs..new_nfs, mi));
+                }
+            }
+
             num_split += 1;
         }
         num_split
     }
 
-    /// Edge to adjacent faces
-    pub(crate) fn edge_adj_map(&self) -> BTreeMap<[usize; 2], Vec<usize>> {
-        let mut edge_adj: BTreeMap<[usize; 2], Vec<usize>> = BTreeMap::new();
-        for (fi, f) in self.f.iter().enumerate() {
-            for e in f.edges_ord() {
-                edge_adj.entry(e).or_default().push(fi);
-            }
-        }
-        edge_adj
-    }
     /// Removes doublets (faces which share more than 1 edge)
     /// CAUTION: Allocates
     pub fn remove_doublets(&mut self) {
-        let edge_adj = self.edge_adj_map();
+        let edge_adj = self.edge_kinds();
 
+        // For each adjacent face, which edges are shared?
         let mut shared_edges: BTreeMap<usize, Vec<[usize; 2]>> = BTreeMap::new();
+
         let curr_f_len = self.f.len();
         for fi in 0..curr_f_len {
             shared_edges.clear();
             let f = &self.f[fi];
             for e in f.edges_ord() {
-                for &adj_f in &edge_adj[&e] {
+                for &adj_f in edge_adj[&e].as_slice() {
                     if adj_f == fi {
                         continue;
                     }
@@ -169,7 +191,9 @@ impl Mesh {
                 }
             }
             for (_, es) in shared_edges.iter() {
+                // TODO should assume that more than two edges can be shared
                 if es.len() != 2 {
+                    assert!(es.len() < 2);
                     continue;
                 }
                 let [e0, e1] = [es[0], es[1]];
