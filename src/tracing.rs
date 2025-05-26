@@ -20,26 +20,30 @@ pub enum WidthKind {
 /// How to define color on a curve
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ColorKind {
-  /// Constant color on the whole curve
-  Constant([F; 3]),
-
-  /*
-  /// Linearly interpolate the color along the curve
-  Linear {
-    start: [F; 3],
-    end: [F; 3],
-  },
-  */
-
-  // TODO add more complex functions here?
+    /// Constant color on the whole curve
+    Constant([F; 3]),
+    /*
+    /// Linearly interpolate the color along the curve
+    Linear {
+      start: [F; 3],
+      end: [F; 3],
+    },
+    */
+    // TODO add more complex functions here?
 }
 
 impl ColorKind {
-  pub fn starting_color(&self) -> [F;3] {
-    match self {
-      ColorKind::Constant(c) => *c,
+    pub fn starting_color(&self) -> [F; 3] {
+        match self {
+            ColorKind::Constant(c) => *c,
+        }
     }
-  }
+}
+
+impl Default for ColorKind {
+    fn default() -> Self {
+        ColorKind::Constant([0.; 3])
+    }
 }
 
 /// Describes a curve on the surface of a triangle mesh
@@ -87,6 +91,7 @@ pub fn trace_curve<'a>(
     let mut pos = vec![pos];
     let /*mut*/ colors = vec![curve.color.starting_color()];
     let mut edges = vec![];
+
     loop {
         // need to find intersection with other triangle edge
         let (tri_idx, coords) = curr_bary.tri_idx_and_coords();
@@ -208,6 +213,7 @@ fn test_trace() {
         width: 3e-3,
 
         bend_amt: 0.,
+        color: Default::default(),
     };
 
     let (curve_v, curve_f) = trace_curve(
@@ -242,7 +248,7 @@ fn test_trace_sphere() {
     let mut m = super::load("icosphere.obj").unwrap().into_flattened_mesh();
     m.geometry_only();
     m.vert_colors = vec![[1.; 3]; m.v.len()];
-    let edge_adj = m.edge_adj_map();
+    let edge_adj = m.edge_kinds();
 
     let curve = Curve {
         start: Barycentric::Tri([0., 0., 1.]),
@@ -251,12 +257,13 @@ fn test_trace_sphere() {
         length: 5000.,
         width: 3e-3,
         bend_amt: 0.,
+        color: Default::default(),
     };
 
     let (curve_v, curve_f) = trace_curve(
         &m.v,
         &m.f,
-        |[e0, e1]| &edge_adj[&std::cmp::minmax(e0, e1)],
+        |[e0, e1]| edge_adj[&std::cmp::minmax(e0, e1)].as_slice(),
         curve,
     );
     let black_verts = vec![[0.; 3]; curve_v.len()];
