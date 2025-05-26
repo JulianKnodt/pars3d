@@ -1,4 +1,4 @@
-use super::{add, kmul, F};
+use super::{add, dot, kmul, F};
 
 // https://coolors.co/palettes/popular/simple
 pub const HIGH_CONTRAST: [[u8; 3]; 6] = [
@@ -34,6 +34,25 @@ pub fn hue_to_rgb(v: F) -> [F; 3] {
     let rgb = rgb.map(|val| val + m);
     let sum = rgb.into_iter().sum::<F>().max(1e-8);
     kmul(sum.recip(), rgb)
+}
+
+/// Transform RGB to YIQ space (Luma, In-phase, Quadrature)
+#[inline]
+pub fn rgb_to_yiq(rgb: [F; 3]) -> [F; 3] {
+    [
+        dot([0.299, 0.587, 0.114], rgb),
+        dot([0.5959, -0.2746, -0.3213], rgb),
+        dot([0.2115, -0.5227, 0.3227], rgb),
+    ]
+}
+
+#[inline]
+pub fn yiq_to_rgb(yiq: [F; 3]) -> [F; 3] {
+    [
+        dot([1., 0.956, 0.619], rgb),
+        dot([1., -0.272, -0.647], rgb),
+        dot([1., -1.106, 1.703], rgb),
+    ]
 }
 
 #[test]

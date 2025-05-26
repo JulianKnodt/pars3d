@@ -68,7 +68,10 @@ pub fn trace_curve<'a>(
         let isect_y = -coords[1] / curr_dir[1];
         let isect_xy = (1. - coords[0] - coords[1]) / (curr_dir[0] + curr_dir[1]);
         let uv = [coords[0], coords[1]];
-        assert!([isect_x, isect_y, isect_xy].iter().copied().any(F::is_finite));
+        assert!([isect_x, isect_y, isect_xy]
+            .iter()
+            .copied()
+            .any(F::is_finite));
         let nearest = [isect_x, isect_y, isect_xy]
             .into_iter()
             .filter(|v| v.is_finite())
@@ -80,11 +83,7 @@ pub fn trace_curve<'a>(
             continue;
         };
         let new_pos = add(uv, kmul(nearest, curr_dir));
-        let edge_bary = [
-            new_pos[0],
-            new_pos[1],
-            (1. - new_pos[0] - new_pos[1]),
-        ];
+        let edge_bary = [new_pos[0], new_pos[1], (1. - new_pos[0] - new_pos[1])];
 
         let new_global_pos = FaceKind::Tri(tri)
             .map_kind(|vi| vs[vi])
@@ -151,8 +150,8 @@ pub fn trace_curve<'a>(
         let new_world_dir = normalize(quat_rot(new_world_dir, quat_from_to(curr_n, new_n)));
         curr_dir = dir_to_barycentric(new_world_dir, new_tri.map(|vi| vs[vi]));
         if curve.bend_amt != 0. {
-          let rot = super::rot_matrix_2d(seg_len * curve.bend_amt);
-          curr_dir = super::matmul_2d(rot, curr_dir);
+            let rot = super::rot_matrix_2d(seg_len * curve.bend_amt);
+            curr_dir = super::matmul_2d(rot, curr_dir);
         }
     }
 
