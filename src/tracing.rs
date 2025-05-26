@@ -17,6 +17,31 @@ pub enum WidthKind {
 }
 */
 
+/// How to define color on a curve
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ColorKind {
+  /// Constant color on the whole curve
+  Constant([F; 3]),
+
+  /*
+  /// Linearly interpolate the color along the curve
+  Linear {
+    start: [F; 3],
+    end: [F; 3],
+  },
+  */
+
+  // TODO add more complex functions here?
+}
+
+impl ColorKind {
+  pub fn starting_color(&self) -> [F;3] {
+    match self {
+      ColorKind::Constant(c) => *c,
+    }
+  }
+}
+
 /// Describes a curve on the surface of a triangle mesh
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Curve {
@@ -35,6 +60,8 @@ pub struct Curve {
 
     /// How much to rotate the direction by length (coarsely approximated)
     bend_amt: F,
+
+    color: ColorKind,
 }
 
 /// Trace a curve along the surface of this mesh.
@@ -58,6 +85,7 @@ pub fn trace_curve<'a>(
         .from_barycentric(curr_bary);
 
     let mut pos = vec![pos];
+    let /*mut*/ colors = vec![curve.color.starting_color()];
     let mut edges = vec![];
     loop {
         // need to find intersection with other triangle edge
@@ -155,7 +183,7 @@ pub fn trace_curve<'a>(
         }
     }
 
-    let (v, _, fs) = colored_wireframe(edges.into_iter(), |vi| pos[vi], |_| [0.; 3], curve.width);
+    let (v, _, fs) = colored_wireframe(edges.into_iter(), |vi| pos[vi], |_| colors[0], curve.width);
     (v, fs)
 }
 
