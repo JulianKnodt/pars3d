@@ -265,6 +265,7 @@ impl FaceKind {
     /// Canonicalize this face, deleting duplicates and retaining order such that the lowest
     /// index vertex is first.
     /// Returns true if this face is now degenerate.
+    // ROT indicates whether the output array should be rotated or not
     fn _canonicalize<const ROT: bool>(&mut self) -> bool {
         use FaceKind::*;
         match self {
@@ -274,12 +275,26 @@ impl FaceKind {
                 *self = Self::Tri([a, c, d]);
                 return self.canonicalize();
             }
+            // has a singlet, do not merge
             &mut Quad([a, _, c, _] | [_, a, _, c]) if a == c => return true,
+
             Quad(_) => {}
+
             Poly(ref mut v) => {
                 v.dedup();
                 while !v.is_empty() && v.last() == v.first() {
                     v.pop();
+                }
+                let mut i = 0;
+                while v.len() >= 3 && i < v.len() {
+                    if v[(i + 2) % v.len()] == v[i] {
+                        // remove self and remove next (more robust than removing next element due
+                        // to wrapping)
+                        v.remove(i);
+                        v.remove(i % v.len());
+                    } else {
+                        i += 1;
+                    }
                 }
                 if v.len() < 3 {
                     return true;
@@ -658,4 +673,14 @@ fn test_all_tri_splits_quad() {
         "{:?}",
         p.all_triangle_splits().collect::<Vec<_>>()
     );
+}
+
+#[test]
+fn test_canonicalize_wrap() {
+    let mut q = FaceKind::Poly(vec![0, 1, 2, 3, 1]);
+    q.canonicalize();
+    assert_eq!(q, FaceKind::Tri([1, 2, 3]));
+    let mut q = FaceKind::Poly(vec![0, 3, 7, 3, 1, 2, 3]);
+    q.canonicalize();
+    assert_eq!(q, FaceKind::Tri([1, 2, 3]));
 }
