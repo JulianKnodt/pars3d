@@ -379,7 +379,12 @@ pub(crate) fn per_vertex_colored_wireframe(
 
     for vi in 0..nv {
         let (ei, vc) = vs(vi);
-        let o = if vi == 0 { vs(1).0 } else { vs(vi - 1).0 };
+        let o = if vi == 0 {
+            // extrapolate here for consistency
+            sub(kmul(2., ei), vs(1).0)
+        } else {
+            vs(vi - 1).0
+        };
         let e_dir = normalize(sub(ei, o));
         if e_dir.iter().all(|&v| v == 0.) {
             continue;

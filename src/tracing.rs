@@ -46,6 +46,15 @@ impl ColorKind {
             &ColorKind::Linear(s, e) => add(kmul(1. - t, s), kmul(t, e)),
         }
     }
+    fn split(&self) -> (ColorKind, ColorKind) {
+        match self {
+            &ColorKind::Constant(c) => (ColorKind::Constant(c), ColorKind::Constant(c)),
+            &ColorKind::Linear(s, e) => {
+                let mid = self.lerp(0.5);
+                (ColorKind::Linear(s, mid), ColorKind::Linear(mid, e))
+            }
+        }
+    }
 }
 
 impl Default for ColorKind {
@@ -97,6 +106,39 @@ impl Curve {
     }
 }
 */
+
+pub fn trace_curve_from_mid<'a>(
+    vs: &[[F; 3]],
+    fs: &[FaceKind],
+    // For each edge, returns adjacent faces
+    edge_adj: impl Fn([usize; 2]) -> &'a [usize],
+
+    mut curve: Curve,
+) -> (Vec<[F; 3]>, Vec<[F; 3]>, Vec<[usize; 4]>) {
+    for c in curve.start.coords_mut() {
+        *c = c.clamp(1e-2, 0.99);
+    }
+    curve.start.normalize();
+
+    curve.length /= 2.;
+    let (c0, c1) = curve.color.split();
+    //curve.color = c0;
+    curve.color = ColorKind::Constant([0.; 3]);
+    let (mut v0, mut vc0, mut f0) = trace_curve(vs, fs, &edge_adj, curve);
+    //curve.color = c1;
+    curve.color = ColorKind::Constant([1.; 3]);
+    curve.direction = curve.direction.map(|d| -d);
+
+    let (mut v1, mut vc1, mut f1) = trace_curve(vs, fs, &edge_adj, curve);
+    let o = vc0.len();
+    for vis in f1.iter_mut() {
+        *vis = vis.map(|vi| vi + o)
+    }
+    v0.append(&mut v1);
+    vc0.append(&mut vc1);
+    f0.append(&mut f1);
+    (v0, vc0, f0)
+}
 
 /// Trace a curve along the surface of this mesh.
 pub fn trace_curve<'a>(

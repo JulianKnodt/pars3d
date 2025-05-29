@@ -79,7 +79,8 @@ pub mod noise;
 /// Visualize per-element attributes.
 pub mod visualization;
 
-/// Trace lines on the surface of a mesh
+/// Trace lines on the surface of a mesh.
+/// For visualization or for art.
 pub mod tracing;
 
 // GEOMETRY PROCESSING ---
@@ -318,9 +319,9 @@ pub fn barycentric_3d(p: [F; 3], [a, b, c]: [[F; 3]; 3]) -> [F; 3] {
 
 /// For a given direction in world space, convert it to a direction lying in the plane of the
 /// triangle using basis defined by the barycentric coordinates.
-pub fn dir_to_barycentric(dir: [F; 3], abc: [[F; 3]; 3]) -> [F; 2] {
-    let p = add(abc[2], kmul(1e-5, dir));
-    let [b0, b1, _] = barycentric_3d(p, abc);
+pub fn dir_to_barycentric(dir: [F; 3], tri: [[F; 3]; 3]) -> [F; 2] {
+    let p = add(tri[2], kmul(1e-5, dir));
+    let [b0, b1, _] = barycentric_3d(p, tri);
     normalize([b0, b1])
 }
 
