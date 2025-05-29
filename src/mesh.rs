@@ -499,6 +499,12 @@ impl Mesh {
             .all(|v| v.1 == mat0)
             .then_some(mat0)
     }
+
+    /// Assigns a single material to this mesh.
+    /// Should correspond to a material in the scene.
+    pub fn assign_single_mat(&mut self, mati: usize) {
+        self.face_mat_idx = vec![(0..self.f.len(), mati)];
+    }
     /// The number of triangles in this mesh, after triangulation.
     pub fn num_tris(&self) -> usize {
         self.f.iter().map(|f| f.num_tris()).sum::<usize>()
