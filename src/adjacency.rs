@@ -145,6 +145,51 @@ impl<D> VertexAdj<D> {
         &self.data[idx..idx + cnt]
     }
 
+    /// Returns the unique set of vertices in the 2-ring around vi for a vertex-vertex adj.
+    /// It's the caller's responsibility to clear out, if they so choose.
+    #[inline]
+    pub fn two_ring(&self, vi: usize, out: &mut Vec<usize>) {
+        let prev = self.adj(vi);
+        let curr_len = out.len();
+        for &p in prev {
+            for &a2_vi in self.adj(p as usize) {
+                if prev.contains(&a2_vi) {
+                    continue;
+                }
+                let a2_vi = a2_vi as usize;
+                if a2_vi == vi {
+                    continue;
+                }
+                if out[curr_len..].contains(&a2_vi) {
+                    continue;
+                }
+                out.push(a2_vi);
+            }
+        }
+    }
+
+    /// Returns the unique set of faces which are adjacent to the one ring, but not adjacent to
+    /// vi. It's the caller's responsibility to clear `buf`, if they so choose.
+    pub fn two_ring_faces<D2>(
+        &self,
+        vi: usize,
+        vertex_face_adj: &VertexAdj<D2>,
+        buf: &mut Vec<usize>,
+    ) {
+        let face_adj = vertex_face_adj.adj(vi);
+        let vert_adj = self.adj(vi);
+        let start_len = buf.len();
+        for &adj_v in vert_adj {
+            let face_aa = vertex_face_adj.adj(adj_v as usize);
+            for &a_f in face_aa {
+                if face_adj.contains(&a_f) || buf[start_len..].contains(&(a_f as usize)) {
+                    continue;
+                }
+                buf.push(a_f as usize);
+            }
+        }
+    }
+
     pub fn adj_data(&self, v: usize) -> impl Iterator<Item = (u32, D)> + '_
     where
         D: Copy,
