@@ -456,8 +456,28 @@ impl Barycentric {
             Barycentric::Poly(ti, b) => (ti, b),
         }
     }
+    pub fn tri(&self, f: &FaceKind) -> [usize; 3] {
+        let ti = self.tri_idx_and_coords().0;
+        f.as_triangle_fan().nth(ti).unwrap()
+    }
     pub fn coords(&self) -> [F; 3] {
         self.tri_idx_and_coords().1
+    }
+    pub fn coords_mut(&mut self) -> &mut [F; 3] {
+        match self {
+            Barycentric::Tri(ref mut b) => b,
+            Barycentric::Quad(_, ref mut b) => b,
+            Barycentric::Poly(_, ref mut b) => b,
+        }
+    }
+    pub fn normalize(&mut self) {
+        let sum = self.coords().into_iter().sum::<F>();
+        if sum.abs() < 1e-20 {
+            return;
+        }
+        for v in self.coords_mut() {
+            *v /= sum;
+        }
     }
     /// Returns true if any value is negative for the barycentric.
     pub fn is_outside(&self) -> bool {
