@@ -366,8 +366,9 @@ pub fn colored_wireframe(
     (new_vs, new_vc, new_fs)
 }
 
-/// emit a cylindrical wireframe of a given color for a set of edges
-pub(crate) fn per_vertex_colored_wireframe(
+/// emit a wireframe for a sequential vertex list with position and color.
+/// Currently used primarily for tracing lines on the surface.
+pub fn per_vertex_colored_wireframe(
     nv: usize,
     vs: impl Fn(usize) -> ([F; 3], [F; 3]),
     width: F,

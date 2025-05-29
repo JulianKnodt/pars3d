@@ -122,11 +122,12 @@ pub fn trace_curve_from_mid<'a>(
 
     curve.length /= 2.;
     let (c0, c1) = curve.color.split();
-    //curve.color = c0;
-    curve.color = ColorKind::Constant([0.; 3]);
+    // DEBUG
+    //let c0 = ColorKind::Constant([0.; 3]);
+    //let c1 = ColorKind::Constant([1.; 3]);
+    curve.color = c0;
     let (mut v0, mut vc0, mut f0) = trace_curve(vs, fs, &edge_adj, curve);
-    //curve.color = c1;
-    curve.color = ColorKind::Constant([1.; 3]);
+    curve.color = c1;
     curve.direction = curve.direction.map(|d| -d);
 
     let (mut v1, mut vc1, mut f1) = trace_curve(vs, fs, &edge_adj, curve);
