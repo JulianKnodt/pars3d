@@ -366,6 +366,51 @@ pub fn colored_wireframe(
     (new_vs, new_vc, new_fs)
 }
 
+/// emit a cylindrical wireframe of a given color for a set of edges
+pub(crate) fn per_vertex_colored_wireframe(
+    nv: usize,
+    vs: impl Fn(usize) -> ([F; 3], [F; 3]),
+    width: F,
+) -> (Vec<[F; 3]>, Vec<[F; 3]>, Vec<[usize; 4]>) {
+    assert!(nv > 1);
+    let mut new_vs = vec![];
+    let mut new_vc = vec![];
+    let mut new_fs = vec![];
+
+    for vi in 0..nv {
+        let (ei, vc) = vs(vi);
+        let o = if vi == 0 { vs(1).0 } else { vs(vi - 1).0 };
+        let e_dir = normalize(sub(ei, o));
+        if e_dir.iter().all(|&v| v == 0.) {
+            continue;
+        }
+        let np = non_parallel(e_dir);
+        let t = normalize(cross(e_dir, np));
+        let b = normalize(cross(e_dir, t));
+        let t = kmul(width, t);
+        let b = kmul(width, b);
+        let q0 = [
+            add(ei, t),
+            add(ei, b),
+            add(ei, t.map(Neg::neg)),
+            add(ei, b.map(Neg::neg)),
+        ];
+        new_vs.extend(q0.into_iter());
+        new_vc.extend([vc; 4].into_iter());
+        if vi == 0 {
+            continue;
+        };
+        assert!(new_vs.len() >= 8, "{}", new_vs.len());
+        let c = new_vs.len();
+        for i in 0..4 {
+            new_fs.push([i, (i + 1) % 4, ((i + 1) % 4) + 4, i + 4].map(|v| v + c - 8));
+        }
+    }
+    assert_eq!(new_vs.len(), new_vc.len());
+
+    (new_vs, new_vc, new_fs)
+}
+
 pub fn wireframe_to_mesh(
     (v, vert_colors, faces): (Vec<[F; 3]>, Vec<[F; 3]>, Vec<[usize; 4]>),
 ) -> super::Mesh {

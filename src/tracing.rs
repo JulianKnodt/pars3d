@@ -1,6 +1,5 @@
 use super::face::Barycentric;
 use super::quat::{quat_from_to, quat_rot};
-use super::visualization::colored_wireframe;
 use super::{
     add, barycentric_3d, dir_to_barycentric, dist, edges as edges_iter, kmul, normalize, sub,
     FaceKind, F,
@@ -22,20 +21,29 @@ pub enum WidthKind {
 pub enum ColorKind {
     /// Constant color on the whole curve
     Constant([F; 3]),
-    /*
+
     /// Linearly interpolate the color along the curve
-    Linear {
-      start: [F; 3],
-      end: [F; 3],
-    },
-    */
+    Linear([F; 3], [F; 3]),
     // TODO add more complex functions here?
 }
 
 impl ColorKind {
     pub fn starting_color(&self) -> [F; 3] {
         match self {
-            ColorKind::Constant(c) => *c,
+            &ColorKind::Constant(c) => c,
+            &ColorKind::Linear(s, _) => s,
+        }
+    }
+    pub fn ending_color(&self) -> [F; 3] {
+        match self {
+            &ColorKind::Constant(c) => c,
+            &ColorKind::Linear(_, e) => e,
+        }
+    }
+    pub fn lerp(&self, t: F) -> [F; 3] {
+        match self {
+            &ColorKind::Constant(c) => c,
+            &ColorKind::Linear(s, e) => add(kmul(1. - t, s), kmul(t, e)),
         }
     }
 }
@@ -50,23 +58,45 @@ impl Default for ColorKind {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Curve {
     // The barycentric coordinate within the first face
-    start: Barycentric,
+    pub start: Barycentric,
     // index of first face of the curve (not first tri, face)
-    start_face: usize,
+    pub start_face: usize,
     /// Direction in barycentric coordinates (v0, v1) on the surface of a mesh.
-    direction: [F; 2],
+    pub direction: [F; 2],
 
     /// Width of the edge
-    width: F,
+    pub width: F,
 
     /// Length in world-space distance
-    length: F,
+    pub length: F,
 
     /// How much to rotate the direction by length (coarsely approximated)
-    bend_amt: F,
+    /// Expressed in radians, but note that it will be scaled by distance, so test large values
+    /// for style.
+    pub bend_amt: F,
 
-    color: ColorKind,
+    pub color: ColorKind,
 }
+
+pub struct CurveSet {
+    pub count: usize,
+}
+
+/*
+impl Curve {
+    pub fn new_on_edge(v: &[[F;3]], f: &FaceKind, mut e: [usize; 2], dir: [F; 3]) -> Self {
+        let (ei, _) = f.edges().enumerate().find(|(_, fe)| {
+            let flip = [fe[1], fe[0]];
+            if e == flip {
+                e = e.swap(0, 1);
+                return fe;
+            }
+            e == fe
+        });
+        let bary_dir = super::dir_to_barycentric(dir, std::array::from_fn(|i| vs[i]));
+    }
+}
+*/
 
 /// Trace a curve along the surface of this mesh.
 pub fn trace_curve<'a>(
@@ -76,7 +106,7 @@ pub fn trace_curve<'a>(
     edge_adj: impl Fn([usize; 2]) -> &'a [usize],
 
     curve: Curve,
-) -> (Vec<[F; 3]>, Vec<[usize; 4]>) {
+) -> (Vec<[F; 3]>, Vec<[F; 3]>, Vec<[usize; 4]>) {
     let mut rem_len = curve.length;
 
     let mut curr_bary = curve.start;
@@ -89,9 +119,9 @@ pub fn trace_curve<'a>(
         .from_barycentric(curr_bary);
 
     let mut pos = vec![pos];
-    let /*mut*/ colors = vec![curve.color.starting_color()];
-    let mut edges = vec![];
+    let mut colors = vec![curve.color.starting_color()];
 
+    let mut did_flip = false;
     loop {
         // need to find intersection with other triangle edge
         let (tri_idx, coords) = curr_bary.tri_idx_and_coords();
@@ -101,20 +131,26 @@ pub fn trace_curve<'a>(
         let isect_y = -coords[1] / curr_dir[1];
         let isect_xy = (1. - coords[0] - coords[1]) / (curr_dir[0] + curr_dir[1]);
         let uv = [coords[0], coords[1]];
-        assert!([isect_x, isect_y, isect_xy]
-            .iter()
-            .copied()
-            .any(F::is_finite));
-        let nearest = [isect_x, isect_y, isect_xy]
+        let isects = [isect_x, isect_y, isect_xy];
+        assert!(
+            isects.iter().copied().any(F::is_finite),
+            "{isects:?} {uv:?} {curr_dir:?}"
+        );
+        let nearest = isects
             .into_iter()
             .filter(|v| v.is_finite())
             // only allow forward direction (w/ some eps so can't intersect repeat edge)
             .filter(|&v| v > 1e-5)
             .min_by(|a, b| a.partial_cmp(&b).unwrap());
         let Some(nearest) = nearest else {
+            if did_flip {
+                return (vec![], vec![], vec![]);
+            }
+            did_flip = true;
             curr_dir = curr_dir.map(core::ops::Neg::neg);
             continue;
         };
+        did_flip = false;
         let new_pos = add(uv, kmul(nearest, curr_dir));
         let edge_bary = [new_pos[0], new_pos[1], (1. - new_pos[0] - new_pos[1])];
 
@@ -124,6 +160,9 @@ pub fn trace_curve<'a>(
 
         // TODO here need to cut if off earlier if the distance exceeds the length of the curve.
         let seg_len = dist(new_global_pos, *pos.last().unwrap());
+        if seg_len <= 1e-8 {
+            return (vec![], vec![], vec![]);
+        }
         let new_len = rem_len - seg_len;
         if new_len <= 0. {
             let t = rem_len / seg_len;
@@ -131,13 +170,14 @@ pub fn trace_curve<'a>(
             let prev_pos = *pos.last().unwrap();
             let dir = kmul(t, sub(new_global_pos, prev_pos));
             pos.push(add(prev_pos, dir));
-            edges.push([pos.len() - 2, pos.len() - 1]);
+            colors.push(curve.color.ending_color());
             break;
         }
         rem_len = new_len;
 
         pos.push(new_global_pos);
-        edges.push([pos.len() - 2, pos.len() - 1]);
+        let t = 1. - rem_len / curve.length;
+        colors.push(curve.color.lerp(t));
 
         let min_bary = edge_bary
             .iter()
@@ -162,7 +202,8 @@ pub fn trace_curve<'a>(
             .find(|&v| v != curr_face);
         // for now break until hit a boundary
         let Some(opp_f) = opp_f else {
-            break;
+            //break;
+            return (vec![], vec![], vec![]);
         };
         curr_face = opp_f;
         // find which triangle of this face contains the edge traversed
@@ -178,6 +219,11 @@ pub fn trace_curve<'a>(
 
         let np = pos.len();
         let new_world_dir = normalize(sub(pos[np - 1], pos[np - 2]));
+        if new_world_dir == [0.; 3] {
+            // TODO make this check other faces until a non-degenerate face is found
+            return (vec![], vec![], vec![]);
+        }
+        assert_ne!(new_world_dir, [0., 0., 0.]);
         let curr_n = FaceKind::Tri(tri).normal(&vs);
         let new_n = FaceKind::Tri(new_tri).normal(&vs);
         let new_world_dir = normalize(quat_rot(new_world_dir, quat_from_to(curr_n, new_n)));
@@ -188,8 +234,18 @@ pub fn trace_curve<'a>(
         }
     }
 
-    let (v, _, fs) = colored_wireframe(edges.into_iter(), |vi| pos[vi], |_| colors[0], curve.width);
-    (v, fs)
+    let nv = pos.len();
+    if dist(pos[0], pos[nv - 1]) < 0.8 * curve.length
+        || dist(pos[0], pos[nv - 2]) < 0.8 * curve.length
+    {
+        return (vec![], vec![], vec![]);
+    }
+
+    super::visualization::per_vertex_colored_wireframe(
+        pos.len(),
+        |vi| (pos[vi], colors[vi]),
+        curve.width,
+    )
 }
 
 #[test]
@@ -216,7 +272,7 @@ fn test_trace() {
         color: Default::default(),
     };
 
-    let (curve_v, curve_f) = trace_curve(
+    let (curve_v, _, curve_f) = trace_curve(
         &vs,
         &fs,
         |[e0, e1]| {
@@ -260,7 +316,7 @@ fn test_trace_sphere() {
         color: Default::default(),
     };
 
-    let (curve_v, curve_f) = trace_curve(
+    let (curve_v, _, curve_f) = trace_curve(
         &m.v,
         &m.f,
         |[e0, e1]| edge_adj[&std::cmp::minmax(e0, e1)].as_slice(),
