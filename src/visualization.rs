@@ -378,21 +378,26 @@ pub fn per_vertex_colored_wireframe(
     let mut new_vc = vec![];
     let mut new_fs = vec![];
 
+    let mut last = None;
     for vi in 0..nv {
         let (ei, vc) = vs(vi);
-        let o = if vi == 0 {
+        let o = if let Some(last) = last {
+            vs(last).0
+        } else {
             // extrapolate here for consistency
             sub(kmul(2., ei), vs(1).0)
-        } else {
-            vs(vi - 1).0
         };
         let e_dir = normalize(sub(ei, o));
         if e_dir.iter().all(|&v| v == 0.) {
             continue;
         }
+        last = Some(vi);
+        let [t, b] = basis(e_dir);
+        /*
         let np = non_parallel(e_dir);
         let t = normalize(cross(e_dir, np));
         let b = normalize(cross(e_dir, t));
+        */
         let t = kmul(width, t);
         let b = kmul(width, b);
         let q0 = [
@@ -442,6 +447,19 @@ fn non_parallel([x, y, z]: [F; 3]) -> [F; 3] {
     } else {
         [-x, y, z]
     }
+}
+
+pub fn basis([x, y, z]: [F; 3]) -> [[F; 3]; 2] {
+    let sign = (1. as F).copysign(z);
+    let a = -1. / (sign + z);
+    let b = x * y * a;
+    [
+        [1. + sign * sqr(x) * a, sign * b, -sign * x],
+        [b, sign + sqr(y) * a, -y],
+    ]
+}
+fn sqr(x: F) -> F {
+    x * x
 }
 
 #[ignore]

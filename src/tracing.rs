@@ -46,13 +46,19 @@ impl ColorKind {
             &ColorKind::Linear(s, e) => add(kmul(1. - t, s), kmul(t, e)),
         }
     }
-    fn split(&self) -> (ColorKind, ColorKind) {
+    fn split(&self) -> [ColorKind; 2] {
         match self {
-            &ColorKind::Constant(c) => (ColorKind::Constant(c), ColorKind::Constant(c)),
+            &ColorKind::Constant(c) => [ColorKind::Constant(c); 2],
             &ColorKind::Linear(s, e) => {
                 let mid = self.lerp(0.5);
-                (ColorKind::Linear(s, mid), ColorKind::Linear(mid, e))
+                [ColorKind::Linear(s, mid), ColorKind::Linear(mid, e)]
             }
+        }
+    }
+    fn reverse(&self) -> Self {
+        match self {
+            &ColorKind::Constant(c) => ColorKind::Constant(c),
+            &ColorKind::Linear(s, e) => ColorKind::Linear(e, s),
         }
     }
 }
@@ -84,11 +90,8 @@ pub struct Curve {
     /// for style.
     pub bend_amt: F,
 
+    /// How to color this curve along its extent
     pub color: ColorKind,
-}
-
-pub struct CurveSet {
-    pub count: usize,
 }
 
 /*
@@ -121,11 +124,11 @@ pub fn trace_curve_from_mid<'a>(
     curve.start.normalize();
 
     curve.length /= 2.;
-    let (c0, c1) = curve.color.split();
+    let [c0, c1] = curve.color.split();
     // DEBUG
     //let c0 = ColorKind::Constant([0.; 3]);
     //let c1 = ColorKind::Constant([1.; 3]);
-    curve.color = c0;
+    curve.color = c0.reverse();
     let (mut v0, mut vc0, mut f0) = trace_curve(vs, fs, &edge_adj, curve);
     curve.color = c1;
     curve.direction = curve.direction.map(|d| -d);
@@ -175,10 +178,12 @@ pub fn trace_curve<'a>(
         let isect_xy = (1. - coords[0] - coords[1]) / (curr_dir[0] + curr_dir[1]);
         let uv = [coords[0], coords[1]];
         let isects = [isect_x, isect_y, isect_xy];
+        /*
         assert!(
             isects.iter().copied().any(F::is_finite),
             "{isects:?} {uv:?} {curr_dir:?}"
         );
+        */
         let nearest = isects
             .into_iter()
             .filter(|v| v.is_finite())
