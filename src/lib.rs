@@ -76,6 +76,9 @@ pub mod coloring;
 /// Utilities for generating noise.
 pub mod noise;
 
+/// Functions for interpolation over [0,1]
+pub mod func;
+
 /// Visualize per-element attributes.
 pub mod visualization;
 

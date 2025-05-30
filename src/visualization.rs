@@ -370,8 +370,7 @@ pub fn colored_wireframe(
 /// Currently used primarily for tracing lines on the surface.
 pub fn per_vertex_colored_wireframe(
     nv: usize,
-    vs: impl Fn(usize) -> ([F; 3], [F; 3]),
-    width: F,
+    vs: impl Fn(usize) -> ([F; 3], [F; 3], F),
 ) -> (Vec<[F; 3]>, Vec<[F; 3]>, Vec<[usize; 4]>) {
     assert!(nv > 1);
     let mut new_vs = vec![];
@@ -380,7 +379,7 @@ pub fn per_vertex_colored_wireframe(
 
     let mut last = None;
     for vi in 0..nv {
-        let (ei, vc) = vs(vi);
+        let (ei, vc, width) = vs(vi);
         let o = if let Some(last) = last {
             vs(last).0
         } else {

@@ -1,73 +1,10 @@
 use super::face::Barycentric;
+use super::func::ScalarFn;
 use super::quat::{quat_from_to, quat_rot};
 use super::{
     add, barycentric_3d, dir_to_barycentric, dist, edges as edges_iter, kmul, normalize, sub,
     FaceKind, F,
 };
-
-/*
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum WidthKind {
-  Constant(F),
-  LinearDecay {
-    initial: F,
-    decay_rate: F,
-  },
-}
-*/
-
-/// How to define color on a curve
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum ColorKind {
-    /// Constant color on the whole curve
-    Constant([F; 3]),
-
-    /// Linearly interpolate the color along the curve
-    Linear([F; 3], [F; 3]),
-    // TODO add more complex functions here?
-}
-
-impl ColorKind {
-    pub fn starting_color(&self) -> [F; 3] {
-        match self {
-            &ColorKind::Constant(c) => c,
-            &ColorKind::Linear(s, _) => s,
-        }
-    }
-    pub fn ending_color(&self) -> [F; 3] {
-        match self {
-            &ColorKind::Constant(c) => c,
-            &ColorKind::Linear(_, e) => e,
-        }
-    }
-    pub fn lerp(&self, t: F) -> [F; 3] {
-        match self {
-            &ColorKind::Constant(c) => c,
-            &ColorKind::Linear(s, e) => add(kmul(1. - t, s), kmul(t, e)),
-        }
-    }
-    fn split(&self) -> [ColorKind; 2] {
-        match self {
-            &ColorKind::Constant(c) => [ColorKind::Constant(c); 2],
-            &ColorKind::Linear(s, e) => {
-                let mid = self.lerp(0.5);
-                [ColorKind::Linear(s, mid), ColorKind::Linear(mid, e)]
-            }
-        }
-    }
-    fn reverse(&self) -> Self {
-        match self {
-            &ColorKind::Constant(c) => ColorKind::Constant(c),
-            &ColorKind::Linear(s, e) => ColorKind::Linear(e, s),
-        }
-    }
-}
-
-impl Default for ColorKind {
-    fn default() -> Self {
-        ColorKind::Constant([0.; 3])
-    }
-}
 
 /// Describes a curve on the surface of a triangle mesh
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -80,7 +17,7 @@ pub struct Curve {
     pub direction: [F; 2],
 
     /// Width of the edge
-    pub width: F,
+    pub width: ScalarFn<1>,
 
     /// Length in world-space distance
     pub length: F,
@@ -91,7 +28,7 @@ pub struct Curve {
     pub bend_amt: F,
 
     /// How to color this curve along its extent
-    pub color: ColorKind,
+    pub color: ScalarFn<3>,
 }
 
 /*
@@ -165,7 +102,7 @@ pub fn trace_curve<'a>(
         .from_barycentric(curr_bary);
 
     let mut pos = vec![pos];
-    let mut colors = vec![curve.color.starting_color()];
+    let mut ts = vec![0.];
 
     let mut did_flip = false;
     loop {
@@ -218,14 +155,16 @@ pub fn trace_curve<'a>(
             let prev_pos = *pos.last().unwrap();
             let dir = kmul(t, sub(new_global_pos, prev_pos));
             pos.push(add(prev_pos, dir));
-            colors.push(curve.color.ending_color());
+            ts.push(1.);
             break;
         }
         rem_len = new_len;
 
-        pos.push(new_global_pos);
-        let t = 1. - rem_len / curve.length;
-        colors.push(curve.color.lerp(t));
+        if seg_len > 1e-6 || pos.len() == 1 {
+            pos.push(new_global_pos);
+            let t = 1. - rem_len / curve.length;
+            ts.push(t);
+        }
 
         let min_bary = edge_bary
             .iter()
@@ -289,11 +228,10 @@ pub fn trace_curve<'a>(
         return (vec![], vec![], vec![]);
     }
 
-    super::visualization::per_vertex_colored_wireframe(
-        pos.len(),
-        |vi| (pos[vi], colors[vi]),
-        curve.width,
-    )
+    super::visualization::per_vertex_colored_wireframe(pos.len(), |vi| {
+        let t = ts[vi];
+        (pos[vi], curve.color.lerp(t), curve.width.lerp(t)[0])
+    })
 }
 
 #[test]
@@ -314,7 +252,7 @@ fn test_trace() {
         direction: bary_dir,
 
         length: 100.,
-        width: 3e-3,
+        width: ScalarFn::Constant([3e-3]),
 
         bend_amt: 0.,
         color: Default::default(),
@@ -359,7 +297,7 @@ fn test_trace_sphere() {
         start_face: 0,
         direction: normalize([0.5, 0.1]),
         length: 5000.,
-        width: 3e-3,
+        width: ScalarFn::Constant([3e-3]),
         bend_amt: 0.,
         color: Default::default(),
     };
