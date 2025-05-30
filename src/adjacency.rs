@@ -324,11 +324,13 @@ impl<D> VertexAdj<D> {
             let mut prev: usize = first;
             let mut curr: usize = out[&first][1];
             while curr != first {
+                not_visited.remove(&curr);
                 if out[&curr][1] == prev {
                     out.get_mut(&curr).unwrap().swap(0, 1);
                 }
+                let next = out[&curr][1];
                 prev = curr;
-                curr = out[&curr][1];
+                curr = next;
             }
         }
 
