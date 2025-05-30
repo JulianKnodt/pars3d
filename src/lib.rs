@@ -273,6 +273,17 @@ pub fn tri_area_nd<const N: usize>([a, b, c]: [[F; N]; 3]) -> F {
     (s * (s - e0) * (s - e1) * (s - e2)).sqrt()
 }
 
+/// Given 3 triangle edge lengths, compute the cosine for the angle opposite to each edge.
+pub fn cosine_angles([a,b,c]: [F;3]) -> [F;3] {
+  let a2 = a * a;
+  let b2 = b * b;
+  let c2 = c * c;
+  let a_ang = -(a2 - b2 - c2) / (2. * b * c);
+  let b_ang = -(b2 - a2 - c2) / (2. * a * c);
+  let c_ang = -(c2 - b2 - a2) / (2. * b * a);
+  [a_ang, b_ang, c_ang]
+}
+
 /// More robust ln triangle area.
 pub fn ln_tri_area<const N: usize>([a, b, c]: [[F; N]; 3]) -> F {
     let e0 = length(sub(a, b));
