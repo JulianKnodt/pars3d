@@ -295,13 +295,9 @@ impl Mesh {
 
     /// Non-unique iterator over boundary vertices
     pub fn boundary_edges(&self) -> impl Iterator<Item = [usize; 2]> + '_ {
-        let mut edges: BTreeMap<[usize; 2], u32> = BTreeMap::new();
-        for f in &self.f {
-            for e in f.edges_ord() {
-                *edges.entry(e).or_default() += 1;
-            }
-        }
-        edges.into_iter().filter(|(_, v)| *v == 1).map(|(e, _)| e)
+        self.edge_kinds()
+            .into_iter()
+            .filter_map(|(k, v)| v.is_boundary().then_some(k))
     }
 
     /// Returns the associated face set with each edge.
