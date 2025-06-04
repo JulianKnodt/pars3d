@@ -1,4 +1,4 @@
-use super::{add, cross_2d, dot, kmul, sub, FaceKind, F};
+use super::{add, cross_2d, dot, kmul, length, sub, FaceKind, F};
 use crate::aabb::AABB;
 
 // https://coolors.co/palettes/popular/simple
@@ -436,6 +436,11 @@ pub fn bake_vertex_colors_to_texture_exact(
         colors.len(),
         "Expected identical length for UV & Vertex Colors"
     );
+    assert_eq!(
+        vs.len(),
+        colors.len(),
+        "Expected identical length for UV & Vertex Colors"
+    );
 
     let mut tri_per_pix: BTreeMap<_, Vec<_>> = BTreeMap::new();
     let image_aabb = AABB {
@@ -479,11 +484,24 @@ pub fn bake_vertex_colors_to_texture_exact(
                     continue;
                 }
 
-                let area_2d = poly_area_2d(&poly);
-                if area_2d == 0. {
-                    todo!();
-                }
-                let ratio = area_2d / FaceKind::Tri(uv_t).area();
+                let uv_tri = FaceKind::Tri(uv_t);
+                let tri_area_2d = uv_tri.area();
+                // Compute the ratio of the triangle in 2D that is contained in the pixel.
+                let ratio = if tri_area_2d == 0. {
+                    let perim = uv_tri.perimeter();
+                    if perim.abs() < 1e-12 {
+                        // basically a single point
+                        1.
+                    } else {
+                        let poly_perim = super::edges(&poly)
+                            .map(|[e0, e1]| length(sub(e1, e0)))
+                            .sum::<F>();
+                        poly_perim / perim
+                    }
+                    // TODO should be a fraction of the line contained?
+                } else {
+                    poly_area_2d(&poly) / tri_area_2d
+                };
 
                 let area_3d = super::tri_area(t.map(|vi| vs[vi])) * ratio;
 
@@ -491,7 +509,7 @@ pub fn bake_vertex_colors_to_texture_exact(
                 let poly_center = poly.iter().copied().fold([0.; 2], add);
                 let poly_center = kmul((poly.len() as F).recip(), poly_center);
 
-                // color of center of polygon
+                // color of center of polygon (TODO could do more samples?)
                 let mut b = FaceKind::Tri(uv_t).barycentric(poly_center);
                 b.clamp();
 
