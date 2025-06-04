@@ -31,20 +31,39 @@ impl Mesh {
     #[inline]
     pub fn triangulate_with_new_edges(&mut self, mut cb: impl FnMut([usize; 2])) {
         let nf = self.f.len();
-        // nifty little method which doesn't require an extra buffer
-        let mut i = 0;
-        while i < nf {
+        for i in 0..nf {
             if self.f[i].len() <= 3 {
-                i += 1;
                 continue;
             }
-            let f = self.f.swap_remove(i);
+            let mesh_idx = self.face_mesh_idx.get(i).copied();
+            let mat_idx = self.mat_for_face(i);
+
+            let f = &self.f[i];
             let s = f.as_slice();
             let first = s[0];
             for &v in &s[2..s.len() - 1] {
                 cb([first, v])
             }
-            self.f.extend(f.as_triangle_fan().map(FaceKind::Tri));
+
+            let curr_nfs = self.f.len();
+
+            let t0 = f.as_triangle_fan().map(FaceKind::Tri).next().unwrap();
+            let f = std::mem::replace(&mut self.f[i], t0);
+            self.f
+                .extend(f.as_triangle_fan().map(FaceKind::Tri).skip(1));
+            let new_nfs = self.f.len();
+
+            self.face_mesh_idx
+                .extend((curr_nfs..new_nfs).map(|_| mesh_idx).flatten());
+
+            if let Some(mi) = mat_idx {
+                let last_range = self.face_mat_idx.last_mut().unwrap();
+                if last_range.1 == mi {
+                    last_range.0.end = new_nfs;
+                } else {
+                    self.face_mat_idx.push((curr_nfs..new_nfs, mi));
+                }
+            }
         }
     }
 
