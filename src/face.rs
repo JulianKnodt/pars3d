@@ -483,6 +483,13 @@ impl Barycentric {
     pub fn is_outside(&self) -> bool {
         self.coords().iter().any(|&v| v < 0.)
     }
+
+    pub(crate) fn clamp(&mut self) {
+        for c in self.coords_mut() {
+            *c = c.clamp(0., 1.);
+        }
+        self.normalize();
+    }
 }
 
 macro_rules! impl_barycentrics {
