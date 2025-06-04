@@ -1,4 +1,4 @@
-use super::{sub, F};
+use super::{add, cross_2d, kmul, sub, F};
 use core::ops::Range;
 use std::array::from_fn;
 
@@ -80,17 +80,75 @@ impl From<[[F; 2]; 2]> for AABB<F, 2> {
 impl AABB<F, 2> {
     #[inline]
     pub fn corners(&self) -> [[F; 2]; 4] {
-        [
-            self.min,
-            [self.min[0], self.max[1]],
-            [self.min[1], self.max[0]],
-            self.max,
-        ]
+        let [lx, ly] = self.min;
+        let [hx, hy] = self.max;
+        [[lx, ly], [hx, ly], [hx, hy], [lx, hy]]
     }
+
     pub fn expand_by(&mut self, v: F) {
         self.min = self.min.map(|val| val - v);
         self.max = self.max.map(|val| val + v);
     }
+
+    /// Does this polygon intersect with this aabb? Uses the separating axis theorem
+    pub fn intersects_tri(&self, tri: [[F; 2]; 3]) -> bool {
+        let [lx, ly] = self.min;
+        // quick rejects
+        if tri.iter().all(|p| p[0] <= lx) {
+            return false;
+        }
+        if tri.iter().all(|p| p[1] <= ly) {
+            return false;
+        }
+        let [hx, hy] = self.max;
+        if tri.iter().all(|p| p[0] >= hx) {
+            return false;
+        }
+        if tri.iter().all(|p| p[1] >= hy) {
+            return false;
+        }
+
+        if tri.iter().copied().any(|p| self.contains_point(p)) {
+            return false;
+        }
+
+        // if any edge of the tri intersects with the box, then there is an intersection
+        super::edges(&tri).any(|e| self.line_segment_isect(e).next().is_some())
+    }
+
+    pub(crate) fn line_segment_isect(&self, l: [[F; 2]; 2]) -> impl Iterator<Item = [F; 2]> + '_ {
+        let c = self.corners();
+        (0..4).filter_map(move |i| line_segment_isect([c[i], c[(i + 1) % 4]], l))
+    }
+}
+
+fn line_segment_isect([a0, a1]: [[F; 2]; 2], [b0, b1]: [[F; 2]; 2]) -> Option<[F; 2]> {
+    assert_ne!(a0, a1);
+    let a_dir = sub(a1, a0);
+    assert_ne!(b0, b1);
+    let b_dir = sub(b1, b0);
+
+    let denom = cross_2d(a_dir, b_dir);
+    if denom == 0. {
+        // they're parallel
+        return None;
+    }
+    let t = cross_2d(sub(b0, a0), b_dir) / denom;
+    let u = cross_2d(sub(b0, a0), a_dir) / denom;
+
+    let valid = (0.0..=1.0).contains(&t) && (0.0..=1.0).contains(&u);
+    valid.then(|| add(a0, kmul(t, a_dir)))
+}
+
+#[test]
+fn test_line_segment_isect() {
+    let isect = line_segment_isect([[-1., 0.], [1., 0.]], [[0., 1.], [0., -1.]]);
+    assert_eq!(Some([0., 0.]), isect);
+    let isect = line_segment_isect([[-1., 0.], [1., 0.]], [[0., -1.], [0., 1.]]);
+    assert_eq!(Some([0., 0.]), isect);
+
+    let isect = line_segment_isect([[-1., 0.], [1., 0.]], [[0.5, 100.], [-0.5, -100.]]);
+    assert_eq!(Some([0., 0.]), isect);
 }
 
 impl AABB<i32, 2> {

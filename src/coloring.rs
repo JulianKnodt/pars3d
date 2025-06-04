@@ -1,4 +1,5 @@
-use super::{add, dot, kmul, F};
+use super::{add, cross_2d, dot, kmul, sub, FaceKind, F};
+use crate::aabb::AABB;
 
 // https://coolors.co/palettes/popular/simple
 pub const HIGH_CONTRAST: [[u8; 3]; 6] = [
@@ -345,7 +346,6 @@ pub fn bake_vertex_colors_to_texture(
     faces: &[super::FaceKind],
     colors: &[[F; 3]],
 ) -> image::ImageBuffer<Rgb<u8>, Vec<u8>> {
-    use crate::aabb::AABB;
     use std::collections::BTreeMap;
     assert_eq!(
         uvs.len(),
@@ -371,32 +371,267 @@ pub fn bake_vertex_colors_to_texture(
     }
 
     image::ImageBuffer::from_fn(w, h, |x, y| {
-        let Some(cands) = tri_per_pix.get(&[x as i32, y as i32]) else {
+        let Some(tri_cands) = tri_per_pix.get(&[x as i32, y as i32]) else {
             return Rgb([0; 3]);
         };
-        assert!(!cands.is_empty());
+        assert!(!tri_cands.is_empty());
 
         let u = (x as F + 0.5) / (w as F);
         let v = (y as F + 0.5) / (h as F);
 
-        let mut count = 0;
+        let offsets = [
+            [0., 0.],
+            // diagonal samples
+            [-0.25, -0.25],
+            [-0.25, 0.25],
+            [0.25, -0.25],
+            [0.25, 0.25],
+            // axis aligned samples
+            [(1. as F / 8.).sqrt(), 0.],
+            [-(1. as F / 8.).sqrt(), 0.],
+            [0., (1. as F / 8.).sqrt()],
+            [0., -(1. as F / 8.).sqrt()],
+        ];
+
+        let mut total_area = 0. as F;
         let mut all_color = [0.; 3];
-        for &fi in cands {
+        for &fi in tri_cands {
             // TODO multiple samples here
             let f = &faces[fi];
-            let bary = f.map_kind(|vi| uvs[vi]).barycentric([u, v]);
-            if bary.is_outside() {
-                continue;
-            }
-            let color = f.map_kind(|vi| colors[vi]).from_barycentric(bary);
-            all_color = add(all_color, color);
+            let uv_tri = f.map_kind(|vi| uvs[vi]);
+            for o in offsets {
+                let bary = uv_tri.barycentric(add([u, v], o));
+                if bary.is_outside() {
+                    continue;
+                }
+                //let uv_area = uv_tri.area();
+                // This should be the area of the triangle inside of the square
+                let uv_area = 1.;
+                let color = f.map_kind(|vi| colors[vi]).from_barycentric(bary);
+                all_color = add(all_color, kmul(uv_area, color));
 
-            count += 1;
+                total_area += uv_area;
+            }
         }
-        if count == 0 {
+        if total_area == 0. {
             return Rgb([0; 3]);
         }
-        let rgb = kmul((count as F).recip(), all_color);
+        let rgb = kmul(total_area.recip(), all_color);
         Rgb(rgb.map(|v| (v.clamp(0., 1.) * 255.) as u8))
     })
+}
+
+/// Converts vertex colors to an image by sampling, using the area of intersection instead of
+/// sampling.
+pub fn bake_vertex_colors_to_texture_exact(
+    [w, h]: [u32; 2],
+    vs: &[[F; 3]],
+    uvs: &[[F; 2]],
+    faces: &[FaceKind],
+    colors: &[[F; 3]],
+) -> image::ImageBuffer<Rgb<u8>, Vec<u8>> {
+    use std::collections::BTreeMap;
+    assert_eq!(
+        uvs.len(),
+        colors.len(),
+        "Expected identical length for UV & Vertex Colors"
+    );
+
+    let mut tri_per_pix: BTreeMap<_, Vec<_>> = BTreeMap::new();
+    let image_aabb = AABB {
+        min: [0i32; 2],
+        max: [w as i32, h as i32],
+    };
+    for (fi, f) in faces.iter().enumerate() {
+        let mut aabb = AABB::new();
+        for &vi in f.as_slice() {
+            aabb.add_point(uvs[vi]);
+        }
+        aabb.scale_by(w as F, h as F);
+        // TODO could cull some of these points
+        for uvi in aabb.round_to_i32().intersect(&image_aabb).iter_coords() {
+            tri_per_pix.entry(uvi).or_default().push(fi);
+        }
+    }
+
+    let mut poly = vec![];
+    image::ImageBuffer::from_fn(w, h, |x, y| {
+        let Some(tri_cands) = tri_per_pix.get(&[x as i32, y as i32]) else {
+            return Rgb([0; 3]);
+        };
+        assert!(!tri_cands.is_empty());
+
+        let aabb = AABB {
+            min: [x as F / w as F, y as F / h as F],
+            max: [(x + 1) as F / w as F, (y + 1) as F / h as F],
+        };
+
+        let mut total_area = 0. as F;
+        let mut all_color = [0.; 3];
+
+        for &fi in tri_cands {
+            let f = &faces[fi];
+            for t in f.as_triangle_fan() {
+                let uv_t = t.map(|vi| uvs[vi]);
+
+                intersection_poly(uv_t, aabb, &mut poly);
+                if poly.len() < 3 {
+                    continue;
+                }
+
+                let area_2d = poly_area_2d(&poly);
+                if area_2d == 0. {
+                    todo!();
+                }
+                let ratio = area_2d / FaceKind::Tri(uv_t).area();
+
+                let area_3d = super::tri_area(t.map(|vi| vs[vi])) * ratio;
+
+                // center of polygon
+                let poly_center = poly.iter().copied().fold([0.; 2], add);
+                let poly_center = kmul((poly.len() as F).recip(), poly_center);
+
+                // color of center of polygon
+                let mut b = FaceKind::Tri(uv_t).barycentric(poly_center);
+                b.clamp();
+
+                let color = FaceKind::Tri(t.map(|vi| colors[vi])).from_barycentric(b);
+
+                all_color = add(all_color, kmul(area_3d, color));
+                total_area += area_3d;
+            }
+        }
+
+        if total_area == 0. {
+            return Rgb([0; 3]);
+        }
+        let rgb = kmul(total_area.recip(), all_color);
+        Rgb(rgb.map(|v| (v.clamp(0., 1.) * 255.) as u8))
+    })
+}
+
+/// Given a triangle and an AABB in 2D, return the output polygon of their intersection
+/// If no intersection, return empty output
+fn intersection_poly(tri: [[F; 2]; 3], aabb: AABB<F, 2>, poly: &mut Vec<[F; 2]>) {
+    poly.clear();
+
+    // check if any points of the aabb are contained in the tri
+    poly.extend(aabb.corners().into_iter().filter(|&c| tri_contains(tri, c)));
+
+    // for each point on the tri, check if the aabb contains it
+    // If it is contained, then it's part of the polygon
+    // Otherwise, it is projected to the two adjacent edges
+
+    for i in 0..3 {
+        let p = tri[i];
+        if aabb.contains_point(p) {
+            poly.push(p);
+            continue;
+        }
+        for adj in [tri[(i + 2) % 3], tri[(i + 1) % 3]] {
+            //poly.extend(aabb.line_segment_isect([p, adj]));
+            for is in aabb.line_segment_isect([p, adj]) {
+                poly.push(is);
+            }
+        }
+    }
+
+    // sort polygon counterclockwise
+    let center = poly.iter().copied().fold([0.; 2], add);
+    let center = kmul((poly.len() as F).recip(), center);
+
+    poly.sort_by_key(|&p| {
+        let [x, y] = super::normalize(sub(p, center));
+        OrdFloat(y.atan2(x))
+    });
+    poly.dedup();
+}
+
+#[test]
+fn test_intersection_poly() {
+    let mut buf = vec![];
+    let tri = [[0., 0.], [1., 0.], [0., 2.]];
+    let aabb = AABB {
+        min: [0., 0.],
+        max: [1., 1.],
+    };
+
+    intersection_poly(tri, aabb, &mut buf);
+    assert_eq!(buf, [[0.; 2], [1., 0.], [0.5, 1.], [0., 1.]]);
+
+    let aabb = AABB {
+        min: [-1., 0.],
+        max: [0., 1.],
+    };
+    intersection_poly(tri, aabb, &mut buf);
+    assert_eq!(buf.len(), 2);
+
+    let aabb = AABB {
+        min: [-10.; 2],
+        max: [10.; 2],
+    };
+    intersection_poly(tri, aabb, &mut buf);
+    assert_eq!(buf, tri);
+
+    let aabb = AABB {
+        min: [0., 1.],
+        max: [1., 2.],
+    };
+    intersection_poly(tri, aabb, &mut buf);
+    assert_eq!(buf.len(), 3);
+
+    let aabb = AABB {
+        min: [0., 1.],
+        max: [1., 2.],
+    };
+    intersection_poly(tri, aabb, &mut buf);
+    assert_eq!(buf, [[0., 1.], [0.5, 1.], [0., 2.]]);
+
+    let aabb = AABB {
+        min: [0.25, 0.25],
+        max: [0.4, 0.4],
+    };
+    intersection_poly(tri, aabb, &mut buf);
+    assert_eq!(buf, aabb.corners());
+}
+
+#[derive(PartialEq)]
+struct OrdFloat(F);
+
+impl Eq for OrdFloat {}
+impl Ord for OrdFloat {
+    fn cmp(&self, o: &Self) -> std::cmp::Ordering {
+        self.0.partial_cmp(&o.0).unwrap()
+    }
+}
+impl PartialOrd for OrdFloat {
+    fn partial_cmp(&self, o: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(&o))
+    }
+}
+
+// https://stackoverflow.com/questions/2049582/how-to-determine-if-a-point-is-in-a-2d-triangle
+fn tri_contains([v0, v1, v2]: [[F; 2]; 3], p: [F; 2]) -> bool {
+    let d1 = cross_2d(sub(p, v1), sub(v0, v1));
+    let d2 = cross_2d(sub(p, v2), sub(v1, v2));
+    let d3 = cross_2d(sub(p, v0), sub(v2, v0));
+
+    d1.is_sign_positive() == d2.is_sign_positive() && d1.is_sign_positive() == d3.is_sign_positive()
+}
+
+#[test]
+fn test_tri_contains() {
+    let t = [[0., 0.], [1., 0.], [0., 1.]];
+    assert!(tri_contains(t, [0.25, 0.25]));
+    assert!(tri_contains(t, [0.5, 0.5]));
+    assert!(tri_contains(t, [1., 0.]));
+    assert!(!tri_contains(t, [0.75, 0.75]));
+    assert!(!tri_contains(t, [-0.5, 0.25]));
+    assert!(!tri_contains(t, [0.25, -0.5]));
+}
+
+/// Computes the area of a polygon in 2D
+fn poly_area_2d(p: &[[F; 2]]) -> F {
+    let n = p.len();
+    (0..n).map(|i| cross_2d(p[i], p[(i + 1) % n])).sum::<F>() / 2.
 }
