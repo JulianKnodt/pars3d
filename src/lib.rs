@@ -275,6 +275,11 @@ pub fn tri_area_nd<const N: usize>([a, b, c]: [[F; N]; 3]) -> F {
 
 /// Given 3 triangle edge lengths, compute the cosine for the angle opposite to each edge.
 pub fn cosine_angles([a, b, c]: [F; 3]) -> [F; 3] {
+    if a == 0. || b == 0. || c == 0. {
+        // angles are 0, cosine of 0 = 1
+        return [1.; 3];
+    }
+
     let a2 = a * a;
     let b2 = b * b;
     let c2 = c * c;
@@ -284,19 +289,23 @@ pub fn cosine_angles([a, b, c]: [F; 3]) -> [F; 3] {
     [a_ang, b_ang, c_ang]
 }
 
-
 /// Given three edge lengths, compute the area of the triangle with those lengths.
-pub fn herons_area([e0,e1,e2]: [F;3]) -> F {
+/// More numerically stable than a naive implementation, relies on computing the product of the
+/// semi-perimeter in log-space
+pub fn herons_area([e0, e1, e2]: [F; 3]) -> F {
     let s = (e0 + e1 + e2) / 2.;
-    (s * (s - e0) * (s - e1) * (s - e2)).sqrt()
+    let f = |v: F| v.max(1e-14).ln();
+    let v = f(s) + f(s - e0) + f(s - e1) + f(s - e2);
+    assert!(v.is_finite(), "{} {} {}", s - e0, s - e1, s - e2);
+    (v * 0.5).exp()
 }
 
 /// Given 3 triangle edge lengths, compute the sine of the angle opposite to each edge.
 pub fn sine_angles([a, b, c]: [F; 3]) -> [F; 3] {
-    let area = herons_area([a,b,c]);
-    if area == 0. {
+    if a == 0. || b == 0. || c == 0. {
         return [0.; 3];
     }
+    let area = herons_area([a, b, c]);
     // double circumradius
     let dbl_circumradius = a * b * c / (2. * area);
     [a, b, c].map(|v| v / dbl_circumradius)
@@ -304,44 +313,38 @@ pub fn sine_angles([a, b, c]: [F; 3]) -> [F; 3] {
 
 #[test]
 fn test_cosine_sine() {
-  let tri = [
-    [0.5, 0.1, -0.3],
-    [-0.24, 0.3, -0.1],
-    [0., 0.7, 0.2],
-  ];
+    let tri = [[0.5, 0.1, -0.3], [-0.24, 0.3, -0.1], [0., 0.7, 0.2]];
 
-  let [e0, e1, e2] = [
-    sub(tri[1], tri[0]),
-    sub(tri[2], tri[1]),
-    sub(tri[0], tri[2]),
-  ];
+    let [e0, e1, e2] = [
+        sub(tri[1], tri[0]),
+        sub(tri[2], tri[1]),
+        sub(tri[0], tri[2]),
+    ];
 
-  let edge_lens = [
-    length(e1),
-    length(e2),
-    length(e0),
-  ];
+    let edge_lens = [length(e1), length(e2), length(e0)];
 
-  use std::ops::Neg;
-  let coss = cosine_angles(edge_lens);
-  let [c0, c1, c2] = [
-    [e0, e2.map(Neg::neg)],
-    [e1, e0.map(Neg::neg)],
-    [e2, e1.map(Neg::neg)],
-  ].map(|[a,b]| dot(normalize(a),normalize(b)));
-  assert!((coss[0] - c0).abs() < 1e-5);
-  assert!((coss[1] - c1).abs() < 1e-5);
-  assert!((coss[2] - c2).abs() < 1e-5);
+    use std::ops::Neg;
+    let coss = cosine_angles(edge_lens);
+    let [c0, c1, c2] = [
+        [e0, e2.map(Neg::neg)],
+        [e1, e0.map(Neg::neg)],
+        [e2, e1.map(Neg::neg)],
+    ]
+    .map(|[a, b]| dot(normalize(a), normalize(b)));
+    assert!((coss[0] - c0).abs() < 1e-5);
+    assert!((coss[1] - c1).abs() < 1e-5);
+    assert!((coss[2] - c2).abs() < 1e-5);
 
-  let sines = sine_angles(edge_lens);
-  let [s0, s1, s2] = [
-    [e0, e2.map(Neg::neg)],
-    [e1, e0.map(Neg::neg)],
-    [e2, e1.map(Neg::neg)],
-  ].map(|[a,b]| length(cross(normalize(a),normalize(b))));
-  assert!((sines[0] - s0).abs() < 1e-5);
-  assert!((sines[1] - s1).abs() < 1e-5);
-  assert!((sines[2] - s2).abs() < 1e-5);
+    let sines = sine_angles(edge_lens);
+    let [s0, s1, s2] = [
+        [e0, e2.map(Neg::neg)],
+        [e1, e0.map(Neg::neg)],
+        [e2, e1.map(Neg::neg)],
+    ]
+    .map(|[a, b]| length(cross(normalize(a), normalize(b))));
+    assert!((sines[0] - s0).abs() < 1e-5);
+    assert!((sines[1] - s1).abs() < 1e-5);
+    assert!((sines[2] - s2).abs() < 1e-5);
 }
 
 /// More robust ln triangle area.
@@ -370,7 +373,7 @@ pub fn barycentric_n<const N: usize>(p: [F; N], a: [F; N], b: [F; N], c: [F; N])
     let d20 = dot(v2, v0);
     let d21 = dot(v2, v1);
     let denom = d00 * d11 - d01 * d01;
-    if denom.abs() < 1e-20 {
+    if denom.abs() < 1e-16 {
         return [1., 0., 0.];
     }
     let v = (d11 * d20 - d01 * d21) / denom;
