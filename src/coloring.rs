@@ -613,6 +613,31 @@ fn test_intersection_poly() {
     assert_eq!(buf, aabb.corners());
 }
 
+#[test]
+fn test_intersection_poly_complex() {
+    let mut buf = vec![];
+    let tri = [[0., 1.25], [-1.25, 0.], [1.25, 0.]];
+    let aabb = AABB {
+        min: [-1.; 2],
+        max: [1.; 2],
+    };
+
+    intersection_poly(tri, aabb, &mut buf);
+    assert_eq!(buf.len(), 6, "{buf:?}");
+    assert_eq!(
+        buf,
+        [
+            [-1.0, 0.25],
+            [-1.0, 0.0],
+            [1.0, 0.0],
+            [1.0, 0.25],
+            [0.25, 1.0],
+            [-0.25, 1.0]
+        ]
+    );
+    assert_eq!(1.4375, poly_area_2d(&buf));
+}
+
 #[derive(PartialEq)]
 struct OrdFloat(F);
 

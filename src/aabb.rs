@@ -85,9 +85,17 @@ impl AABB<F, 2> {
         [[lx, ly], [hx, ly], [hx, hy], [lx, hy]]
     }
 
+    #[inline]
     pub fn expand_by(&mut self, v: F) {
         self.min = self.min.map(|val| val - v);
         self.max = self.max.map(|val| val + v);
+    }
+
+    #[inline]
+    pub fn area(&self) -> F {
+        let [lx, ly] = self.min;
+        let [hx, hy] = self.max;
+        (hx - lx) * (hy - ly)
     }
 
     /// Does this polygon intersect with this aabb? Uses the separating axis theorem
