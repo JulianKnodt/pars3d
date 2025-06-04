@@ -12,7 +12,7 @@ pub fn save_uv(
     faces: &[FaceKind],
     stroke_width: F,
 ) -> std::io::Result<()> {
-    let sz = 1024.;
+    let sz = 2048.;
     let mut doc = Document::new().set("viewBox", (0., 0., sz, sz));
 
     for f in faces {
