@@ -1,4 +1,4 @@
-use crate::{add, barycentric_2d, barycentric_3d, cross, edges, kmul, sub, F};
+use crate::{add, barycentric_2d, barycentric_3d, cross, edges, kmul, length, sub, F};
 
 /// Face representation for meshes.
 /// Tris and quads are stack allocated,
@@ -572,6 +572,9 @@ impl FaceKind<[F; 2]> {
             &FaceKind::Quad(q) => super::quad_area_2d(q),
             &FaceKind::Poly(_) => todo!(),
         }
+    }
+    pub fn perimeter(&self) -> F {
+        self.edges().map(|[e0, e1]| length(sub(e0, e1))).sum::<F>()
     }
     pub fn tri(&self) -> Option<[[F; 2]; 3]> {
         if let Self::Tri(t) = self {
