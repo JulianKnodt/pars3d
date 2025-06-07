@@ -336,4 +336,27 @@ impl<D> VertexAdj<D> {
 
         (num_loops, out)
     }
+
+    /// For this vertex-vertex adjacency, returns a labelling of each vertex's component
+    pub fn connected_components(&self) -> Vec<u32> {
+        let mut unseen = (0..self.idx_count.len()).collect::<BTreeSet<_>>();
+
+        let mut out = vec![u32::MAX; self.idx_count.len()];
+        let mut curr = 0;
+        while let Some(fst) = unseen.pop_first() {
+            out[fst as usize] = curr;
+            let mut stack = self.adj(fst).to_vec();
+            while let Some(next) = stack.pop() {
+                if !unseen.remove(&(next as usize)) {
+                    assert_ne!(out[next as usize], u32::MAX);
+                    continue;
+                }
+                assert_eq!(out[next as usize], u32::MAX);
+                out[next as usize] = curr;
+                stack.extend_from_slice(self.adj(next as usize));
+            }
+            curr += 1;
+        }
+        out
+    }
 }

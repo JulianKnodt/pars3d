@@ -7,6 +7,9 @@ use std::collections::BTreeMap;
 /// Curvature related functions
 pub mod curvature;
 
+/// Subdivision
+pub mod subdivision;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum VertexNormalWeightingKind {
     Uniform,
