@@ -122,8 +122,8 @@ impl ObjObject {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ObjImage {
-    img: DynamicImage,
-    path: String,
+    pub img: DynamicImage,
+    pub path: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -198,7 +198,9 @@ impl Default for MTL {
 
 impl MTL {
     pub fn is_empty(&self) -> bool {
-        self == &Self::default()
+        let mut tmp = Self::default();
+        tmp.mtllib_idx = self.mtllib_idx;
+        self == &tmp
     }
     /*
     pub fn diffuse_image(&self) -> DynamicImage {
