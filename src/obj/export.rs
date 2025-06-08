@@ -53,7 +53,7 @@ fn write_mtls(
                 );
             }
             OutputKind::New(v) => {
-                assert_ne!(v, "", "Cannot specify empty new MTL");
+                assert_ne!(v, "", "Cannot specify empty new MTL (maybe update material path?)");
                 let p: &Path = v.as_ref();
                 let obj_path: &Path = obj_file_path.as_ref();
                 obj_path.with_file_name(p.file_name().unwrap())
