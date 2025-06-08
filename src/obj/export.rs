@@ -138,6 +138,8 @@ fn write_mtls(
                     TextureKind::Diffuse => write_tex!(tex, "Kd", "map_Kd"),
                     TextureKind::Specular => write_tex!(tex, "Ks", "map_Ks"),
                     TextureKind::Emissive => write_tex!(tex, "Ke", "map_Ke"),
+                    TextureKind::Metallic => write_tex!(tex, "Pm", "map_Pm"),
+                    TextureKind::Roughness => write_tex!(tex, "Pr", "map_Pr"),
                     TextureKind::Normal => {
                         let Some(img) = &tex.image else {
                             continue;
@@ -145,10 +147,9 @@ fn write_mtls(
                         let path = save_img!(img);
                         writeln!(mtl_file, "bump {}", path.display())?;
                     }
-                    // OBJ cannot handle other kinds of textures
-                    _ => continue,
-                    // TODO handle PBR extensions
+                    // TODO handle more PBR extensions
                     // (https://github.com/tinyobjloader/tinyobjloader/blob/release/pbr-mtl.md)
+                    // https://en.wikipedia.org/wiki/Wavefront_.obj_file#Physically-based_Rendering
                 }
             }
         }

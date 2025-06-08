@@ -141,6 +141,7 @@ pub struct MTL {
     pub map_ka: Option<ObjImage>,
     /// emissive map
     pub map_ke: Option<ObjImage>,
+
     /// Normal Map
     pub bump_normal: Option<ObjImage>,
 
@@ -153,6 +154,12 @@ pub struct MTL {
     pub ns: f32,
     pub ni: f32,
     pub d: f32,
+
+    /// Roughness Map
+    pub map_pr: Option<ObjImage>,
+
+    /// Metallic Map
+    pub map_pm: Option<ObjImage>,
 
     pub illum: u8,
 
@@ -180,6 +187,9 @@ impl Default for MTL {
             // IMPORTANT set this to 1 otherwise it will be transparent.
             d: 1.,
             illum: 0,
+
+            map_pr: None,
+            map_pm: None,
 
             mtllib_idx: usize::MAX,
         }
@@ -501,7 +511,8 @@ pub fn parse_mtl(p: impl AsRef<Path>, idx: usize) -> io::Result<Vec<(String, MTL
                 }
             },
             "map_kd" | "map_ka" | "map_ke" | "map_ks" | "disp" | "bump_normal" | "map_normal"
-            | "bump" | "map_bump" | "map_ao" | "map_ns" | "refl" | "map_d" => {
+            | "bump" | "map_bump" | "map_ao" | "map_ns" | "refl" | "map_d" |
+            "map_Pr" | "map_Pm" => {
                 let f = match [iter.next(), iter.next(), iter.next()] {
                     [Some(f), None, _] => f,
                     [Some(_), Some(_), Some(f)] => f,
@@ -552,6 +563,7 @@ pub fn parse_mtl(p: impl AsRef<Path>, idx: usize) -> io::Result<Vec<(String, MTL
                     "map_ks" => &mut curr_mtl.map_ks,
                     "map_ka" => &mut curr_mtl.map_ka,
                     "map_ke" => &mut curr_mtl.map_ke,
+
                     "disp" => &mut curr_mtl.disp,
                     "map_ao" => &mut curr_mtl.map_ao,
                     "bump" | "map_bump" | "map_normal" | "bump_normal" => &mut curr_mtl.bump_normal,
@@ -559,6 +571,10 @@ pub fn parse_mtl(p: impl AsRef<Path>, idx: usize) -> io::Result<Vec<(String, MTL
                     "map_ns" => continue,
                     "map_d" => continue,
                     "refl" => continue,
+
+                    "map_pr" => &mut curr_mtl.map_pr,
+                    "map_pm" => &mut curr_mtl.map_pm,
+
                     _ => unreachable!(),
                 };
                 *img_dst = Some(ObjImage {
