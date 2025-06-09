@@ -1,7 +1,7 @@
 #![feature(cmp_minmax)]
 
 use pars3d::{load, save, F, U};
-use std::collections::{HashMap, BTreeSet};
+use std::collections::{BTreeSet, HashMap};
 
 fn main() -> std::io::Result<()> {
     macro_rules! help {
@@ -68,7 +68,6 @@ fn main() -> std::io::Result<()> {
 
         m.vert_colors = coloring;
     }
-
 
     save(dst, &scene).expect("Failed to save output");
     Ok(())

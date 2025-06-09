@@ -53,7 +53,10 @@ fn write_mtls(
                 );
             }
             OutputKind::New(v) => {
-                assert_ne!(v, "", "Cannot specify empty new MTL (maybe update material path?)");
+                assert_ne!(
+                    v, "",
+                    "Cannot specify empty new MTL (maybe update material path?)"
+                );
                 let p: &Path = v.as_ref();
                 let obj_path: &Path = obj_file_path.as_ref();
                 obj_path.with_file_name(p.file_name().unwrap())
@@ -146,10 +149,9 @@ fn write_mtls(
                         };
                         let path = save_img!(img);
                         writeln!(mtl_file, "bump {}", path.display())?;
-                    }
-                    // TODO handle more PBR extensions
-                    // (https://github.com/tinyobjloader/tinyobjloader/blob/release/pbr-mtl.md)
-                    // https://en.wikipedia.org/wiki/Wavefront_.obj_file#Physically-based_Rendering
+                    } // TODO handle more PBR extensions
+                      // (https://github.com/tinyobjloader/tinyobjloader/blob/release/pbr-mtl.md)
+                      // https://en.wikipedia.org/wiki/Wavefront_.obj_file#Physically-based_Rendering
                 }
             }
         }

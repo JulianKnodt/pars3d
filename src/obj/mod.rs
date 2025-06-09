@@ -513,8 +513,8 @@ pub fn parse_mtl(p: impl AsRef<Path>, idx: usize) -> io::Result<Vec<(String, MTL
                 }
             },
             "map_kd" | "map_ka" | "map_ke" | "map_ks" | "disp" | "bump_normal" | "map_normal"
-            | "bump" | "map_bump" | "map_ao" | "map_ns" | "refl" | "map_d" |
-            "map_Pr" | "map_Pm" => {
+            | "bump" | "map_bump" | "map_ao" | "map_ns" | "refl" | "map_d" | "map_Pr"
+            | "map_Pm" => {
                 let f = match [iter.next(), iter.next(), iter.next()] {
                     [Some(f), None, _] => f,
                     [Some(_), Some(_), Some(f)] => f,
