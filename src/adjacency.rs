@@ -360,3 +360,36 @@ impl<D> VertexAdj<D> {
         out
     }
 }
+
+/// Given a tree which has all loops, returns a vertex in the longest loop of the set.
+/// Distance is measured using some arbitrary function, which can map to euclidean distance in
+/// 3D, a count of edges or some 2D length.
+pub fn longest_loop(
+    loops: &BTreeMap<usize, [usize; 2]>,
+    dist_fn: impl Fn(usize, usize) -> F,
+) -> Option<usize> {
+    let mut seen = BTreeSet::new();
+    let mut best = None;
+    let mut best_dist = F::INFINITY;
+    for &v in loops.keys() {
+        if !seen.insert(v) {
+            continue;
+        }
+        let mut prev = v;
+        let mut n = loops[&v][0];
+        let mut curr_dist = dist_fn(prev, n);
+        while n != v {
+            assert!(seen.insert(n));
+            assert_ne!(prev, loops[&n][0]);
+            prev = n;
+            n = loops[&n][0];
+            curr_dist += dist_fn(prev, n);
+        }
+        curr_dist += dist_fn(n, prev);
+        if curr_dist < best_dist {
+            best_dist = curr_dist;
+            best = Some(v);
+        }
+    }
+    best
+}
