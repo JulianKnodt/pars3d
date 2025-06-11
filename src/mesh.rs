@@ -638,6 +638,57 @@ impl Mesh {
         }
     }
 
+    pub fn clear_vertex_normals(&mut self) {
+        if self.n.is_empty() {
+            return;
+        }
+
+        let v = std::mem::take(&mut self.v);
+        let uv = std::mem::take(&mut self.uv);
+
+        let mut new_v = vec![];
+        let mut new_uv: [Vec<[F; 2]>; MAX_UV] = std::array::from_fn(|_| vec![]);
+
+        // original vertex position to new vertex index
+        let mut new_map: HashMap<_, usize> = HashMap::new();
+
+        let key = |vi: usize| {
+            let vk = v[vi].map(F::to_bits);
+            let uv_k: [_; MAX_UV] =
+                std::array::from_fn(|i| uv[i].get(vi).map(|uv| uv.map(F::to_bits)));
+            (vk, uv_k)
+        };
+
+        for f in self.f.iter_mut() {
+            for vi in f.as_mut_slice() {
+                let k = key(*vi);
+                *vi = match new_map.entry(k) {
+                    Entry::Occupied(o) => *o.get(),
+                    Entry::Vacant(vac) => {
+                        let new_idx = new_v.len();
+                        new_v.push(v[*vi]);
+                        for i in 0..MAX_UV {
+                            let Some(&uv) = uv[i].get(*vi) else {
+                                continue;
+                            };
+                            new_uv[i].push(uv);
+                        }
+                        vac.insert(new_idx);
+                        new_idx
+                    }
+                }
+            }
+        }
+
+        *self = Mesh {
+            v: new_v,
+            uv: new_uv,
+            f: std::mem::take(&mut self.f),
+            face_mesh_idx: std::mem::take(&mut self.face_mesh_idx),
+            ..Default::default()
+        }
+    }
+
     pub fn normalize_joint_weights(&mut self) {
         for ws in &mut self.joint_weights {
             let sum = ws.iter().sum::<F>();
