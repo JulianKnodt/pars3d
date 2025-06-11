@@ -1,11 +1,11 @@
-use super::{dot, normalize, sub, FaceKind, Mesh, F};
+use super::{dot, normalize, sub, Mesh, F};
 use std::collections::{BTreeMap, BTreeSet};
 
-/// Structure for maintaining vertex adjacencies of a mesh with fixed topology.
+/// Structure for maintaining adjacencies of a mesh with fixed topology.
 /// If the mesh is modified, this structure will no longer be valid.
 /// Can also be used to store associated data.
 #[derive(Debug, Clone)]
-pub struct VertexAdj<D = ()> {
+pub struct Adj<D = ()> {
     /// Index and # of nbrs in adjacency vector
     idx_count: Vec<(u32, u16)>,
     /// Flattened 2D vector from vertex to its neighbors
@@ -14,10 +14,11 @@ pub struct VertexAdj<D = ()> {
     data: Vec<D>,
 }
 
-impl VertexAdj {
-    pub fn new(fs: &[FaceKind], nv: usize) -> Self {
+impl Mesh {
+    /// Returns vertices adjacent to each vertex in the input mesh
+    pub fn vertex_vertex_adj(&self) -> Adj<()> {
         let mut nbrs: BTreeMap<usize, Vec<u32>> = BTreeMap::new();
-        for f in fs {
+        for f in &self.f {
             for [e0, e1] in f.edges() {
                 assert_ne!(e0, e1);
                 let e0_nbrs = nbrs.entry(e0).or_default();
@@ -32,7 +33,7 @@ impl VertexAdj {
         }
         let mut idx_count = vec![];
         let mut adj = vec![];
-        for vi in 0..nv {
+        for vi in 0..self.v.len() {
             let Some(n) = nbrs.get_mut(&vi) else {
                 // no neighbors
                 idx_count.push((0, 0));
@@ -44,21 +45,14 @@ impl VertexAdj {
         }
 
         let data = vec![(); adj.len()];
-        VertexAdj {
+        Adj {
             idx_count,
             adj,
             data,
         }
     }
-}
-
-impl Mesh {
-    /// Returns vertices adjacent to each vertex in the input mesh
-    pub fn vertex_vertex_adj(&self) -> VertexAdj<()> {
-        VertexAdj::new(&self.f, self.v.len())
-    }
     /// Returns faces adjacent to each vertex in the input mesh
-    pub fn vertex_face_adj(&self) -> VertexAdj<()> {
+    pub fn vertex_face_adj(&self) -> Adj<()> {
         let mut nbrs: BTreeMap<usize, Vec<u32>> = BTreeMap::new();
         for (fi, f) in self.f.iter().enumerate() {
             let fi = fi as u32;
@@ -84,7 +78,41 @@ impl Mesh {
             adj.append(n);
         }
         let data = vec![(); adj.len()];
-        VertexAdj {
+        Adj {
+            idx_count,
+            adj,
+            data,
+        }
+    }
+    pub fn face_face_adj(&self) -> Adj<()> {
+        let edge_adjs = self.edge_kinds();
+        let mut f_nbrs = vec![vec![]; self.f.len()];
+
+        for (fi, f) in self.f.iter().enumerate() {
+            for e in f.edges_ord() {
+                f_nbrs[fi].extend(
+                    edge_adjs[&e]
+                        .as_slice()
+                        .iter()
+                        .copied()
+                        .filter(|&ofi| ofi != fi)
+                        .map(|v| v as u32),
+                );
+            }
+        }
+
+        let mut idx_count = vec![];
+        let mut adj = vec![];
+        for fi in 0..self.f.len() {
+            let Some(n) = f_nbrs.get_mut(fi) else {
+                idx_count.push((0, 0));
+                continue;
+            };
+            idx_count.push((adj.len() as u32, n.len() as u16));
+            adj.append(n);
+        }
+        let data = vec![(); adj.len()];
+        Adj {
             idx_count,
             adj,
             data,
@@ -92,10 +120,10 @@ impl Mesh {
     }
 }
 
-impl<D> VertexAdj<D> {
+impl<D> Adj<D> {
     /// Modifies the data for this vertex adjacency based on a function which takes an ordered
     /// edge.
-    pub fn map<U>(self, f: impl Fn(&Self, usize, usize, D) -> U) -> VertexAdj<U>
+    pub fn map<U>(self, f: impl Fn(&Self, usize, usize, D) -> U) -> Adj<U>
     where
         U: Default + Copy,
         D: Copy,
@@ -111,7 +139,7 @@ impl<D> VertexAdj<D> {
             idx_count,
         } = self;
 
-        VertexAdj {
+        Adj {
             data,
             adj,
             idx_count,
@@ -170,12 +198,7 @@ impl<D> VertexAdj<D> {
 
     /// Returns the unique set of faces which are adjacent to the one ring, but not adjacent to
     /// vi. It's the caller's responsibility to clear `buf`, if they so choose.
-    pub fn two_ring_faces<D2>(
-        &self,
-        vi: usize,
-        vertex_face_adj: &VertexAdj<D2>,
-        buf: &mut Vec<usize>,
-    ) {
+    pub fn two_ring_faces<D2>(&self, vi: usize, vertex_face_adj: &Adj<D2>, buf: &mut Vec<usize>) {
         let face_adj = vertex_face_adj.adj(vi);
         let vert_adj = self.adj(vi);
         let start_len = buf.len();
@@ -337,8 +360,9 @@ impl<D> VertexAdj<D> {
         (num_loops, out)
     }
 
-    /// For this vertex-vertex adjacency, returns a labelling of each vertex's component
-    pub fn connected_components(&self) -> Vec<u32> {
+    /// For this vertex-vertex adjacency, returns a labelling of each vertex's component, along
+    /// with the total number of components present.
+    pub fn connected_components(&self) -> (Vec<u32>, u32) {
         let mut unseen = (0..self.idx_count.len()).collect::<BTreeSet<_>>();
 
         let mut out = vec![u32::MAX; self.idx_count.len()];
@@ -357,7 +381,7 @@ impl<D> VertexAdj<D> {
             }
             curr += 1;
         }
-        out
+        (out, curr)
     }
 }
 
