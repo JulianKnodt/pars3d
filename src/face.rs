@@ -513,7 +513,9 @@ macro_rules! impl_barycentrics {
                             (i, b, b[0].min(b[1]).min(b[2]))
                         })
                         .max_by(|(_, _, a), (_, _, b)| {
-                            a.partial_cmp(&b).expect("Quad Barycentric was not finite")
+                            a.partial_cmp(&b).unwrap_or_else(|| {
+                                panic!("Quad barycentric was not finite {a} {b}")
+                            })
                         })
                         .unwrap();
                     Barycentric::Quad(i == 1, b)

@@ -48,7 +48,7 @@ fn main() -> std::io::Result<()> {
         }
     }
     if state != State::Empty {
-      help!();
+        help!();
     }
     let Some(src) = src else {
         help!();

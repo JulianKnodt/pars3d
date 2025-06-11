@@ -1,5 +1,5 @@
 #[cfg(feature = "svg")]
-use pars3d::{load, svg::save_uv};
+use pars3d::{load, svg::save_uv, F};
 
 #[cfg(feature = "svg")]
 fn main() {
@@ -46,7 +46,7 @@ fn main() {
         }
     }
     if state != State::Empty {
-      help!();
+        help!();
     }
     let Some(src) = src else {
         help!();

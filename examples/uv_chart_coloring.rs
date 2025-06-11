@@ -32,8 +32,9 @@ fn main() -> std::io::Result<()> {
     let mut scene = load(&src).expect("Failed to load input scene");
 
     for m in &mut scene.meshes {
+        m.clear_vertex_normals();
         let vv_adj = m.vertex_vertex_adj();
-        let comps = vv_adj.connected_components();
+        let (comps, _) = vv_adj.connected_components();
         // TODO determine if two regions are adjacent (any two vertices with same position but
         // different chart)
 
