@@ -121,6 +121,9 @@ impl Mesh {
 }
 
 impl<D> Adj<D> {
+    pub fn len(&self) -> usize {
+      self.idx_count.len()
+    }
     /// Modifies the data for this vertex adjacency based on a function which takes an ordered
     /// edge.
     pub fn map<U>(self, f: impl Fn(&Self, usize, usize, D) -> U) -> Adj<U>
@@ -360,7 +363,7 @@ impl<D> Adj<D> {
         (num_loops, out)
     }
 
-    /// For this vertex-vertex adjacency, returns a labelling of each vertex's component, along
+    /// For this adjacency, returns a labelling of each element's component, along
     /// with the total number of components present.
     pub fn connected_components(&self) -> (Vec<u32>, u32) {
         let mut unseen = (0..self.idx_count.len()).collect::<BTreeSet<_>>();
