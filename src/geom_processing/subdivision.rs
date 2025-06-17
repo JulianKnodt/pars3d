@@ -88,8 +88,10 @@ fn add_triples(
 }
 
 /// For a given set of vertices, triangles, and vertex colors, compute the loop subdivided version
-/// of the input mesh. Note that the output vertices will be in barycentric form, and can be
-/// computed using other functions.
+/// of the input mesh. Note that the output vertices will be in barycentric form, and extracted
+/// values such as position, uv, and color can be computed by calling `eval` for each one.
+/// To get the face index of the original triangle that corresponds to a new triangle call
+/// `original_tri_index(new_fi, num_subdivs)`.
 pub fn loop_subdivision(ts: &[[usize; 3]]) -> (Vec<BarycentricRepr>, Vec<[usize; 3]>) {
     let nv = ts
         .iter()
@@ -136,9 +138,18 @@ pub fn loop_subdivision(ts: &[[usize; 3]]) -> (Vec<BarycentricRepr>, Vec<[usize;
     (out_vs, out_ts)
 }
 
+/// Returns the original tri index that corresponds to this triangle.
+/// Assumes the triangles were not shuffled, and that "subdivision" refers to the
+/// `loop_subdivision` function.
+pub fn original_tri_index(fi: usize, num_subdivs: usize) -> usize {
+    (0..num_subdivs).fold(fi, |acc, _| acc / 4)
+}
+
 /// Compose two sets of barycentric coordinates of subdivisions
 /// The first argument should be the barycentric coordinates of the subdivided mesh with
 /// vertices of base. The output iterator has the same number of elements as subdiv.
+/// When subdividing multiple times, it should be:
+/// compose(N, compose(..., compose(2, compose(1, 0))))
 pub fn compose_barycentric_repr<'a: 'c, 'b: 'c, 'c>(
     subdiv: &'a [BarycentricRepr],
     base: &'b [BarycentricRepr],
@@ -158,6 +169,8 @@ pub fn compose_barycentric_repr<'a: 'c, 'b: 'c, 'c>(
         BarycentricRepr::from_triple(new_idxs, new_ws)
     })
 }
+
+// TODO make a lazy version of above, which doesn't need to make intermediate representations
 
 #[test]
 fn test_loop_subdiv() {
