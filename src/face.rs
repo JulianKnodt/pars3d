@@ -407,6 +407,16 @@ impl FaceKind {
             }
         }
     }
+    /// Compute the centroid of some set of values for this face.
+    #[inline]
+    pub fn centroid<const N: usize>(&self, vals: &[[F; N]]) -> [F; N] {
+        let s = self
+            .as_slice()
+            .iter()
+            .map(|&vi| vals[vi])
+            .fold([0.; N], add);
+        kmul((self.len() as F).recip(), s)
+    }
 }
 
 impl From<&[usize]> for FaceKind {
