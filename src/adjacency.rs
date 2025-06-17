@@ -122,7 +122,7 @@ impl Mesh {
 
 impl<D> Adj<D> {
     pub fn len(&self) -> usize {
-      self.idx_count.len()
+        self.idx_count.len()
     }
     /// Modifies the data for this vertex adjacency based on a function which takes an ordered
     /// edge.
