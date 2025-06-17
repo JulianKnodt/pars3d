@@ -31,6 +31,13 @@ impl<const N: usize> AABB<F, N> {
     pub fn diag(&self) -> [F; N] {
         sub(self.max, self.min)
     }
+    pub fn from_slice(ps: &[[F; N]]) -> Self {
+        let mut s = Self::new();
+        for &p in ps {
+            s.add_point(p);
+        }
+        s
+    }
     pub fn round_to_i32(&self) -> AABB<i32, N> {
         AABB {
             min: self.min.map(|i| i.floor() as i32),
