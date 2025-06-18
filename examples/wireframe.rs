@@ -4,10 +4,11 @@ use pars3d::{load, save, F};
 use std::collections::BTreeSet;
 
 fn main() -> std::io::Result<()> {
+    let mut width = 1.5e-3;
     macro_rules! help {
         () => {{
             eprintln!("Outputs the wireframe of <arg1> to <arg2>");
-            eprintln!("Usage: <bin> src dst [-w/--width <float>]");
+            eprintln!("Usage: <bin> src dst [-w/--width <float> (default = {width})]");
             return Ok(());
         }};
     }
@@ -21,7 +22,6 @@ fn main() -> std::io::Result<()> {
     let mut state = State::Empty;
     let mut src = None;
     let mut dst = None;
-    let mut width = 1.5e-3;
     for v in std::env::args().skip(1) {
         match v.as_str() {
             "-w" | "--width" => {
