@@ -1,4 +1,6 @@
-use crate::{add, barycentric_2d, barycentric_3d, cross, edges, kmul, length, sub, F};
+use crate::{
+    add, barycentric_2d, barycentric_3d, cross, cross_2d, dot, edges, kmul, length, sub, F,
+};
 
 /// Face representation for meshes.
 /// Tris and quads are stack allocated,
@@ -451,7 +453,8 @@ pub enum Barycentric {
     Poly(usize, [F; 3]),
 }
 impl Barycentric {
-    pub(crate) fn new(f: &FaceKind, ti: usize, b: [F; 3]) -> Self {
+    /// Construct a new barycentric coordinate for a specific triangle of a given face.
+    pub fn new<T>(f: &FaceKind<T>, ti: usize, b: [F; 3]) -> Self {
         assert!(ti < f.len() - 2);
         match f {
             FaceKind::Tri(_) => Barycentric::Tri(b),
@@ -506,8 +509,62 @@ impl Barycentric {
     }
 }
 
+fn sign(x: F) -> F {
+    if x == 0. {
+        0.
+    } else {
+        x.signum()
+    }
+}
+
+fn tri_sdf_2d(&[p0, p1, p2]: &[[F; 2]; 3], p: [F; 2]) -> F {
+    let e0 = sub(p1, p0);
+    let e1 = sub(p2, p1);
+    let e2 = sub(p0, p2);
+    let v0 = sub(p, p0);
+    let v1 = sub(p, p1);
+    let v2 = sub(p, p2);
+    let [pq0, pq1, pq2] = [[v0, e0], [v1, e1], [v2, e2]]
+        .map(|[v, e]| sub(v, kmul((dot(v, e) / dot(e, e)).clamp(0.0, 1.0), e)));
+    let s = sign(cross_2d(e0, e2));
+    let dx = dot(pq0, pq0).min(dot(pq1, pq1)).min(dot(pq2, pq2));
+    let dy = (s * cross_2d(v0, e0))
+        .min(s * cross_2d(v1, e1))
+        .min(s * cross_2d(v2, e2));
+    -dx.sqrt() * sign(dy)
+}
+
+fn tri_sdf_3d(&[a, b, c]: &[[F; 3]; 3], p: [F; 3]) -> F {
+    let ba = sub(b, a);
+    let pa = sub(p, a);
+    let cb = sub(c, b);
+    let pb = sub(p, b);
+    let ac = sub(a, c);
+    let pc = sub(p, c);
+    let nor = cross(ba, ac);
+
+    fn dot2<const N: usize>(x: [F; N]) -> F {
+        dot(x, x)
+    }
+
+    let cond = sign(dot(cross(ba, nor), pa))
+        + sign(dot(cross(cb, nor), pb))
+        + sign(dot(cross(ac, nor), pc))
+        < 2.0;
+    let v = if cond {
+        let [a, b, c] = [[ba, pa], [cb, pb], [ac, pc]].map(|[e, p]| {
+            let v = kmul((dot(e, p) / dot2(e)).clamp(0., 1.), e);
+            dot2(sub(v, p))
+        });
+        a.min(b).min(c)
+    } else {
+        dot(nor, pa) * dot(nor, pa) / dot(nor, nor)
+    };
+    v.sqrt()
+}
+
 macro_rules! impl_barycentrics {
-    ($barycentric_fn: tt, $dim: tt) => {
+    ($barycentric_fn: tt, $dim: tt, $dist_fn: expr) => {
         pub fn barycentric_tri(&self, p: [F; $dim]) -> [F; 3] {
             let &FaceKind::Tri(t) = self else {
                 panic!("FaceKind::barycentric_tri requires tri, got {self:?}");
@@ -519,15 +576,16 @@ macro_rules! impl_barycentrics {
             match self {
                 &FaceKind::Tri(t) => Barycentric::Tri($barycentric_fn(p, t)),
                 &FaceKind::Quad(_) => {
+                    // find triangle with minimum signed distance, and compute bary of that
+                    // triangle.
                     let (i, b, _) = self
                         .as_triangle_fan()
                         .enumerate()
                         .map(|(i, t)| {
                             let b = $barycentric_fn(p, t);
-                            let dist = -b.iter().map(|v| v.min(0.)).sum::<F>();
-                            (i, b, dist)
+                            (i, b, $dist_fn(&t, p))
                         })
-                        .min_by(|(_, _, a), (_, _, b)| {
+                        .min_by(|(_, _a, a), (_, _b, b)| {
                             a.partial_cmp(&b).unwrap_or_else(|| {
                                 panic!("Quad barycentric was not finite {a} {b}")
                             })
@@ -542,8 +600,7 @@ macro_rules! impl_barycentrics {
                         .enumerate()
                         .map(|(i, t)| {
                             let b = $barycentric_fn(p, t);
-                            let dist = -b.iter().map(|v| v.min(0.)).sum::<F>();
-                            (i, b, dist)
+                            (i, b, $dist_fn(&t, p))
                         })
                         .min_by(|(_, _, a), (_, _, b)| {
                             a.partial_cmp(&b).expect("Poly Barycentric was not finite")
@@ -574,7 +631,7 @@ macro_rules! impl_barycentrics {
 }
 
 impl FaceKind<[F; 2]> {
-    impl_barycentrics!(barycentric_2d, 2);
+    impl_barycentrics!(barycentric_2d, 2, tri_sdf_2d);
     pub fn scale_by(&mut self, x: F, y: F) {
         for p in self.as_mut_slice() {
             p[0] *= x;
@@ -600,7 +657,7 @@ impl FaceKind<[F; 2]> {
 }
 
 impl FaceKind<[F; 3]> {
-    impl_barycentrics!(barycentric_3d, 3);
+    impl_barycentrics!(barycentric_3d, 3, tri_sdf_3d);
 
     /// The non-normalized normal of this face.
     pub fn normal(&self) -> [F; 3] {
