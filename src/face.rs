@@ -494,6 +494,10 @@ impl Barycentric {
         self.coords().iter().any(|&v| v < 0.)
     }
 
+    pub fn tri_idx(&self) -> usize {
+        self.tri_idx_and_coords().0
+    }
+
     pub(crate) fn clamp(&mut self) {
         for c in self.coords_mut() {
             *c = c.clamp(0., 1.);
@@ -520,9 +524,10 @@ macro_rules! impl_barycentrics {
                         .enumerate()
                         .map(|(i, t)| {
                             let b = $barycentric_fn(p, t);
-                            (i, b, b[0].min(b[1]).min(b[2]))
+                            let dist = -b.iter().map(|v| v.min(0.)).sum::<F>();
+                            (i, b, dist)
                         })
-                        .max_by(|(_, _, a), (_, _, b)| {
+                        .min_by(|(_, _, a), (_, _, b)| {
                             a.partial_cmp(&b).unwrap_or_else(|| {
                                 panic!("Quad barycentric was not finite {a} {b}")
                             })
@@ -537,9 +542,10 @@ macro_rules! impl_barycentrics {
                         .enumerate()
                         .map(|(i, t)| {
                             let b = $barycentric_fn(p, t);
-                            (i, b, b[0].min(b[1]).min(b[2]))
+                            let dist = -b.iter().map(|v| v.min(0.)).sum::<F>();
+                            (i, b, dist)
                         })
-                        .max_by(|(_, _, a), (_, _, b)| {
+                        .min_by(|(_, _, a), (_, _, b)| {
                             a.partial_cmp(&b).expect("Poly Barycentric was not finite")
                         })
                         .unwrap();
@@ -562,10 +568,7 @@ macro_rules! impl_barycentrics {
         pub fn from_barycentric(&self, b: Barycentric) -> [F; $dim] {
             let (tri_idx, b) = b.tri_idx_and_coords();
             let t = self.as_triangle_fan().nth(tri_idx).unwrap();
-            t.iter()
-                .enumerate()
-                .map(|(i, n)| kmul(b[i], *n))
-                .fold([0.; _], add)
+            add(kmul(b[0], t[0]), add(kmul(b[1], t[1]), kmul(b[2], t[2])))
         }
     };
 }
