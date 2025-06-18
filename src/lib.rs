@@ -362,6 +362,13 @@ pub fn barycentric_2d(p: [F; 2], [a, b, c]: [[F; 2]; 3]) -> [F; 3] {
     barycentric_n(p, a, b, c)
 }
 
+fn diff_of_prod(a: F, b: F, x: F, y: F) -> F {
+    let xy = x * y;
+    let dop = a.mul_add(b, -xy);
+    let err = x.mul_add(-y, xy);
+    dop + err
+}
+
 #[inline]
 pub fn barycentric_n<const N: usize>(p: [F; N], a: [F; N], b: [F; N], c: [F; N]) -> [F; 3] {
     let v0 = sub(b, a);
@@ -372,12 +379,12 @@ pub fn barycentric_n<const N: usize>(p: [F; N], a: [F; N], b: [F; N], c: [F; N])
     let d11 = dot(v1, v1);
     let d20 = dot(v2, v0);
     let d21 = dot(v2, v1);
-    let denom = d00 * d11 - d01 * d01;
+    let denom = diff_of_prod(d00, d11, d01, d01);
     if denom.abs() < 1e-16 {
         return [1., 0., 0.];
     }
-    let v = (d11 * d20 - d01 * d21) / denom;
-    let w = (d00 * d21 - d01 * d20) / denom;
+    let v = diff_of_prod(d11, d20, d01, d21) / denom;
+    let w = diff_of_prod(d00, d21, d01, d20) / denom;
     [1.0 - v - w, v, w]
 }
 
