@@ -1,6 +1,6 @@
 use super::aabb::AABB;
 use super::edge::EdgeKind;
-use super::{add, cross, dot, kmul, length, normalize, sub, tri_area, F, U};
+use super::{add, cross, dot, kmul, length, normalize, sub, tri_area, tri_area_2d, F, U};
 use super::{face::Barycentric, FaceKind, Mesh, Scene};
 use std::collections::BTreeMap;
 
@@ -120,7 +120,7 @@ impl Mesh {
 
                 let [ti2, ti3] = [[f1, f2, f3], [f1, f3, f0]];
                 let t23 = [ti2, ti3].map(|ti| ti.map(|vi| self.v[vi]));
-                let [n2, n3] = t23.map(tri_normal);
+                let [n2, n3] = t23.map(tri_normal).map(normalize);
 
                 // actually probably only need one of these checks
                 if dot(n0, n1) > m1eps && dot(n2, n3) > m1eps {
@@ -169,6 +169,96 @@ impl Mesh {
                 continue;
             }
             drop(tri_fan); // not sure why this is explicitly needed
+            let prev = std::mem::replace(&mut self.f[fi], FaceKind::empty());
+            let mut tris = prev.as_triangle_fan();
+            self.f[fi] = FaceKind::Tri(tris.next().unwrap());
+            self.f.extend(tris.map(FaceKind::Tri));
+            let new_nfs = self.f.len();
+            if let Some(&mesh_idx) = mesh_idx {
+                self.face_mesh_idx
+                    .extend((curr_nfs..new_nfs).map(|_| mesh_idx));
+            }
+            if let Some(mi) = mat_idx {
+                let last_range = self.face_mat_idx.last_mut().unwrap();
+                if last_range.1 == mi {
+                    last_range.0.end = new_nfs;
+                } else {
+                    self.face_mat_idx.push((curr_nfs..new_nfs, mi));
+                }
+            }
+
+            num_split += 1;
+        }
+        num_split
+    }
+
+    /// Splits any UV polygon which is self intersecting
+    /// Returning how many polygons were split.
+    pub fn split_self_intersecting_uv_poly(&mut self, channel: usize) -> usize {
+        let mut num_split = 0;
+        let curr_f = self.f.len();
+        for fi in 0..curr_f {
+            if self.f[fi].is_tri() {
+                continue;
+            }
+
+            let mesh_idx = self.face_mesh_idx.get(fi);
+            let mat_idx = self.mat_for_face(fi);
+            // special case quads
+            let curr_nfs = self.f.len();
+            if let FaceKind::Quad([f0, f1, f2, f3]) = self.f[fi] {
+                let [ti0, ti1] = [[f0, f1, f2], [f0, f2, f3]];
+                let t01 = [ti0, ti1].map(|ti| ti.map(|vi| self.uv[channel][vi]));
+                let [n0, n1] = t01.map(tri_area_2d);
+
+                let [ti2, ti3] = [[f1, f2, f3], [f1, f3, f0]];
+                let t23 = [ti2, ti3].map(|ti| ti.map(|vi| self.uv[channel][vi]));
+                let [n2, n3] = t23.map(tri_area_2d);
+                if n0.signum() == n1.signum() && n2.signum() == n3.signum() {
+                    continue;
+                }
+
+                let t01 = [ti0, ti1].map(|ti| ti.map(|vi| self.v[vi]));
+                let t23 = [ti2, ti3].map(|ti| ti.map(|vi| self.v[vi]));
+                let a01_min_area = t01.map(tri_area).into_iter().min_by(F::total_cmp).unwrap();
+                let a23_min_area = t23.map(tri_area).into_iter().min_by(F::total_cmp).unwrap();
+
+                if a01_min_area > a23_min_area {
+                    self.f[fi] = FaceKind::Tri(ti0);
+                    self.f.push(FaceKind::Tri(ti1));
+                } else {
+                    self.f[fi] = FaceKind::Tri(ti2);
+                    self.f.push(FaceKind::Tri(ti3));
+                }
+
+                if let Some(&mesh_idx) = mesh_idx {
+                    self.face_mesh_idx.push(mesh_idx);
+                }
+                if let Some(mi) = mat_idx {
+                    let last_range = self.face_mat_idx.last_mut().unwrap();
+                    if last_range.1 == mi {
+                        last_range.0.end += 1;
+                    } else {
+                        self.face_mat_idx.push((curr_nfs..curr_nfs + 1, mi));
+                    }
+                }
+
+                num_split += 1;
+                continue;
+            }
+
+            let mut tri_fan = self.f[fi].as_triangle_fan();
+            let Some(t0) = tri_fan.next() else {
+                continue;
+            };
+            let area_signum =
+                |t: [usize; 3]| tri_area_2d(t.map(|vi| self.uv[channel][vi])).signum();
+            let s0 = area_signum(t0);
+            let non_planar = tri_fan.any(|t| area_signum(t) != s0);
+            if !non_planar {
+                continue;
+            }
+            drop(tri_fan);
             let prev = std::mem::replace(&mut self.f[fi], FaceKind::empty());
             let mut tris = prev.as_triangle_fan();
             self.f[fi] = FaceKind::Tri(tris.next().unwrap());
