@@ -138,9 +138,11 @@ impl AABB<F, 2> {
 }
 
 fn line_segment_isect([a0, a1]: [[F; 2]; 2], [b0, b1]: [[F; 2]; 2]) -> Option<[F; 2]> {
-    assert_ne!(a0, a1);
+    // they could also lie directly on the line, but that's annoying to check
+    if a0 == a1 || b0 == b1 {
+        return None;
+    }
     let a_dir = sub(a1, a0);
-    assert_ne!(b0, b1);
     let b_dir = sub(b1, b0);
 
     let denom = cross_2d(a_dir, b_dir);
