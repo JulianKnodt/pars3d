@@ -293,6 +293,9 @@ pub fn cosine_angles([a, b, c]: [F; 3]) -> [F; 3] {
 /// More numerically stable than a naive implementation, relies on computing the product of the
 /// semi-perimeter in log-space
 pub fn herons_area([e0, e1, e2]: [F; 3]) -> F {
+    if e0 == 0. || e1 == 0. || e2 == 0. {
+        return 0.;
+    }
     let s = (e0 + e1 + e2) / 2.;
     let f = |v: F| v.max(1e-14).ln();
     let v = f(s) + f(s - e0) + f(s - e1) + f(s - e2);
