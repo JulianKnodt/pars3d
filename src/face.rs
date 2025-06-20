@@ -517,6 +517,11 @@ fn sign(x: F) -> F {
     }
 }
 
+#[inline]
+fn dot2<const N: usize>(x: [F; N]) -> F {
+    dot(x, x)
+}
+
 fn tri_sdf_2d(&[p0, p1, p2]: &[[F; 2]; 3], p: [F; 2]) -> F {
     let e0 = sub(p1, p0);
     let e1 = sub(p2, p1);
@@ -525,9 +530,9 @@ fn tri_sdf_2d(&[p0, p1, p2]: &[[F; 2]; 3], p: [F; 2]) -> F {
     let v1 = sub(p, p1);
     let v2 = sub(p, p2);
     let [pq0, pq1, pq2] = [[v0, e0], [v1, e1], [v2, e2]]
-        .map(|[v, e]| sub(v, kmul((dot(v, e) / dot(e, e)).clamp(0.0, 1.0), e)));
+        .map(|[v, e]| sub(v, kmul((dot(v, e) / dot2(e)).clamp(0., 1.), e)));
     let s = sign(cross_2d(e0, e2));
-    let dx = dot(pq0, pq0).min(dot(pq1, pq1)).min(dot(pq2, pq2));
+    let dx = dot2(pq0).min(dot2(pq1)).min(dot2(pq2));
     let dy = (s * cross_2d(v0, e0))
         .min(s * cross_2d(v1, e1))
         .min(s * cross_2d(v2, e2));
@@ -543,10 +548,6 @@ fn tri_sdf_3d(&[a, b, c]: &[[F; 3]; 3], p: [F; 3]) -> F {
     let pc = sub(p, c);
     let nor = cross(ba, ac);
 
-    fn dot2<const N: usize>(x: [F; N]) -> F {
-        dot(x, x)
-    }
-
     let cond = sign(dot(cross(ba, nor), pa))
         + sign(dot(cross(cb, nor), pb))
         + sign(dot(cross(ac, nor), pc))
@@ -558,7 +559,7 @@ fn tri_sdf_3d(&[a, b, c]: &[[F; 3]; 3], p: [F; 3]) -> F {
         });
         a.min(b).min(c)
     } else {
-        dot(nor, pa) * dot(nor, pa) / dot(nor, nor)
+        dot(nor, pa) * dot(nor, pa) / dot2(nor)
     };
     v.sqrt()
 }
@@ -578,36 +579,30 @@ macro_rules! impl_barycentrics {
                 &FaceKind::Quad(_) => {
                     // find triangle with minimum signed distance, and compute bary of that
                     // triangle.
-                    let (i, b, _) = self
+                    let (i, t, _) = self
                         .as_triangle_fan()
                         .enumerate()
-                        .map(|(i, t)| {
-                            let b = $barycentric_fn(p, t);
-                            (i, b, $dist_fn(&t, p))
-                        })
-                        .min_by(|(_, _a, a), (_, _b, b)| {
+                        .map(|(i, t)| (i, t, $dist_fn(&t, p)))
+                        .min_by(|(_, _, a), (_, _, b)| {
                             a.partial_cmp(&b).unwrap_or_else(|| {
                                 panic!("Quad barycentric was not finite {a} {b}")
                             })
                         })
                         .unwrap();
-                    Barycentric::Quad(i == 1, b)
+                    Barycentric::Quad(i == 1, $barycentric_fn(p, t))
                 }
                 FaceKind::Poly(poly) => {
                     assert!(!poly.is_empty());
-                    let (i, b, _) = self
+                    let (i, t, _) = self
                         .as_triangle_fan()
                         .enumerate()
-                        .map(|(i, t)| {
-                            let b = $barycentric_fn(p, t);
-                            (i, b, $dist_fn(&t, p))
-                        })
+                        .map(|(i, t)| (i, t, $dist_fn(&t, p)))
                         .min_by(|(_, _, a), (_, _, b)| {
                             a.partial_cmp(&b).expect("Poly Barycentric was not finite")
                         })
                         .unwrap();
 
-                    Barycentric::Poly(i, b)
+                    Barycentric::Poly(i, $barycentric_fn(p, t))
                 }
             }
         }
