@@ -190,8 +190,12 @@ pub fn save_obj(
 
     let mut prev_v = 0;
     for (mi, m) in s.meshes.iter().enumerate() {
-        for &[x, y, z] in &m.v {
-            writeln!(geom_dst, "v {x} {y} {z}")?;
+        for (vi, &[x, y, z]) in m.v.iter().enumerate() {
+            if let Some([r, g, b]) = m.vert_colors.get(vi) {
+                writeln!(geom_dst, "v {x} {y} {z} {r} {g} {b}")?;
+            } else {
+                writeln!(geom_dst, "v {x} {y} {z}")?;
+            }
         }
 
         for &[u, v] in &m.uv[0] {
