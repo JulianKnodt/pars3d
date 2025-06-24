@@ -428,6 +428,23 @@ impl Mesh {
         edges
     }
 
+    /// Returns the associated face with each edge by each edge's position.
+    pub fn edge_pos_kinds(&self) -> BTreeMap<[[U; 3]; 2], EdgeKind> {
+        let mut edges: BTreeMap<[[U; 3]; 2], EdgeKind> = BTreeMap::new();
+        for (fi, f) in self.f.iter().enumerate() {
+            for e in f.edges_ord() {
+                let [e0, e1] = e.map(|v| self.v[v].map(F::to_bits));
+                edges
+                    .entry(std::cmp::minmax(e0, e1))
+                    .and_modify(|ek| {
+                        ek.insert(fi);
+                    })
+                    .or_insert_with(|| EdgeKind::Boundary(fi));
+            }
+        }
+        edges
+    }
+
     /// Non-unique iterator over boundary vertices
     pub fn non_manifold_faces(&self) -> impl Iterator<Item = ([usize; 2], Vec<usize>)> + '_ {
         let mut edges: BTreeMap<[usize; 2], Vec<usize>> = BTreeMap::new();
