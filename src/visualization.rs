@@ -103,6 +103,10 @@ pub fn face_segmentation_wireframes<'a>(
 
     let mut edges = vec![];
     'outer: for (&[e0, e1], ek) in edge_face_adj.iter() {
+        if ek.is_boundary() {
+            edges.push([e0, e1]);
+            continue;
+        }
         let eks = ek.as_slice();
         for i in 0..eks.len() {
             let fi = eks[i];
@@ -182,7 +186,7 @@ pub fn greedy_face_coloring(
 
 impl super::mesh::Mesh {
     /// Constructs a new mesh with a given face coloring.
-    /// Does not retain any information from the original mesh.
+    /// Does not retain any other information from the original mesh.
     pub fn with_face_coloring(&self, fc: &[[F; 3]]) -> Self {
         assert_eq!(
             fc.len(),
