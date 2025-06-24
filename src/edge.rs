@@ -52,4 +52,13 @@ impl EdgeKind {
     pub fn is_manifold(&self) -> bool {
         matches!(self, EdgeKind::Manifold(_))
     }
+    /// Returns the element other than `i` if self is `Manifold`, otherwise returns `None`.
+    /// If `i` is not in the `Manifold` edge then returns `None`.
+    #[inline]
+    pub fn opposite(&self, i: usize) -> Option<usize> {
+        match self {
+            &EdgeKind::Manifold([a, b] | [b, a]) if a == i => Some(b),
+            _ => None,
+        }
+    }
 }
