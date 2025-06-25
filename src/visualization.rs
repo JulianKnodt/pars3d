@@ -127,13 +127,13 @@ pub fn face_segmentation_wireframes<'a>(
 /// Face group should be O(1). Outputs a color for each face, which can be applied with
 /// Mesh::with_face_coloring. `palette` can be arbitrary, but one example is
 /// pars3d::coloring::HIGH_CONTRAST.
-pub fn greedy_face_coloring(
+pub fn greedy_face_coloring<'a>(
     // Fn(Face) -> Group#
     face_group: impl Fn(usize) -> usize,
     // #Faces
     num_fs: usize,
-    // Whether two groups are adjacent
-    group_adj: impl Fn(usize, usize) -> bool,
+    // The set of neighbors for a given group.
+    group_adj: impl Fn(usize) -> &'a [usize],
     // Palette to use for coloring
     palette: &[[u8; 3]],
 ) -> Vec<[F; 3]> {
@@ -141,10 +141,15 @@ pub fn greedy_face_coloring(
         [r as F / 255., g as F / 255., b as F / 255.]
     }
     let mut uniq_groups = vec![];
+    let mut uniq_unord = HashMap::new();
     for fi in 0..num_fs {
         let g = face_group(fi);
-        if !uniq_groups.contains(&g) {
-            uniq_groups.push(g);
+        match uniq_unord.entry(g) {
+            Entry::Vacant(v) => {
+                v.insert(uniq_groups.len());
+                uniq_groups.push(g);
+            }
+            Entry::Occupied(_) => {}
         }
     }
 
@@ -152,14 +157,17 @@ pub fn greedy_face_coloring(
     let mut coloring: Vec<usize> = vec![];
 
     // greedy graph coloring
-    for i in 0..uniq_groups.len() {
-        let mut nbrs = vec![];
-        for j in 0..i {
-            if group_adj(uniq_groups[i], uniq_groups[j]) {
-                nbrs.push(coloring[j]);
-            }
-        }
-        let color = (0..).filter(|v| !nbrs.contains(v)).next().unwrap();
+    for &g in &uniq_groups {
+        let nbrs = group_adj(g);
+        let color = (0..)
+            .filter(|&v| {
+                nbrs.iter()
+                    .copied()
+                    .filter(|nbr| uniq_unord[nbr] < uniq_unord[&g])
+                    .all(|nbr| coloring[uniq_unord[&nbr]] != v)
+            })
+            .next()
+            .unwrap();
         coloring.push(color);
     }
 
@@ -168,8 +176,7 @@ pub fn greedy_face_coloring(
     let n = palette.len();
     (0..num_fs)
         .map(|i| {
-            let g = face_group(i);
-            let uniq_group_idx = uniq_groups.iter().position(|&v| v == g).unwrap();
+            let uniq_group_idx = uniq_unord[&face_group(i)];
             let i = coloring[uniq_group_idx];
             let col = to_rgbf(palette[i % n]);
             // common case
