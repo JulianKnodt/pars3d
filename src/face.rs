@@ -575,7 +575,7 @@ macro_rules! impl_barycentrics {
             };
             $barycentric_fn(p, t)
         }
-        /// Computes the barycentric coordinate of a 2D point p.
+        /// Computes the barycentric coordinate of a point p.
         pub fn barycentric(&self, p: [F; $dim]) -> Barycentric {
             match self {
                 &FaceKind::Tri(t) => Barycentric::Tri($barycentric_fn(p, t)),
