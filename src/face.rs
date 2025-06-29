@@ -321,6 +321,9 @@ impl FaceKind {
         };
         false
     }
+    /// Canonicalize this face, deleting duplicates and retaining order such that the lowest
+    /// index vertex is first.
+    /// Returns true if this face is now degenerate.
     pub fn canonicalize(&mut self) -> bool {
         self._canonicalize::<true>()
     }
