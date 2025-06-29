@@ -50,6 +50,8 @@ pub struct Obj {
 #[derive(Debug, Clone, Default)]
 pub struct ObjObject {
     pub v: Vec<Vec3>,
+    pub vc: Vec<Vec3>,
+
     pub vt: Vec<Vec2>,
     pub vn: Vec<Vec3>,
 
@@ -322,8 +324,14 @@ pub fn parse(p: impl AsRef<Path>, split_by_object: bool, split_by_group: bool) -
             ht if ht.starts_with('#') => continue,
             "v" => match [iter.next(), iter.next(), iter.next()] {
                 [None, _, _] | [_, None, _] | [_, _, None] => panic!("Unsupported `v` {i}: {l}"),
-                [Some(a), Some(b), Some(c)] => {
-                    curr_obj.v.push([pf(a), pf(b), pf(c)]);
+                [Some(x), Some(y), Some(z)] => {
+                    curr_obj.v.push([x, y, z].map(pf));
+                    match std::array::from_fn(|_| iter.next()) {
+                        [Some(r), Some(g), Some(b)] => {
+                            curr_obj.vc.push([r, g, b].map(pf));
+                        }
+                        _ => {}
+                    }
                 }
             },
             "vt" => match [iter.next(), iter.next(), iter.next()] {

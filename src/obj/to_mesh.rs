@@ -27,6 +27,8 @@ impl From<ObjObject> for Mesh {
 
         let mut verts = HashMap::new();
         let mut v = vec![];
+        let mut vert_colors = vec![];
+
         let mut uv = vec![];
         let mut n = vec![];
 
@@ -51,6 +53,9 @@ impl From<ObjObject> for Mesh {
                 let key = key_i!(i);
                 if !verts.contains_key(&key) {
                     v.push(obj.v[f.v[i]]);
+                    if let Some(&vc) = obj.vc.get(f.v[i]) {
+                        vert_colors.push(vc);
+                    }
                     if let Some(vt) = key.1 {
                         uv.push(obj.vt[vt]);
                     } else if must_match_uvs {
@@ -80,7 +85,7 @@ impl From<ObjObject> for Mesh {
             n,
             uv: [uv, vec![], vec![], vec![]],
 
-            vert_colors: vec![],
+            vert_colors,
 
             joint_idxs: vec![],
             joint_weights: vec![],
