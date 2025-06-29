@@ -17,48 +17,31 @@ pub struct Adj<D = ()> {
 impl Mesh {
     /// Returns vertices adjacent to each vertex in the input mesh
     pub fn vertex_vertex_adj(&self) -> Adj<()> {
-        let mut nbrs: BTreeMap<usize, Vec<u32>> = BTreeMap::new();
+        let mut nbrs = vec![vec![]; self.v.len()];
         for f in &self.f {
             for [e0, e1] in f.edges() {
                 assert_ne!(e0, e1);
-                let e0_nbrs = nbrs.entry(e0).or_default();
+                let e0_nbrs = &mut nbrs[e0];
                 if !e0_nbrs.contains(&(e1 as u32)) {
                     e0_nbrs.push(e1 as u32);
                 }
-                let e1_nbrs = nbrs.entry(e1).or_default();
+                let e1_nbrs = &mut nbrs[e1];
                 if !e1_nbrs.contains(&(e0 as u32)) {
                     e1_nbrs.push(e0 as u32);
                 }
             }
         }
-        let mut idx_count = vec![];
-        let mut adj = vec![];
-        for vi in 0..self.v.len() {
-            let Some(n) = nbrs.get_mut(&vi) else {
-                // no neighbors
-                idx_count.push((0, 0));
-                continue;
-            };
-            assert!(n.len() < u16::MAX as usize);
-            idx_count.push((adj.len() as u32, n.len() as u16));
-            adj.append(n);
-        }
 
-        let data = vec![(); adj.len()];
-        Adj {
-            idx_count,
-            adj,
-            data,
-        }
+        Self::from_nbr_vec(&mut nbrs)
     }
     /// Returns faces adjacent to each vertex in the input mesh
     pub fn vertex_face_adj(&self) -> Adj<()> {
-        let mut nbrs: BTreeMap<usize, Vec<u32>> = BTreeMap::new();
+        let mut nbrs = vec![vec![]; self.v.len()];
         for (fi, f) in self.f.iter().enumerate() {
             let fi = fi as u32;
             for e in f.edges() {
                 for vi in e {
-                    let vi_nbr = nbrs.entry(vi).or_default();
+                    let vi_nbr = &mut nbrs[vi];
                     if !vi_nbr.contains(&fi) {
                         vi_nbr.push(fi);
                     }
@@ -66,23 +49,7 @@ impl Mesh {
             }
         }
 
-        let mut idx_count = vec![];
-        let mut adj = vec![];
-        for vi in 0..self.v.len() {
-            let Some(n) = nbrs.get_mut(&vi) else {
-                idx_count.push((0, 0));
-                continue;
-            };
-            assert!(n.len() < u16::MAX as usize);
-            idx_count.push((adj.len() as u32, n.len() as u16));
-            adj.append(n);
-        }
-        let data = vec![(); adj.len()];
-        Adj {
-            idx_count,
-            adj,
-            data,
-        }
+        Self::from_nbr_vec(&mut nbrs)
     }
     pub fn face_face_adj(&self) -> Adj<()> {
         let edge_adjs = self.edge_kinds();
@@ -100,11 +67,33 @@ impl Mesh {
                 );
             }
         }
+        Self::from_nbr_vec(&mut f_nbrs)
+    }
+    pub fn face_face_pos_adj(&self) -> Adj<()> {
+        let edge_adjs = self.edge_pos_kinds();
+        let mut f_nbrs = vec![vec![]; self.f.len()];
 
+        for (fi, f) in self.f.iter().enumerate() {
+            for e in f.edges_ord() {
+                let [e0, e1] = e.map(|vi| self.v[vi].map(F::to_bits));
+                f_nbrs[fi].extend(
+                    edge_adjs[&std::cmp::minmax(e0, e1)]
+                        .as_slice()
+                        .iter()
+                        .copied()
+                        .filter(|&ofi| ofi != fi)
+                        .map(|v| v as u32),
+                );
+            }
+        }
+        Self::from_nbr_vec(&mut f_nbrs)
+    }
+
+    fn from_nbr_vec(nbrs: &mut Vec<Vec<u32>>) -> Adj<()> {
         let mut idx_count = vec![];
         let mut adj = vec![];
-        for fi in 0..self.f.len() {
-            let Some(n) = f_nbrs.get_mut(fi) else {
+        for fi in 0..nbrs.len() {
+            let Some(n) = nbrs.get_mut(fi) else {
                 idx_count.push((0, 0));
                 continue;
             };
