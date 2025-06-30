@@ -1,3 +1,4 @@
+use super::aabb::AABB;
 use crate::{
     add, barycentric_2d, barycentric_3d, cross, cross_2d, dot, edges, kmul, length, sub, F,
 };
@@ -421,6 +422,15 @@ impl FaceKind {
             .map(|&vi| vals[vi])
             .fold([0.; N], add);
         kmul((self.len() as F).recip(), s)
+    }
+
+    /// The AABB for this face given a set of coordinates.
+    pub fn aabb<const N: usize>(&self, vals: &[[F; N]]) -> AABB<F, N> {
+        let mut out = AABB::default();
+        for &vi in self.as_slice() {
+            out.add_point(vals[vi]);
+        }
+        out
     }
 }
 

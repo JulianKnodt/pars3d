@@ -468,6 +468,7 @@ pub fn basis([x, y, z]: [F; 3]) -> [[F; 3]; 2] {
         [b, sign + sqr(y) * a, -y],
     ]
 }
+
 fn sqr(x: F) -> F {
     x * x
 }

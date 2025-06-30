@@ -1,6 +1,5 @@
-use super::{add, cross_2d, dot, kmul, length, sub, FaceKind, F};
+use super::{add, dot, kmul, length, sub, FaceKind, F};
 use crate::aabb::AABB;
-
 // https://coolors.co/palettes/popular/simple
 pub const HIGH_CONTRAST: [[u8; 3]; 6] = [
     [0x9d, 0xff, 0xa4],
@@ -479,7 +478,7 @@ pub fn bake_vertex_colors_to_texture_exact(
             for t in f.as_triangle_fan() {
                 let uv_t = t.map(|vi| uvs[vi]);
 
-                intersection_poly(uv_t, aabb, &mut poly);
+                aabb.intersects_tri_poly(uv_t, &mut poly);
                 if poly.len() < 3 {
                     continue;
                 }
@@ -500,7 +499,7 @@ pub fn bake_vertex_colors_to_texture_exact(
                     }
                     // TODO should be a fraction of the line contained?
                 } else {
-                    poly_area_2d(&poly) / tri_area_2d
+                    super::poly_area_2d(&poly) / tri_area_2d
                 };
 
                 let area_3d = super::tri_area(t.map(|vi| vs[vi])) * ratio;
@@ -526,155 +525,4 @@ pub fn bake_vertex_colors_to_texture_exact(
         let rgb = kmul(total_area.recip(), all_color);
         Rgb(rgb.map(|v| (v.clamp(0., 1.) * 255.) as u8))
     })
-}
-
-/// Given a triangle and an AABB in 2D, return the output polygon of their intersection
-/// If no intersection, return empty output
-fn intersection_poly(tri: [[F; 2]; 3], aabb: AABB<F, 2>, poly: &mut Vec<[F; 2]>) {
-    poly.clear();
-
-    // check if any points of the aabb are contained in the tri
-    poly.extend(aabb.corners().into_iter().filter(|&c| tri_contains(tri, c)));
-
-    // for each point on the tri, check if the aabb contains it
-    // If it is contained, then it's part of the polygon
-    // Otherwise, it is projected to the two adjacent edges
-
-    for i in 0..3 {
-        let p = tri[i];
-        if aabb.contains_point(p) {
-            poly.push(p);
-            continue;
-        }
-        for adj in [tri[(i + 2) % 3], tri[(i + 1) % 3]] {
-            //poly.extend(aabb.line_segment_isect([p, adj]));
-            for is in aabb.line_segment_isect([p, adj]) {
-                poly.push(is);
-            }
-        }
-    }
-
-    // sort polygon counterclockwise
-    let center = poly.iter().copied().fold([0.; 2], add);
-    let center = kmul((poly.len() as F).recip(), center);
-
-    poly.sort_by_key(|&p| {
-        let [x, y] = super::normalize(sub(p, center));
-        OrdFloat(y.atan2(x))
-    });
-    poly.dedup();
-}
-
-#[test]
-fn test_intersection_poly() {
-    let mut buf = vec![];
-    let tri = [[0., 0.], [1., 0.], [0., 2.]];
-    let aabb = AABB {
-        min: [0., 0.],
-        max: [1., 1.],
-    };
-
-    intersection_poly(tri, aabb, &mut buf);
-    assert_eq!(buf, [[0.; 2], [1., 0.], [0.5, 1.], [0., 1.]]);
-
-    let aabb = AABB {
-        min: [-1., 0.],
-        max: [0., 1.],
-    };
-    intersection_poly(tri, aabb, &mut buf);
-    assert_eq!(buf.len(), 2);
-
-    let aabb = AABB {
-        min: [-10.; 2],
-        max: [10.; 2],
-    };
-    intersection_poly(tri, aabb, &mut buf);
-    assert_eq!(buf, tri);
-
-    let aabb = AABB {
-        min: [0., 1.],
-        max: [1., 2.],
-    };
-    intersection_poly(tri, aabb, &mut buf);
-    assert_eq!(buf.len(), 3);
-
-    let aabb = AABB {
-        min: [0., 1.],
-        max: [1., 2.],
-    };
-    intersection_poly(tri, aabb, &mut buf);
-    assert_eq!(buf, [[0., 1.], [0.5, 1.], [0., 2.]]);
-
-    let aabb = AABB {
-        min: [0.25, 0.25],
-        max: [0.4, 0.4],
-    };
-    intersection_poly(tri, aabb, &mut buf);
-    assert_eq!(buf, aabb.corners());
-}
-
-#[test]
-fn test_intersection_poly_complex() {
-    let mut buf = vec![];
-    let tri = [[0., 1.25], [-1.25, 0.], [1.25, 0.]];
-    let aabb = AABB {
-        min: [-1.; 2],
-        max: [1.; 2],
-    };
-
-    intersection_poly(tri, aabb, &mut buf);
-    assert_eq!(buf.len(), 6, "{buf:?}");
-    assert_eq!(
-        buf,
-        [
-            [-1.0, 0.25],
-            [-1.0, 0.0],
-            [1.0, 0.0],
-            [1.0, 0.25],
-            [0.25, 1.0],
-            [-0.25, 1.0]
-        ]
-    );
-    assert_eq!(1.4375, poly_area_2d(&buf));
-}
-
-#[derive(PartialEq)]
-struct OrdFloat(F);
-
-impl Eq for OrdFloat {}
-impl Ord for OrdFloat {
-    fn cmp(&self, o: &Self) -> std::cmp::Ordering {
-        self.0.partial_cmp(&o.0).unwrap()
-    }
-}
-impl PartialOrd for OrdFloat {
-    fn partial_cmp(&self, o: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(&o))
-    }
-}
-
-// https://stackoverflow.com/questions/2049582/how-to-determine-if-a-point-is-in-a-2d-triangle
-fn tri_contains([v0, v1, v2]: [[F; 2]; 3], p: [F; 2]) -> bool {
-    let d1 = cross_2d(sub(p, v1), sub(v0, v1));
-    let d2 = cross_2d(sub(p, v2), sub(v1, v2));
-    let d3 = cross_2d(sub(p, v0), sub(v2, v0));
-
-    d1.is_sign_positive() == d2.is_sign_positive() && d1.is_sign_positive() == d3.is_sign_positive()
-}
-
-#[test]
-fn test_tri_contains() {
-    let t = [[0., 0.], [1., 0.], [0., 1.]];
-    assert!(tri_contains(t, [0.25, 0.25]));
-    assert!(tri_contains(t, [0.5, 0.5]));
-    assert!(tri_contains(t, [1., 0.]));
-    assert!(!tri_contains(t, [0.75, 0.75]));
-    assert!(!tri_contains(t, [-0.5, 0.25]));
-    assert!(!tri_contains(t, [0.25, -0.5]));
-}
-
-/// Computes the area of a polygon in 2D
-fn poly_area_2d(p: &[[F; 2]]) -> F {
-    let n = p.len();
-    (0..n).map(|i| cross_2d(p[i], p[(i + 1) % n])).sum::<F>() / 2.
 }

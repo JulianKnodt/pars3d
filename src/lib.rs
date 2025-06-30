@@ -211,11 +211,16 @@ pub fn dist<const N: usize>(a: [F; N], b: [F; N]) -> F {
 }
 
 pub(crate) fn cross([x, y, z]: [F; 3], [a, b, c]: [F; 3]) -> [F; 3] {
-    [y * c - z * b, z * a - x * c, x * b - y * a]
+    [
+        diff_of_prod(y, c, z, b),
+        diff_of_prod(z, a, x, c),
+        diff_of_prod(x, b, y, a),
+    ]
+    //[y * c - z * b, z * a - x * c, x * b - y * a]
 }
 
 pub(crate) fn cross_2d([x, y]: [F; 2], [a, b]: [F; 2]) -> F {
-    x * b - y * a
+    diff_of_prod(x, b, y, a)
 }
 
 pub(crate) fn tri_area_2d([a, b, c]: [[F; 2]; 3]) -> F {
@@ -478,4 +483,30 @@ where
     T: Copy,
 {
     (0..vis.len()).map(|vi| [vis[vi], vis[(vi + 1) % vis.len()]])
+}
+
+// https://stackoverflow.com/questions/2049582/how-to-determine-if-a-point-is-in-a-2d-triangle
+fn tri_contains([v0, v1, v2]: [[F; 2]; 3], p: [F; 2]) -> bool {
+    let d1 = cross_2d(sub(p, v1), sub(v0, v1));
+    let d2 = cross_2d(sub(p, v2), sub(v1, v2));
+    let d3 = cross_2d(sub(p, v0), sub(v2, v0));
+
+    d1.is_sign_positive() == d2.is_sign_positive() && d1.is_sign_positive() == d3.is_sign_positive()
+}
+
+#[test]
+fn test_tri_contains() {
+    let t = [[0., 0.], [1., 0.], [0., 1.]];
+    assert!(tri_contains(t, [0.25, 0.25]));
+    assert!(tri_contains(t, [0.5, 0.5]));
+    assert!(tri_contains(t, [1., 0.]));
+    assert!(!tri_contains(t, [0.75, 0.75]));
+    assert!(!tri_contains(t, [-0.5, 0.25]));
+    assert!(!tri_contains(t, [0.25, -0.5]));
+}
+
+/// Computes the area of a polygon in 2D
+fn poly_area_2d(p: &[[F; 2]]) -> F {
+    let n = p.len();
+    (0..n).map(|i| cross_2d(p[i], p[(i + 1) % n])).sum::<F>() / 2.
 }

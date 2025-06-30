@@ -1,7 +1,7 @@
 #![feature(cmp_minmax)]
 
 use pars3d::{load, save, F, U};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, HashMap};
 
 fn main() -> std::io::Result<()> {
     macro_rules! help {
@@ -46,14 +46,15 @@ fn main() -> std::io::Result<()> {
             let k = key(m.v[vi]);
             ident_pos.entry(k).or_default().push(vi);
         }
-        let mut adjs = BTreeSet::new();
+        let mut adjs: BTreeMap<_, Vec<_>> = BTreeMap::new();
         for vis in ident_pos.values() {
             for i in 0..vis.len() {
-                let ci = comps[vis[i]];
+                let ci = comps[vis[i]] as usize;
                 for j in i + 1..vis.len() {
-                    let cj = comps[vis[j]];
+                    let cj = comps[vis[j]] as usize;
                     if ci != cj {
-                        adjs.insert(std::cmp::minmax(ci, cj));
+                        adjs.entry(ci).or_default().push(cj);
+                        adjs.entry(cj).or_default().push(ci);
                     }
                 }
             }
@@ -63,7 +64,7 @@ fn main() -> std::io::Result<()> {
         let coloring = pars3d::visualization::greedy_face_coloring(
             |vi| comps[vi] as usize,
             m.v.len(),
-            |a, b| adjs.contains(&std::cmp::minmax(a as u32, b as u32)),
+            |a| adjs.get(&a).map_or(&[], Vec::as_slice),
             &pars3d::coloring::HIGH_CONTRAST,
         );
 
