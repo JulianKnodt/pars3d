@@ -10,6 +10,7 @@ impl From<ObjObject> for Mesh {
     fn from(obj: ObjObject) -> Self {
         if obj.vt.is_empty() && obj.vn.is_empty() {
             let v = obj.v;
+            let vert_colors = obj.vc;
             let f = obj
                 .f
                 .into_iter()
@@ -20,6 +21,7 @@ impl From<ObjObject> for Mesh {
                 face_mesh_idx: vec![0; f.len()],
                 f,
                 face_mat_idx: obj.mat,
+                vert_colors,
                 ..Default::default()
             };
         }
