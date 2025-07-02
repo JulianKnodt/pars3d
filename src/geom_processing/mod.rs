@@ -495,14 +495,14 @@ impl Mesh {
                 Err(e) => e.min(self.f.len() - 1),
             };
             let (_, fi, ti) = &areas[idx];
-            let b0 = rng();
-            let b1 = rng();
-            let [b0, b1] = if b0 + b1 > 1. {
-                [1. - b0, 1. - b1]
-            } else {
-                [b0, b1]
-            };
-            let b2 = (1. - b0 - b1).max(0.);
+            let u = rng();
+            let v = rng();
+
+            let u = u.sqrt();
+            let b0 = 1. - u;
+            let b1 = u * (1. - v);
+            let b2 = u * v;
+            assert!((b0 + b1 + b2 - 1.).abs() < 1e-5);
             (*fi, Barycentric::new(&self.f[*fi], *ti, [b0, b1, b2]))
         })
     }

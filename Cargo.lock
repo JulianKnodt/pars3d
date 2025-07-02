@@ -275,7 +275,7 @@ dependencies = [
 [[package]]
 name = "kdtree"
 version = "0.1.0"
-source = "git+https://github.com/JulianKnodt/kdtree#f02adf6f10d312415c2b4e65d97fe4afc8c67375"
+source = "git+https://github.com/JulianKnodt/kdtree#49b25b4c52afa5c3dcaa0294e2d3617a855a45bc"
 
 [[package]]
 name = "lazy_static"

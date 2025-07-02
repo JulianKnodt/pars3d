@@ -82,7 +82,7 @@ fn main() -> std::io::Result<()> {
         };
 
         let Some(dst) = to_fill.iter_mut().find(|v| v.is_none()) else {
-            help!("Got unknown argument {v}");
+            help!("Got unknown argument `{v}`");
         };
         **dst = Some(v);
 
@@ -118,13 +118,11 @@ fn main() -> std::io::Result<()> {
         }
     };
 
-    let mut a = load(&src)
-        .expect(&format!("Failed to load {}", src))
-        .into_flattened_mesh();
+    let a_scene = load(&src).expect(&format!("Failed to load {}", src));
+    let mut a = a_scene.into_flattened_mesh();
     a.triangulate();
-    let mut b = load(&dst)
-        .expect(&format!("Failed to load {}", dst))
-        .into_flattened_mesh();
+    let b_scene = load(&dst).expect(&format!("Failed to load {}", dst));
+    let mut b = b_scene.into_flattened_mesh();
     b.triangulate();
 
     let a_aabb = a.aabb();
@@ -134,7 +132,16 @@ fn main() -> std::io::Result<()> {
     assert!(diag_len > 0., "Both meshes are degenerate");
 
     let metrics = if with_color {
-        geometric_texture_distance(&a, &b, diag_len, num_samples, texture_a, texture_b)
+        geometric_texture_distance(
+            &a,
+            &a_scene,
+            &b,
+            &b_scene,
+            diag_len,
+            num_samples,
+            texture_a,
+            texture_b,
+        )
     } else {
         geometric_distance(&a, &b, diag_len, num_samples)
     };
@@ -172,16 +179,19 @@ fn geometric_distance(
     diag_len: F,
     num_samples: usize,
 ) -> [(&'static str, f64); 6] {
+    use rand::{Rng, SeedableRng};
+    let mut rng = rand::rngs::SmallRng::seed_from_u64(0);
     let a_samples = a
-        .random_points_on_mesh(num_samples, rand::random)
+        .random_points_on_mesh(num_samples, || rng.random())
         .map(|(fi, b)| a.f[fi].map_kind(|vi| a.v[vi]).from_barycentric(b));
     let a_kdtree = KDTree::<(), 3, false, F>::new(
         a.v.iter().copied().chain(a_samples).map(|v| (v, ())),
         Default::default(),
     );
 
+    let mut rng = rand::rngs::SmallRng::seed_from_u64(1);
     let b_samples = b
-        .random_points_on_mesh(num_samples, rand::random)
+        .random_points_on_mesh(num_samples, || rng.random())
         .map(|(fi, bary)| b.f[fi].map_kind(|vi| b.v[vi]).from_barycentric(bary));
     let b_kdtree = KDTree::<(), 3, false, F>::new(
         b.v.iter().copied().chain(b_samples).map(|v| (v, ())),
@@ -231,7 +241,9 @@ fn geometric_distance(
 #[cfg(all(feature = "kdtree", feature = "rand"))]
 fn geometric_texture_distance(
     a: &pars3d::Mesh,
+    a_scene: &pars3d::Scene,
     b: &pars3d::Mesh,
+    b_scene: &pars3d::Scene,
     diag_len: F,
     num_samples: usize,
     texture_a: Option<String>,
@@ -239,32 +251,34 @@ fn geometric_texture_distance(
 ) -> [(&'static str, f64); 6] {
     const CHAN: usize = 0;
     use image::imageops::{flip_vertical, sample_bilinear};
-    let tex_a = if let Some(ta) = texture_a {
-        assert_eq!(a.uv[CHAN].len(), a.v.len(), "Missing UV on mesh a");
-        Some(flip_vertical(
-            &image::open(ta).expect("Failed to open texture a"),
-        ))
-    } else {
-        assert_eq!(
-            a.v.len(),
-            a.vert_colors.len(),
-            "Texture required for <mesh a> w/o vertex colors"
-        );
-        None
-    };
-    let tex_b = if let Some(tb) = texture_b {
-        assert_eq!(b.uv[CHAN].len(), b.v.len(), "Missing UV on mesh b");
-        Some(flip_vertical(
-            &image::open(tb).expect("Failed to open texture b"),
-        ))
-    } else {
-        assert_eq!(
-            b.v.len(),
-            b.vert_colors.len(),
-            "Texture required for mesh b w/o vertex colors"
-        );
-        None
-    };
+    macro_rules! get_tex {
+        ($mesh: expr, $scene: expr, $tex:expr, $msg: expr) => {
+            if let Some(ta) = $tex {
+                assert_eq!($mesh.uv[CHAN].len(), $mesh.v.len(), "Missing UV on mesh a");
+                Some(flip_vertical(
+                    &image::open(ta).expect("Failed to open texture a"),
+                ))
+            } else if $mesh.v.len() == $mesh.vert_colors.len() {
+                None
+            } else if let Some(m) = $mesh.single_mat() {
+                let m = $scene
+                    .materials
+                    .get(m)
+                    .expect("Could not find referenced material in scene a");
+                let diffuse = m
+                    .textures_by_kind(&$scene.textures, pars3d::mesh::TextureKind::Diffuse)
+                    .next()
+                    .unwrap();
+                assert!(diffuse.image.is_some());
+                diffuse.image.clone().map(|img| img.to_rgba8())
+            } else {
+                panic!($msg);
+            }
+        };
+    }
+    let tex_a = get_tex!(a, a_scene, texture_a, "Missing texture for A");
+    let tex_b = get_tex!(b, b_scene, texture_b, "Missing texture for B");
+
     fn concat<const N: usize, const M: usize>(a: [F; N], b: [F; M]) -> [F; N + M] {
         std::array::from_fn(|i| if i < N { a[i] } else { b[i - N] })
     }
