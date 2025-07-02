@@ -2,8 +2,6 @@
 #![feature(generic_const_exprs)]
 
 #[cfg(all(feature = "kdtree", feature = "rand"))]
-use kdtree::KDTree;
-#[cfg(all(feature = "kdtree", feature = "rand"))]
 use pars3d::{length, load, F};
 
 #[cfg(not(all(feature = "kdtree", feature = "rand")))]
@@ -180,34 +178,26 @@ fn geometric_distance(
     num_samples: usize,
 ) -> [(&'static str, f64); 6] {
     use rand::{Rng, SeedableRng};
+
     let mut rng = rand::rngs::SmallRng::seed_from_u64(0);
     let a_samples = a
         .random_points_on_mesh(num_samples, || rng.random())
         .map(|(fi, b)| a.f[fi].map_kind(|vi| a.v[vi]).from_barycentric(b));
-    let a_kdtree = KDTree::<(), 3, false, F>::new(
-        a.v.iter().copied().chain(a_samples).map(|v| (v, ())),
-        Default::default(),
-    );
+
+    let a_kdtree = a.kdtree();
 
     let mut rng = rand::rngs::SmallRng::seed_from_u64(1);
     let b_samples = b
         .random_points_on_mesh(num_samples, || rng.random())
         .map(|(fi, bary)| b.f[fi].map_kind(|vi| b.v[vi]).from_barycentric(bary));
-    let b_kdtree = KDTree::<(), 3, false, F>::new(
-        b.v.iter().copied().chain(b_samples).map(|v| (v, ())),
-        Default::default(),
-    );
+    let b_kdtree = b.kdtree();
 
-    let a_to_b_dists = a_kdtree
-        .points()
-        .iter()
-        .map(|p| b_kdtree.nearest(p).unwrap().1 / diag_len)
+    let a_to_b_dists = a_samples
+        .map(|p| b_kdtree.nearest(&p).unwrap().1 / diag_len)
         .collect::<Vec<_>>();
 
-    let b_to_a_dists = b_kdtree
-        .points()
-        .iter()
-        .map(|p| a_kdtree.nearest(p).unwrap().1 / diag_len)
+    let b_to_a_dists = b_samples
+        .map(|p| a_kdtree.nearest(&p).unwrap().1 / diag_len)
         .collect::<Vec<_>>();
 
     let hausdorff_a_to_b = a_to_b_dists
@@ -300,18 +290,8 @@ fn geometric_texture_distance(
             };
             concat(p, c)
         });
-    let verts = (0..a.v.len()).map(|i| {
-        let c = if let Some(tex_a) = tex_a.as_ref() {
-            let [u, v] = a.uv[CHAN][i];
-            let image::Rgba([r, g, b, _a]) = sample_bilinear(tex_a, u as f32, v as f32).unwrap();
-            [r, g, b].map(|v| v as F / 255.)
-        } else {
-            a.vert_colors[i]
-        };
-        concat(a.v[i], c)
-    });
-    let a_kdtree =
-        KDTree::<(), 6, false, F>::new(verts.chain(a_samples).map(|v| (v, ())), Default::default());
+
+    let a_kdtree = a.kdtree();
 
     let b_samples = b
         .random_points_on_mesh(num_samples, rand::random)
@@ -331,24 +311,13 @@ fn geometric_texture_distance(
             };
             concat(p, c)
         });
-    let verts = (0..b.v.len()).map(|i| {
-        let c = if let Some(tex_b) = tex_b.as_ref() {
-            let [u, v] = b.uv[CHAN][i];
-            let image::Rgba([r, g, b, _a]) = sample_bilinear(tex_b, u as f32, v as f32).unwrap();
-            [r, g, b].map(|v| v as F / 255.)
-        } else {
-            b.vert_colors[i]
-        };
-        concat(b.v[i], c)
-    });
-    let b_kdtree =
-        KDTree::<(), 6, false, F>::new(verts.chain(b_samples).map(|v| (v, ())), Default::default());
+    let b_kdtree = b.kdtree();
 
     let mut max_a_to_b = 0. as F;
     let mut sum_a_to_b = 0.;
     let mut err_a_to_b = 0.;
-    for p in a_kdtree.points().iter() {
-        let d = b_kdtree.nearest(p).unwrap().1 / diag_len;
+    for p in a_samples {
+        let d = b_kdtree.nearest(&std::array::from_fn(|i| p[i])).unwrap().1 / diag_len;
         max_a_to_b = max_a_to_b.max(d);
 
         // kahan sum
@@ -358,13 +327,13 @@ fn geometric_texture_distance(
         sum_a_to_b = t;
     }
     let hausdorff_a_to_b = max_a_to_b;
-    let chamfer_a_to_b = sum_a_to_b / a_kdtree.points().len() as F;
+    let chamfer_a_to_b = sum_a_to_b / a_kdtree.len() as F;
 
     let mut max_b_to_a = 0. as F;
     let mut sum_b_to_a = 0.;
     let mut err_b_to_a = 0.;
-    for p in b_kdtree.points().iter() {
-        let d = b_kdtree.nearest(p).unwrap().1 / diag_len;
+    for p in b_samples {
+        let d = b_kdtree.nearest(&std::array::from_fn(|i| p[i])).unwrap().1 / diag_len;
         max_b_to_a = max_b_to_a.max(d);
 
         // kahan sum
@@ -375,7 +344,7 @@ fn geometric_texture_distance(
     }
 
     let hausdorff_b_to_a = max_b_to_a;
-    let chamfer_b_to_a = sum_b_to_a / b_kdtree.points().len() as F;
+    let chamfer_b_to_a = sum_b_to_a / b_kdtree.len() as F;
 
     let hausdorff = hausdorff_a_to_b.max(hausdorff_b_to_a);
     let chamfer = chamfer_a_to_b + chamfer_b_to_a;

@@ -10,6 +10,10 @@ pub mod curvature;
 /// Subdivision
 pub mod subdivision;
 
+/// Construction of a KDTree for a mesh
+#[cfg(feature = "kdtree")]
+pub mod kdtree;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum VertexNormalWeightingKind {
     Uniform,
