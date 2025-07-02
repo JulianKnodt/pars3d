@@ -194,7 +194,7 @@ pub fn save(v: impl AsRef<Path>, scene: &mesh::Scene) -> std::io::Result<()> {
     }
 }
 
-pub(crate) fn kmul<const N: usize>(k: F, v: [F; N]) -> [F; N] {
+pub fn kmul<const N: usize>(k: F, v: [F; N]) -> [F; N] {
     v.map(|v| v * k)
 }
 

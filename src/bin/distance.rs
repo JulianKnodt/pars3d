@@ -2,7 +2,7 @@
 #![feature(generic_const_exprs)]
 
 #[cfg(all(feature = "kdtree", feature = "rand"))]
-use pars3d::{dist, length, load, F};
+use pars3d::{dist, length, load, F, kmul};
 
 #[cfg(not(all(feature = "kdtree", feature = "rand")))]
 fn main() {
@@ -24,6 +24,7 @@ fn main() -> std::io::Result<()> {
         TextureA,
         TextureB,
         Stat,
+        ColorWeight,
     }
 
     macro_rules! help {
@@ -33,7 +34,10 @@ fn main() -> std::io::Result<()> {
             )?
             eprintln!(
                 r#"Usage: <bin> <mesh a> <mesh b> <#samples:int>
-  <--with-color> <--texture-a [PATH]> <--texture-b [PATH]> <--stat [PATH].json>
+  --color-weight [FLOAT, default = 0.]
+  --texture-a [PATH]
+  --texture-b [PATH]
+  --stat [PATH].json (Will append keys to the end of this JSON)
 - A tool for evaluating the distance between two meshes including their attributes."#
             );
             return Ok(());
@@ -42,7 +46,7 @@ fn main() -> std::io::Result<()> {
     let mut src = None;
     let mut dst = None;
     let mut num_samples = None;
-    let mut with_color = false;
+    let mut color_weight = 0.;
     let mut texture_a = None;
     let mut texture_b = None;
     let mut stat = None;
@@ -58,8 +62,8 @@ fn main() -> std::io::Result<()> {
             help!();
         }
 
-        if v == "--with-color" {
-            with_color = true;
+        if v == "--color-weight" {
+            state = ParseState::ColorWeight;
             continue;
         } else if v == "--texture-a" {
             state = ParseState::TextureA;
@@ -70,10 +74,19 @@ fn main() -> std::io::Result<()> {
         } else if v == "--stat" {
             state = ParseState::Stat;
             continue;
+        } else if v.starts_with("-") {
+            help!("Got unknown flag {v}");
         }
 
         let to_fill = match state {
             ParseState::Default => default_to_fill.as_mut_slice(),
+            ParseState::ColorWeight => {
+                color_weight = v
+                    .parse::<F>()
+                    .expect(&format!("Failed to parse color weight, got {v}"));
+                state = ParseState::Default;
+                continue;
+            }
             ParseState::TextureA => tex_a_to_fill.as_mut_slice(),
             ParseState::TextureB => tex_b_to_fill.as_mut_slice(),
             ParseState::Stat => stat_to_fill.as_mut_slice(),
@@ -101,7 +114,7 @@ fn main() -> std::io::Result<()> {
     if dst.starts_with("-") {
         help!("Unknown flag {dst:?}, assuming help");
     }
-    const DEFAULT_NUM_SAMPLES: usize = 500000;
+    const DEFAULT_NUM_SAMPLES: usize = 2000000;
     let num_samples = match num_samples {
         None => {
             println!("[INFO]: Using default number of samples {DEFAULT_NUM_SAMPLES}");
@@ -129,13 +142,14 @@ fn main() -> std::io::Result<()> {
     let diag_len = length(a_aabb.diag()).max(length(b_aabb.diag()));
     assert!(diag_len > 0., "Both meshes are degenerate");
 
-    let metrics = if with_color {
+    let metrics = if color_weight > 0. {
         geometric_texture_distance(
             &a,
             &a_scene,
             &b,
             &b_scene,
             diag_len,
+            color_weight,
             num_samples,
             texture_a,
             texture_b,
@@ -235,6 +249,7 @@ fn geometric_texture_distance(
     b: &pars3d::Mesh,
     b_scene: &pars3d::Scene,
     diag_len: F,
+    color_weight: F,
     num_samples: usize,
     texture_a: Option<String>,
     texture_b: Option<String>,
@@ -273,7 +288,7 @@ fn geometric_texture_distance(
         std::array::from_fn(|i| if i < N { a[i] } else { b[i - N] })
     }
     let a_color = |f: &pars3d::FaceKind, bary| {
-        if let Some(tex_a) = tex_a.as_ref() {
+        let c = if let Some(tex_a) = tex_a.as_ref() {
             let [u, v] = f
                 .map_kind(|vi| a.uv[CHAN][vi])
                 .from_barycentric(bary)
@@ -282,7 +297,8 @@ fn geometric_texture_distance(
             [r, g, b].map(|v| v as F / 255.)
         } else {
             f.map_kind(|vi| a.vert_colors[vi]).from_barycentric(bary)
-        }
+        };
+        kmul(color_weight, c)
     };
     let a_samples = a
         .random_points_on_mesh(num_samples, rand::random)
@@ -296,7 +312,7 @@ fn geometric_texture_distance(
     let a_kdtree = a.kdtree();
 
     let b_color = |f: &pars3d::FaceKind, bary| {
-        if let Some(tex_b) = tex_b.as_ref() {
+        let c = if let Some(tex_b) = tex_b.as_ref() {
             let [u, v] = f
                 .map_kind(|vi| b.uv[CHAN][vi])
                 .from_barycentric(bary)
@@ -305,7 +321,8 @@ fn geometric_texture_distance(
             [r, g, b].map(|v| v as F / 255.)
         } else {
             f.map_kind(|vi| b.vert_colors[vi]).from_barycentric(bary)
-        }
+        };
+        kmul(color_weight, c)
     };
     let b_samples = b
         .random_points_on_mesh(num_samples, rand::random)

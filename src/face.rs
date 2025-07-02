@@ -515,8 +515,9 @@ impl Barycentric {
     }
 
     pub fn clamp(&mut self) {
+        // only need to set all to positive, then can normalize correctly.
         for c in self.coords_mut() {
-            *c = c.clamp(0., 1.);
+            *c = c.max(0.);
         }
         self.normalize();
     }
