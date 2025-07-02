@@ -14,3 +14,4 @@ tmp/
 *.svg
 *.png
 *.binary
+*.json

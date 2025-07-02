@@ -15,16 +15,17 @@ fn main() {
 '\_/  '\_/  '|     _)
  '     '     '    '"#
     );
-    eprintln!("Not compiled with KDTree support, exiting.");
+    eprintln!("Not compiled with KDTree & rand support, exiting.");
 }
 
 #[cfg(all(feature = "kdtree", feature = "rand"))]
-fn main() {
+fn main() -> std::io::Result<()> {
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     enum ParseState {
         Default,
         TextureA,
         TextureB,
+        Stat,
     }
 
     macro_rules! help {
@@ -34,10 +35,10 @@ fn main() {
             )?
             eprintln!(
                 r#"Usage: <bin> <mesh a> <mesh b> <#samples:int>
-  <--with-color> <--texture-a [PATH]> <--texture-b [PATH]>
+  <--with-color> <--texture-a [PATH]> <--texture-b [PATH]> <--stat [PATH].json>
 - A tool for evaluating the distance between two meshes including their attributes."#
             );
-            return;
+            return Ok(());
         }};
     }
     let mut src = None;
@@ -46,13 +47,19 @@ fn main() {
     let mut with_color = false;
     let mut texture_a = None;
     let mut texture_b = None;
+    let mut stat = None;
 
     let mut state = ParseState::Default;
     let mut default_to_fill = [&mut src, &mut dst, &mut num_samples];
     let mut tex_a_to_fill = [&mut texture_a];
     let mut tex_b_to_fill = [&mut texture_b];
+    let mut stat_to_fill = [&mut stat];
 
     for v in std::env::args().skip(1) {
+        if v == "-h" || v == "--help" {
+            help!();
+        }
+
         if v == "--with-color" {
             with_color = true;
             continue;
@@ -62,12 +69,16 @@ fn main() {
         } else if v == "--texture-b" {
             state = ParseState::TextureB;
             continue;
+        } else if v == "--stat" {
+            state = ParseState::Stat;
+            continue;
         }
 
         let to_fill = match state {
             ParseState::Default => default_to_fill.as_mut_slice(),
             ParseState::TextureA => tex_a_to_fill.as_mut_slice(),
             ParseState::TextureB => tex_b_to_fill.as_mut_slice(),
+            ParseState::Stat => stat_to_fill.as_mut_slice(),
         };
 
         let Some(dst) = to_fill.iter_mut().find(|v| v.is_none()) else {
@@ -92,8 +103,19 @@ fn main() {
     if dst.starts_with("-") {
         help!("Unknown flag {dst:?}, assuming help");
     }
-    let Some(num_samples) = num_samples.as_ref().and_then(|ns| ns.parse::<usize>().ok()) else {
-        help!("Did not get number of samples to add, instead got {num_samples:?}");
+    const DEFAULT_NUM_SAMPLES: usize = 500000;
+    let num_samples = match num_samples {
+        None => {
+            println!("[INFO]: Using default number of samples {DEFAULT_NUM_SAMPLES}");
+            DEFAULT_NUM_SAMPLES
+        }
+        Some(ns) => {
+            if let Ok(num_samples) = ns.parse::<usize>() {
+                num_samples
+            } else {
+                help!("Did not get samples as #, instead got {ns:?}");
+            }
+        }
     };
 
     let mut a = load(&src)
@@ -111,15 +133,45 @@ fn main() {
     let diag_len = length(a_aabb.diag()).max(length(b_aabb.diag()));
     assert!(diag_len > 0., "Both meshes are degenerate");
 
-    if with_color {
-        geometric_texture_distance(&a, &b, diag_len, num_samples, texture_a, texture_b);
+    let metrics = if with_color {
+        geometric_texture_distance(&a, &b, diag_len, num_samples, texture_a, texture_b)
     } else {
-        geometric_distance(&a, &b, diag_len, num_samples);
+        geometric_distance(&a, &b, diag_len, num_samples)
+    };
+
+    for (k, v) in metrics {
+        println!("{k}: {v}");
     }
+
+    use std::io::Write;
+    if let Some(stat) = stat.as_ref() {
+        if std::fs::exists(stat)? {
+            let mut s = std::fs::read_to_string(stat)?;
+            for (k, v) in metrics {
+                pars3d::util::append_json(&mut s, 2, k, v);
+            }
+            std::fs::write(stat, &s)?;
+        } else {
+            let mut f = std::fs::File::create(stat)?;
+            write!(f, "{{\n")?;
+            for (i, (k, v)) in metrics.into_iter().enumerate() {
+                write!(f, "  \"{k}\": {v}")?;
+                writeln!(f, "{}", if i == metrics.len() - 1 { "" } else { "," })?;
+            }
+            writeln!(f, "}}")?;
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(all(feature = "kdtree", feature = "rand"))]
-fn geometric_distance(a: &pars3d::Mesh, b: &pars3d::Mesh, diag_len: F, num_samples: usize) {
+fn geometric_distance(
+    a: &pars3d::Mesh,
+    b: &pars3d::Mesh,
+    diag_len: F,
+    num_samples: usize,
+) -> [(&'static str, f64); 6] {
     let a_samples = a
         .random_points_on_mesh(num_samples, rand::random)
         .map(|(fi, b)| a.f[fi].map_kind(|vi| a.v[vi]).from_barycentric(b));
@@ -165,16 +217,14 @@ fn geometric_distance(a: &pars3d::Mesh, b: &pars3d::Mesh, diag_len: F, num_sampl
     let hausdorff = hausdorff_a_to_b.max(hausdorff_b_to_a);
     let chamfer = chamfer_a_to_b + chamfer_b_to_a;
 
-    println!(
-        r#"{{
-  "hausdorff": {hausdorff},
-  "chamfer": {chamfer},
-  "hausdorff_a_to_b": {hausdorff_a_to_b},
-  "hausdorff_b_to_a": {hausdorff_b_to_a},
-  "chamfer_a_to_b": {chamfer_a_to_b},
-  "chamfer_b_to_a": {chamfer_b_to_a}
-}}"#
-    );
+    [
+        ("hausdorff", hausdorff),
+        ("chamfer", chamfer),
+        ("hausdorff_a_to_b", hausdorff_a_to_b),
+        ("hausdorff_b_to_a", hausdorff_b_to_a),
+        ("chamfer_a_to_b", chamfer_a_to_b),
+        ("chamfer_b_to_a", chamfer_b_to_a),
+    ]
 }
 
 /// Compute the geometric distance between two meshes, either with texture or vertex colors.
@@ -186,7 +236,7 @@ fn geometric_texture_distance(
     num_samples: usize,
     texture_a: Option<String>,
     texture_b: Option<String>,
-) {
+) -> [(&'static str, f64); 6] {
     const CHAN: usize = 0;
     use image::imageops::{flip_vertical, sample_bilinear};
     let tex_a = if let Some(ta) = texture_a {
@@ -315,15 +365,12 @@ fn geometric_texture_distance(
 
     let hausdorff = hausdorff_a_to_b.max(hausdorff_b_to_a);
     let chamfer = chamfer_a_to_b + chamfer_b_to_a;
-
-    println!(
-        r#"{{
-  "hausdorff": {hausdorff},
-  "chamfer": {chamfer},
-  "hausdorff_a_to_b": {hausdorff_a_to_b},
-  "hausdorff_b_to_a": {hausdorff_b_to_a},
-  "chamfer_a_to_b": {chamfer_a_to_b},
-  "chamfer_b_to_a": {chamfer_b_to_a}
-}}"#
-    );
+    [
+        ("hausdorff", hausdorff),
+        ("chamfer", chamfer),
+        ("hausdorff_a_to_b", hausdorff_a_to_b),
+        ("hausdorff_b_to_a", hausdorff_b_to_a),
+        ("chamfer_a_to_b", chamfer_a_to_b),
+        ("chamfer_b_to_a", chamfer_b_to_a),
+    ]
 }
