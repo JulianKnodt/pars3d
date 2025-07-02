@@ -2,7 +2,7 @@
 #![feature(generic_const_exprs)]
 
 #[cfg(all(feature = "kdtree", feature = "rand"))]
-use pars3d::{length, load, F};
+use pars3d::{dist, length, load, F};
 
 #[cfg(not(all(feature = "kdtree", feature = "rand")))]
 fn main() {
@@ -272,43 +272,47 @@ fn geometric_texture_distance(
     fn concat<const N: usize, const M: usize>(a: [F; N], b: [F; M]) -> [F; N + M] {
         std::array::from_fn(|i| if i < N { a[i] } else { b[i - N] })
     }
+    let a_color = |f: &pars3d::FaceKind, bary| {
+        if let Some(tex_a) = tex_a.as_ref() {
+            let [u, v] = f
+                .map_kind(|vi| a.uv[CHAN][vi])
+                .from_barycentric(bary)
+                .map(|v| v.fract().abs());
+            let image::Rgba([r, g, b, _a]) = sample_bilinear(tex_a, u as f32, v as f32).unwrap();
+            [r, g, b].map(|v| v as F / 255.)
+        } else {
+            f.map_kind(|vi| a.vert_colors[vi]).from_barycentric(bary)
+        }
+    };
     let a_samples = a
         .random_points_on_mesh(num_samples, rand::random)
         .map(|(fi, b)| {
             let f = &a.f[fi];
             let p = f.map_kind(|vi| a.v[vi]).from_barycentric(b);
-            let c = if let Some(tex_a) = tex_a.as_ref() {
-                let [u, v] = f
-                    .map_kind(|vi| a.uv[CHAN][vi])
-                    .from_barycentric(b)
-                    .map(|v| v.fract().abs());
-                let image::Rgba([r, g, b, _a]) =
-                    sample_bilinear(tex_a, u as f32, v as f32).unwrap();
-                [r, g, b].map(|v| v as F / 255.)
-            } else {
-                f.map_kind(|vi| a.vert_colors[vi]).from_barycentric(b)
-            };
+            let c = a_color(f, b);
             concat(p, c)
         });
 
     let a_kdtree = a.kdtree();
 
+    let b_color = |f: &pars3d::FaceKind, bary| {
+        if let Some(tex_b) = tex_b.as_ref() {
+            let [u, v] = f
+                .map_kind(|vi| b.uv[CHAN][vi])
+                .from_barycentric(bary)
+                .map(|v| v.fract().abs());
+            let image::Rgba([r, g, b, _a]) = sample_bilinear(tex_b, u as f32, v as f32).unwrap();
+            [r, g, b].map(|v| v as F / 255.)
+        } else {
+            f.map_kind(|vi| b.vert_colors[vi]).from_barycentric(bary)
+        }
+    };
     let b_samples = b
         .random_points_on_mesh(num_samples, rand::random)
         .map(|(fi, bary)| {
             let f = &b.f[fi];
             let p = f.map_kind(|vi| b.v[vi]).from_barycentric(bary);
-            let c = if let Some(tex_b) = tex_b.as_ref() {
-                let [u, v] = f
-                    .map_kind(|vi| b.uv[CHAN][vi])
-                    .from_barycentric(bary)
-                    .map(|v| v.fract().abs());
-                let image::Rgba([r, g, b, _a]) =
-                    sample_bilinear(tex_b, u as f32, v as f32).unwrap();
-                [r, g, b].map(|v| v as F / 255.)
-            } else {
-                f.map_kind(|vi| b.vert_colors[vi]).from_barycentric(bary)
-            };
+            let c = b_color(f, bary);
             concat(p, c)
         });
     let b_kdtree = b.kdtree();
@@ -317,7 +321,15 @@ fn geometric_texture_distance(
     let mut sum_a_to_b = 0.;
     let mut err_a_to_b = 0.;
     for p in a_samples {
-        let d = b_kdtree.nearest(&std::array::from_fn(|i| p[i])).unwrap().1 / diag_len;
+        let pos = std::array::from_fn(|i| p[i]);
+        let &(fi, ti) = b_kdtree.nearest(&pos).unwrap().2;
+        let tri = b.f[fi].as_triangle_fan().nth(ti as usize).unwrap();
+        let v_tri = tri.map(|vi| b.v[vi]);
+        let bary = pars3d::barycentric_3d(pos, v_tri);
+        let mut bary = pars3d::face::Barycentric::new(&b.f[fi], ti as usize, bary);
+        bary.clamp();
+        let b_pos = b.f[fi].map_kind(|vi| b.v[vi]).from_barycentric(bary);
+        let d = dist(concat(b_pos, b_color(&b.f[fi], bary)), p) / diag_len;
         max_a_to_b = max_a_to_b.max(d);
 
         // kahan sum
@@ -333,7 +345,16 @@ fn geometric_texture_distance(
     let mut sum_b_to_a = 0.;
     let mut err_b_to_a = 0.;
     for p in b_samples {
-        let d = b_kdtree.nearest(&std::array::from_fn(|i| p[i])).unwrap().1 / diag_len;
+        let pos = std::array::from_fn(|i| p[i]);
+        let &(fi, ti) = a_kdtree.nearest(&pos).unwrap().2;
+        let tri = a.f[fi].as_triangle_fan().nth(ti as usize).unwrap();
+        let v_tri = tri.map(|vi| a.v[vi]);
+        let bary = pars3d::barycentric_3d(pos, v_tri);
+        let mut bary = pars3d::face::Barycentric::new(&a.f[fi], ti as usize, bary);
+        bary.clamp();
+        let a_pos = a.f[fi].map_kind(|vi| a.v[vi]).from_barycentric(bary);
+        let d = dist(concat(a_pos, a_color(&a.f[fi], bary)), p) / diag_len;
+
         max_b_to_a = max_b_to_a.max(d);
 
         // kahan sum

@@ -514,7 +514,7 @@ impl Barycentric {
         self.tri_idx_and_coords().0
     }
 
-    pub(crate) fn clamp(&mut self) {
+    pub fn clamp(&mut self) {
         for c in self.coords_mut() {
             *c = c.clamp(0., 1.);
         }
