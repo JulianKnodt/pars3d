@@ -3,7 +3,7 @@ use super::{
     FBXBlendshapeChannel, FBXCluster, FBXMaterial, FBXMesh, FBXMeshMaterial, FBXNode, FBXScene,
     FBXSkin, FBXTexture, MeshOrNode, RefKind, VertexMappingKind,
 };
-use crate::{FaceKind, F};
+use crate::{F, FaceKind};
 
 use std::array::from_fn;
 use std::ascii::Char;
@@ -809,7 +809,7 @@ impl KVs {
                 },
                 "Normals", &[Data::F64Arr(_)] => |c: usize| {
                     let gc = &self.kvs[c];
-                    let Data::F64Arr(ref ns) = &gc.values[0] else {
+                    let Data::F64Arr(ns) = &gc.values[0] else {
                       unreachable!();
                     };
                     assert_eq!(ns.len() % 3, 0);
@@ -818,7 +818,7 @@ impl KVs {
                 },
                 "NormalsIndex", &[Data::I32Arr(_)] => |c: usize| {
                     let gc = &self.kvs[c];
-                    let Data::I32Arr(ref arr) = &gc.values[0] else {
+                    let Data::I32Arr(arr) = &gc.values[0] else {
                       unreachable!();
                     };
                     let idxs = arr
@@ -844,7 +844,7 @@ impl KVs {
                   out.uv.ref_kind = RefKind::from_str(ref_str);
               },
               "UV", &[Data::F64Arr(_)] => |c: usize| {
-                  let Data::F64Arr(ref arr) = &self.kvs[c].values[0] else {
+                  let Data::F64Arr(arr) = &self.kvs[c].values[0] else {
                     unreachable!();
                   };
                   assert_eq!(arr.len() % 2, 0);
@@ -852,7 +852,7 @@ impl KVs {
                   out.uv.values.extend(uvs);
               },
               "UVIndex", &[Data::I32Arr(_)] => |c: usize| {
-                  let Data::I32Arr(ref arr) = self.kvs[c].values[0] else {
+                  let Data::I32Arr(arr) = &self.kvs[c].values[0] else {
                       unreachable!();
                   };
                   let idxs = arr
@@ -884,7 +884,7 @@ impl KVs {
                               assert_eq!(mapping_kind, MappingKind::Uniform);
                               out.mat = FBXMeshMaterial::Global(i as usize);
                           }
-                          Data::I32Arr(ref arr) => {
+                          Data::I32Arr(arr) => {
                               assert!(arr.iter().all(|&v| v >= 0));
                               if arr.is_empty() {
                                   out.mat = FBXMeshMaterial::None;
@@ -929,7 +929,7 @@ impl KVs {
                   out.color.values.extend(vc);
               },
               "ColorIndex", &[Data::I32Arr(_)] => |c: usize| {
-                  let Data::I32Arr(ref arr) = &self.kvs[c].values[0] else {
+                  let Data::I32Arr(arr) = &self.kvs[c].values[0] else {
                       unreachable!();
                   };
                   let idxs = arr
@@ -1798,9 +1798,7 @@ fn read_scope(
         }};
     }
     macro_rules! read_word {
-        (bool) => {{
-            read_word!(u8) == 1
-        }};
+        (bool) => {{ read_word!(u8) == 1 }};
         ($t: ty) => {{
             let mut v = [0u8; size_of::<$t>()];
             // here is failing

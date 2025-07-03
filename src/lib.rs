@@ -2,16 +2,12 @@
 #![feature(array_windows)]
 #![feature(array_try_map)]
 #![feature(iter_array_chunks)]
-#![feature(cfg_match)]
 #![feature(cmp_minmax)]
 #![feature(binary_heap_into_iter_sorted)]
-#![feature(let_chains)]
 #![feature(array_chunks)]
 #![feature(ascii_char)]
 #![feature(ascii_char_variants)]
 #![feature(assert_matches)]
-#![feature(generic_arg_infer)]
-#![feature(os_str_display)]
 
 #[cfg(not(feature = "f64"))]
 pub type U = u32;

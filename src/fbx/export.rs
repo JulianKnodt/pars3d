@@ -1,9 +1,9 @@
 #![allow(unused)]
 
-use super::parser::{Data, Token, KV};
+use super::parser::{Data, KV, Token};
 use super::{
-    id, FBXAnimCurve, FBXAnimCurveNode, FBXAnimLayer, FBXAnimStack, FBXCluster, FBXMesh, FBXNode,
-    FBXPose, FBXScene, FBXSkin, MeshOrNode,
+    FBXAnimCurve, FBXAnimCurveNode, FBXAnimLayer, FBXAnimStack, FBXCluster, FBXMesh, FBXNode,
+    FBXPose, FBXScene, FBXSkin, MeshOrNode, id,
 };
 use crate::F;
 use std::io::{self, Seek, SeekFrom, Write};
@@ -822,15 +822,9 @@ pub fn write_token_set(
     assert!(!tokens.is_empty());
     let mut written = 0;
     macro_rules! write_word {
-        ($dst:expr, $word: expr) => {{
-            write_word!($dst, u64, $word)
-        }};
-        ($dst:expr, bool, $w: expr) => {{
-            write_word!($dst, u8, if $w { 1 } else { 0 })
-        }};
-        ($dst:expr, $ty: ty, $w: expr) => {{
-            $dst.write(&($w as $ty).to_le_bytes())?
-        }};
+        ($dst:expr, $word: expr) => {{ write_word!($dst, u64, $word) }};
+        ($dst:expr, bool, $w: expr) => {{ write_word!($dst, u8, if $w { 1 } else { 0 }) }};
+        ($dst:expr, $ty: ty, $w: expr) => {{ $dst.write(&($w as $ty).to_le_bytes())? }};
     }
     macro_rules! write_arr {
         ($dst:expr, $ty: ty, $arr: expr) => {{
@@ -910,7 +904,7 @@ pub fn write_token_set(
     let mut prop_count = 0;
     let mut prop_len = 0;
     while i + prop_count < tokens.len()
-        && let Token::Data(ref d) = &tokens[i + prop_count]
+        && let Token::Data(d) = &tokens[i + prop_count]
     {
         prop_len += write_data!(std::io::sink(), d);
         prop_count += 1;
@@ -927,7 +921,7 @@ pub fn write_token_set(
     written += write_string!(w, k, false, false);
 
     for j in 0..prop_count {
-        let Token::Data(ref d) = &tokens[i + j] else {
+        let Token::Data(d) = &tokens[i + j] else {
             panic!();
         };
         written += write_data!(w, d);
