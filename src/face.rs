@@ -1,6 +1,6 @@
 use super::aabb::AABB;
 use crate::{
-    add, barycentric_2d, barycentric_3d, cross, cross_2d, dot, edges, kmul, length, sub, F,
+    F, add, barycentric_2d, barycentric_3d, cross, cross_2d, dot, edges, kmul, length, sub,
 };
 
 /// Face representation for meshes.
@@ -240,7 +240,7 @@ impl FaceKind {
             Tri([a, b, c]) if a == b || b == c || a == c => true,
             Tri(_) => false,
             &Quad([a, b, c, d] | [d, a, b, c] | [c, d, a, b] | [b, c, d, a]) if a == b => {
-                return Self::Tri([a, c, d]).is_degenerate()
+                return Self::Tri([a, c, d]).is_degenerate();
             }
             &Quad([a, _, c, _] | [_, a, _, c]) if a == c => true,
             Quad(_) => false,
@@ -283,7 +283,7 @@ impl FaceKind {
 
             Quad(_) => {}
 
-            Poly(ref mut v) => {
+            Poly(v) => {
                 v.dedup();
                 while !v.is_empty() && v.last() == v.first() {
                     v.pop();
@@ -339,7 +339,7 @@ impl FaceKind {
         *self = match self {
             &mut Tri([a, b, c]) => Quad([a, b, c, v]),
             &mut Quad([a, b, c, d]) => Poly(vec![a, b, c, d, v]),
-            Poly(ref mut vis) => match vis.len() {
+            Poly(vis) => match vis.len() {
                 2 => Tri([vis[0], vis[1], v]),
                 3 => Quad([vis[0], vis[1], vis[2], v]),
                 _ => {
@@ -491,9 +491,9 @@ impl Barycentric {
     }
     pub fn coords_mut(&mut self) -> &mut [F; 3] {
         match self {
-            Barycentric::Tri(ref mut b) => b,
-            Barycentric::Quad(_, ref mut b) => b,
-            Barycentric::Poly(_, ref mut b) => b,
+            Barycentric::Tri(b) => b,
+            Barycentric::Quad(_, b) => b,
+            Barycentric::Poly(_, b) => b,
         }
     }
     pub fn normalize(&mut self) {
@@ -524,11 +524,7 @@ impl Barycentric {
 }
 
 fn sign(x: F) -> F {
-    if x == 0. {
-        0.
-    } else {
-        x.signum()
-    }
+    if x == 0. { 0. } else { x.signum() }
 }
 
 #[inline]
