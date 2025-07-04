@@ -1,5 +1,5 @@
 use super::anim::Animation;
-use super::{add, kmul, sub, FaceKind, F, U};
+use super::{F, FaceKind, U, add, kmul, sub};
 
 use std::array::from_fn;
 use std::collections::hash_map::Entry;

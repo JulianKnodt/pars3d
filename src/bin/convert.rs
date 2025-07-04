@@ -1,4 +1,3 @@
-#![feature(generic_arg_infer)]
 use pars3d::{load, save};
 
 fn main() {

@@ -1,4 +1,4 @@
-use super::{cross, dot, edges, normalize, quad_area, sub, tri_area, FaceKind, F};
+use super::{F, FaceKind, cross, dot, edges, normalize, quad_area, sub, tri_area};
 use std::cmp::minmax;
 use std::collections::HashMap;
 

@@ -1,7 +1,7 @@
 use crate::anim::{
     Animation, Channel, Dim, InterpolationKind, OutputProperty, Sampler, Samplers, Time,
 };
-use crate::{identity, matmul, F};
+use crate::{F, identity, matmul};
 use gltf_json::validation::{Checked::Valid, USize64};
 use std::io::{self, Write};
 use std::mem;

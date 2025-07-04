@@ -1,4 +1,4 @@
-use super::{add, dot, kmul, length, sub, FaceKind, F};
+use super::{F, FaceKind, add, dot, kmul, length, sub};
 use crate::aabb::AABB;
 // https://coolors.co/palettes/popular/simple
 pub const HIGH_CONTRAST: [[u8; 3]; 6] = [

@@ -1,4 +1,4 @@
-use crate::{Mesh, F};
+use crate::{F, Mesh};
 use kdtree::KDTree;
 
 impl Mesh {

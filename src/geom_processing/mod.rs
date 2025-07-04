@@ -1,7 +1,7 @@
 use super::aabb::AABB;
 use super::edge::EdgeKind;
-use super::{add, cross, dot, kmul, length, normalize, sub, tri_area, tri_area_2d, F, U};
-use super::{face::Barycentric, FaceKind, Mesh, Scene};
+use super::{F, U, add, cross, dot, kmul, length, normalize, sub, tri_area, tri_area_2d};
+use super::{FaceKind, Mesh, Scene, face::Barycentric};
 use std::collections::BTreeMap;
 
 /// Curvature related functions

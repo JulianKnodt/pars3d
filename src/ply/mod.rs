@@ -1,5 +1,5 @@
 use super::mesh::VertexAttrs;
-use super::{FaceKind, F};
+use super::{F, FaceKind};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Error, ErrorKind, Read, Write};
 use std::path::Path;
@@ -256,9 +256,7 @@ impl Ply {
 
                     for (fi, v) in l.split_whitespace().enumerate() {
                         macro_rules! get {
-                            ($t: ty) => {{
-                                v.parse::<$t>().unwrap()
-                            }};
+                            ($t: ty) => {{ v.parse::<$t>().unwrap() }};
                         }
                         match fields[fi] {
                             Field::X => xyz[0] = get!(F),
@@ -322,11 +320,7 @@ impl Ply {
                     };
                     f.push(face);
 
-                    if num_f == 0 {
-                        Done
-                    } else {
-                        Faces
-                    }
+                    if num_f == 0 { Done } else { Faces }
                 }
                 Done => {
                     eprintln!("Unexpected extra lines in PLY {l}");
@@ -440,7 +434,7 @@ impl Ply {
 #[ignore]
 #[test]
 fn test_ply_write() {
-    use std::fs::{remove_file, File};
+    use std::fs::{File, remove_file};
 
     let name = "tmp.ply";
     {

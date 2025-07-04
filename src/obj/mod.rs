@@ -1,4 +1,4 @@
-use super::{Vec2, Vec3, F};
+use super::{F, Vec2, Vec3};
 
 use image::DynamicImage;
 use std::fs::File;

@@ -1,4 +1,4 @@
-use super::{dot, normalize, sub, Mesh, F};
+use super::{F, Mesh, dot, normalize, sub};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Structure for maintaining adjacencies of a mesh with fixed topology.
@@ -327,9 +327,10 @@ impl<D> Adj<D> {
             *slot = e0;
         }
 
-        assert!(out
-            .values()
-            .all(|&[v0, v1]| v0 != usize::MAX && v1 != usize::MAX));
+        assert!(
+            out.values()
+                .all(|&[v0, v1]| v0 != usize::MAX && v1 != usize::MAX)
+        );
 
         // Fix up the loop order
         let mut num_loops = 0;

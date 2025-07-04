@@ -313,7 +313,7 @@ impl KVs {
                   "RotationActive" => {},
                   "ScalingMax" => {},
                   "GeometricTranslation" => {
-                    [4,5,6].map(|i| vals[i].as_float().unwrap());
+                    let _not_sure_where_to_use = [4,5,6].map(|i| vals[i].as_float().unwrap());
                   },
 
                   "lockInfluenceWeights" => {},

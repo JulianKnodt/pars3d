@@ -1,11 +1,11 @@
 use super::{
-    id, FBXCluster, FBXMaterial, FBXMesh, FBXMeshMaterial, FBXNode, FBXScene, FBXSettings, FBXSkin,
-    VertexAttribute,
+    FBXCluster, FBXMaterial, FBXMesh, FBXMeshMaterial, FBXNode, FBXScene, FBXSettings, FBXSkin,
+    VertexAttribute, id,
 };
 use crate::mesh::{
     Axis, Material, Mesh, Node, Scene, Settings, Skin, Texture, TextureKind, Transform,
 };
-use crate::{append_one, FaceKind, F};
+use crate::{F, FaceKind, append_one};
 
 use std::ops::Range;
 
@@ -18,7 +18,7 @@ fn uniq_vec_to_vertex_attribute<const N: usize>(
     if v.is_empty() {
         return Default::default();
     }
-    use std::collections::{btree_map::Entry, BTreeMap};
+    use std::collections::{BTreeMap, btree_map::Entry};
 
     let mut uniq = BTreeMap::new();
     let mut uniq_vals = vec![];

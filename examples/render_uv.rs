@@ -1,5 +1,5 @@
 #[cfg(feature = "svg")]
-use pars3d::{load, svg::save_uv, F};
+use pars3d::{F, load, svg::save_uv};
 
 #[cfg(feature = "svg")]
 fn main() {

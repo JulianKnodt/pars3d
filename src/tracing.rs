@@ -2,8 +2,8 @@ use super::face::Barycentric;
 use super::func::ScalarFn;
 use super::quat::{quat_from_to, quat_rot};
 use super::{
-    add, barycentric_3d, dir_to_barycentric, dist, edges as edges_iter, kmul, normalize, sub,
-    FaceKind, F,
+    F, FaceKind, add, barycentric_3d, dir_to_barycentric, dist, edges as edges_iter, kmul,
+    normalize, sub,
 };
 
 /// Describes a curve on the surface of a triangle mesh

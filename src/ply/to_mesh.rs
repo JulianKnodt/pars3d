@@ -1,6 +1,6 @@
 use super::Ply;
-use crate::mesh::Mesh;
 use crate::F;
+use crate::mesh::Mesh;
 
 impl From<Ply> for Mesh {
     fn from(ply: Ply) -> Self {

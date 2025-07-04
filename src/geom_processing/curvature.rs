@@ -1,5 +1,5 @@
 use super::barycentric_areas;
-use crate::{dot, normalize, sub, FaceKind, F};
+use crate::{F, FaceKind, dot, normalize, sub};
 
 /// Compute gaussian curvature at each vertex.
 pub fn gaussian_curvature(fs: &[FaceKind], vs: &[[F; 3]], dst: &mut Vec<F>) {

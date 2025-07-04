@@ -1,5 +1,5 @@
 use crate::mesh::DecomposedTransform;
-use crate::{FaceKind, F};
+use crate::{F, FaceKind};
 use std::sync::atomic::AtomicUsize;
 
 pub mod export;

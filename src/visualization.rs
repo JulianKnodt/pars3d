@@ -1,10 +1,10 @@
 use core::ops::Neg;
-use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 
 use super::coloring::magma;
 use super::edge::EdgeKind;
-use super::{add, cross, edges, kmul, normalize, sub, F};
+use super::{F, add, cross, edges, kmul, normalize, sub};
 
 /// Returns a coherent vertex coloring for a mesh with joint influences.
 pub fn joint_influence_coloring(

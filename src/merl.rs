@@ -1,4 +1,4 @@
-use crate::{add, normalize, rotate_on_axis, F};
+use crate::{F, add, normalize, rotate_on_axis};
 use std::io::{self, BufRead, BufReader, Read};
 use std::path::Path;
 

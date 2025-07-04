@@ -1,7 +1,7 @@
-use crate::{FaceKind, F};
+use crate::{F, FaceKind};
 use svg::{
-    node::element::{path::Data, Path},
     Document,
+    node::element::{Path, path::Data},
 };
 
 /// Save a 2D SVG of a UV map

@@ -2,7 +2,7 @@
 
 pub mod to_mesh;
 
-use super::{FaceKind, F};
+use super::{F, FaceKind};
 
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read};

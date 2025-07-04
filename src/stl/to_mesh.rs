@@ -1,6 +1,6 @@
-use super::{STLFace, STL};
+use super::{STL, STLFace};
 use crate::mesh::Mesh;
-use crate::{add, cross, normalize, sub, FaceKind};
+use crate::{FaceKind, add, cross, normalize, sub};
 use std::array::from_fn;
 
 impl From<STL> for Mesh {

@@ -1,8 +1,8 @@
-use super::{Vec3, F};
-use std::collections::hash_map::Entry;
+use super::{F, Vec3};
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 
-use super::{I, U};
+use super::I;
 
 /// Returns mapping between original vertex coordinate and new vertex coordinate
 pub fn fuse_vertices(vertices: &[Vec3], dist: F) -> Vec<usize> {
@@ -15,7 +15,7 @@ pub fn fuse_vertices(vertices: &[Vec3], dist: F) -> Vec<usize> {
 
     let to_hash = |v: Vec3| {
         if dist == 0. || inv_dist.is_nan() {
-            return v.map(|v| unsafe { std::mem::transmute::<U, I>(v.to_bits()) });
+            return v.map(|v| v.to_bits().cast_signed());
         }
 
         v.map(|v| f64::from(v * inv_dist) as I)

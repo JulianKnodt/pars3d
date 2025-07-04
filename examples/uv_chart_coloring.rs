@@ -1,6 +1,6 @@
 #![feature(cmp_minmax)]
 
-use pars3d::{load, save, F, U};
+use pars3d::{F, U, load, save};
 use std::collections::{BTreeMap, HashMap};
 
 fn main() -> std::io::Result<()> {

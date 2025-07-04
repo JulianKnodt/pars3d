@@ -1,4 +1,4 @@
-use super::{add, kmul, F};
+use super::{F, add, kmul};
 
 /// How to define color on a curve
 #[derive(Debug, Clone, Copy, PartialEq)]

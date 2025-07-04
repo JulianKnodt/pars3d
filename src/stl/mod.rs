@@ -1,4 +1,4 @@
-use super::{Vec3, F};
+use super::{F, Vec3};
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::Path;
 

@@ -1,6 +1,6 @@
-use super::{Obj, ObjImage, ObjObject, MTL};
+use super::{MTL, Obj, ObjImage, ObjObject};
 use crate::mesh::{Material, Mesh, Node, Scene, Texture, TextureKind, Transform};
-use crate::{append_one, FaceKind};
+use crate::{FaceKind, append_one};
 use image::DynamicImage;
 
 use std::array::from_fn;

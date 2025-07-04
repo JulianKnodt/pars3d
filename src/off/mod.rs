@@ -1,4 +1,4 @@
-use super::{FaceKind, F};
+use super::{F, FaceKind};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::Path;

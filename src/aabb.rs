@@ -1,4 +1,4 @@
-use super::{add, cross_2d, kmul, sub, F};
+use super::{F, add, cross_2d, kmul, sub};
 use core::ops::Range;
 use std::array::from_fn;
 

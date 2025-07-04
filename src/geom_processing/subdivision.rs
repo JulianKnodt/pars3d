@@ -1,5 +1,5 @@
 use crate::edge::EdgeKind;
-use crate::{add, kmul, F};
+use crate::{F, add, kmul};
 use std::cmp::minmax;
 use std::collections::BTreeMap;
 

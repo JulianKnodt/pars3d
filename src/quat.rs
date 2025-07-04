@@ -1,4 +1,4 @@
-use super::{add, cross, dot, kmul, normalize, F};
+use super::{F, add, cross, dot, kmul, normalize};
 
 /// Computes the conjugate for inverse rotation of a quaternion.
 #[inline]

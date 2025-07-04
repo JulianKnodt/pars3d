@@ -2,7 +2,7 @@
 #![feature(generic_const_exprs)]
 
 #[cfg(all(feature = "kdtree", feature = "rand"))]
-use pars3d::{dist, length, load, F, kmul};
+use pars3d::{F, dist, kmul, length, load};
 
 #[cfg(not(all(feature = "kdtree", feature = "rand")))]
 fn main() {
