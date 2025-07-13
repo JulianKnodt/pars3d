@@ -1,4 +1,4 @@
-use super::{F, Mesh, dot, normalize, sub};
+use super::{F, FaceKind, Mesh, dot, normalize, sub};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Structure for maintaining adjacencies of a mesh with fixed topology.
@@ -14,25 +14,48 @@ pub struct Adj<D = ()> {
     data: Vec<D>,
 }
 
+pub fn vertex_vertex_adj(nv: usize, f: &[FaceKind]) -> Adj<()> {
+    let mut nbrs = vec![vec![]; nv];
+    for f in f {
+        for [e0, e1] in f.edges() {
+            assert_ne!(e0, e1);
+            let e0_nbrs = &mut nbrs[e0];
+            if !e0_nbrs.contains(&(e1 as u32)) {
+                e0_nbrs.push(e1 as u32);
+            }
+            let e1_nbrs = &mut nbrs[e1];
+            if !e1_nbrs.contains(&(e0 as u32)) {
+                e1_nbrs.push(e0 as u32);
+            }
+        }
+    }
+
+    from_nbr_vec(&mut nbrs)
+}
+
+fn from_nbr_vec(nbrs: &mut Vec<Vec<u32>>) -> Adj<()> {
+    let mut idx_count = vec![];
+    let mut adj = vec![];
+    for fi in 0..nbrs.len() {
+        let Some(n) = nbrs.get_mut(fi) else {
+            idx_count.push((0, 0));
+            continue;
+        };
+        idx_count.push((adj.len() as u32, n.len() as u16));
+        adj.append(n);
+    }
+    let data = vec![(); adj.len()];
+    Adj {
+        idx_count,
+        adj,
+        data,
+    }
+}
+
 impl Mesh {
     /// Returns vertices adjacent to each vertex in the input mesh
     pub fn vertex_vertex_adj(&self) -> Adj<()> {
-        let mut nbrs = vec![vec![]; self.v.len()];
-        for f in &self.f {
-            for [e0, e1] in f.edges() {
-                assert_ne!(e0, e1);
-                let e0_nbrs = &mut nbrs[e0];
-                if !e0_nbrs.contains(&(e1 as u32)) {
-                    e0_nbrs.push(e1 as u32);
-                }
-                let e1_nbrs = &mut nbrs[e1];
-                if !e1_nbrs.contains(&(e0 as u32)) {
-                    e1_nbrs.push(e0 as u32);
-                }
-            }
-        }
-
-        Self::from_nbr_vec(&mut nbrs)
+        vertex_vertex_adj(self.v.len(), &self.f)
     }
     /// Returns faces adjacent to each vertex in the input mesh
     pub fn vertex_face_adj(&self) -> Adj<()> {
@@ -49,7 +72,7 @@ impl Mesh {
             }
         }
 
-        Self::from_nbr_vec(&mut nbrs)
+        from_nbr_vec(&mut nbrs)
     }
     pub fn face_face_adj(&self) -> Adj<()> {
         let edge_adjs = self.edge_kinds();
@@ -67,7 +90,7 @@ impl Mesh {
                 );
             }
         }
-        Self::from_nbr_vec(&mut f_nbrs)
+        from_nbr_vec(&mut f_nbrs)
     }
     pub fn face_face_pos_adj(&self) -> Adj<()> {
         let edge_adjs = self.edge_pos_kinds();
@@ -86,26 +109,7 @@ impl Mesh {
                 );
             }
         }
-        Self::from_nbr_vec(&mut f_nbrs)
-    }
-
-    fn from_nbr_vec(nbrs: &mut Vec<Vec<u32>>) -> Adj<()> {
-        let mut idx_count = vec![];
-        let mut adj = vec![];
-        for fi in 0..nbrs.len() {
-            let Some(n) = nbrs.get_mut(fi) else {
-                idx_count.push((0, 0));
-                continue;
-            };
-            idx_count.push((adj.len() as u32, n.len() as u16));
-            adj.append(n);
-        }
-        let data = vec![(); adj.len()];
-        Adj {
-            idx_count,
-            adj,
-            data,
-        }
+        from_nbr_vec(&mut f_nbrs)
     }
 }
 

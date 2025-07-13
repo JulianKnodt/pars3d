@@ -194,6 +194,10 @@ pub fn kmul<const N: usize>(k: F, v: [F; N]) -> [F; N] {
     v.map(|v| v * k)
 }
 
+pub fn divk<const N: usize>(v: [F; N], k: F) -> [F; N] {
+    v.map(|v| v / k)
+}
+
 pub(crate) fn add<const N: usize>(a: [F; N], b: [F; N]) -> [F; N] {
     std::array::from_fn(|i| a[i] + b[i])
 }
@@ -233,7 +237,7 @@ pub fn length<const N: usize>(v: [F; N]) -> F {
 
 /// Normalizes a vector, returning a zero vector if it has 0 norm
 #[inline]
-pub(crate) fn normalize<const N: usize>(v: [F; N]) -> [F; N] {
+pub fn normalize<const N: usize>(v: [F; N]) -> [F; N] {
     let sum: F = v.iter().map(|v| v * v).sum();
     if sum < 1e-20 {
         return [0.; N];

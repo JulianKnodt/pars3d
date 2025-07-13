@@ -635,6 +635,7 @@ impl Mesh {
             v: new_v,
             f: std::mem::take(&mut self.f),
             face_mesh_idx: std::mem::take(&mut self.face_mesh_idx),
+            face_mat_idx: std::mem::take(&mut self.face_mat_idx),
             ..Default::default()
         }
     }
