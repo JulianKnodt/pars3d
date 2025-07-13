@@ -14,6 +14,9 @@ pub mod subdivision;
 #[cfg(feature = "kdtree")]
 pub mod kdtree;
 
+/// Remesh an input mesh with a vertex field into a new mesh.
+pub mod instant_meshes;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum VertexNormalWeightingKind {
     Uniform,
@@ -32,6 +35,34 @@ pub fn barycentric_areas(fs: &[FaceKind], vs: &[[F; 3]], dst: &mut Vec<F>) {
             }
         }
     }
+}
+
+/// Computes vertex normals into dst for a set of faces and vertices
+pub fn vertex_normals(
+    fs: &[FaceKind],
+    vs: &[[F; 3]],
+    dst: &mut Vec<[F; 3]>,
+    kind: VertexNormalWeightingKind,
+) -> bool {
+    dst.resize(vs.len(), [0.; 3]);
+    dst.fill([0.; 3]);
+    for f in fs {
+        let normal = f.normal(&vs);
+        if length(normal) < 1e-10 {
+            continue;
+        }
+        let area = match kind {
+            VertexNormalWeightingKind::Uniform => 1.,
+            VertexNormalWeightingKind::Area => f.area(&vs),
+        };
+        for &vi in f.as_slice() {
+            dst[vi] = add(dst[vi], kmul(area, normal));
+        }
+    }
+    for n in dst {
+        *n = normalize(*n);
+    }
+    true
 }
 
 impl Mesh {
@@ -72,34 +103,6 @@ impl Mesh {
                 }
             }
         }
-    }
-
-    /// Computes vertex normals into dst for a set of faces and vertices
-    pub fn vertex_normals(
-        fs: &[FaceKind],
-        vs: &[[F; 3]],
-        dst: &mut Vec<[F; 3]>,
-        kind: VertexNormalWeightingKind,
-    ) -> bool {
-        dst.resize(vs.len(), [0.; 3]);
-        dst.fill([0.; 3]);
-        for f in fs {
-            let normal = f.normal(&vs);
-            if length(normal) < 1e-10 {
-                continue;
-            }
-            let area = match kind {
-                VertexNormalWeightingKind::Uniform => 1.,
-                VertexNormalWeightingKind::Area => f.area(&vs),
-            };
-            for &vi in f.as_slice() {
-                dst[vi] = add(dst[vi], kmul(area, normal));
-            }
-        }
-        for n in dst {
-            *n = normalize(*n);
-        }
-        true
     }
     /// Splits non-planar faces into tris. Returns number of faces split.
     pub fn split_non_planar_faces(&mut self, eps: F) -> usize {
@@ -512,11 +515,7 @@ impl Mesh {
     }
 
     pub fn aabb(&self) -> AABB<F, 3> {
-        let mut aabb = AABB::new();
-        for &v in &self.v {
-            aabb.add_point(v);
-        }
-        aabb
+        AABB::from_slice(&self.v)
     }
 
     /// Implementation from: https://mobile.rodolphe-vaillant.fr/entry/20/compute-harmonic-weights-on-a-triangular-mesh
