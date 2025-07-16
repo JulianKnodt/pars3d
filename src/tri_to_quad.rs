@@ -188,6 +188,77 @@ pub fn quadrangulate(
     (new_faces, merged)
 }
 
+/// Dissolves a fixed set of edges (when the edge is manifold).
+pub fn dissolve_edges(faces: &mut Vec<FaceKind>, es: &[[usize; 2]]) -> usize {
+    if es.is_empty() {
+        return 0;
+    }
+
+    let mut edge_adj: HashMap<[usize; 2], EdgeKind> = HashMap::new();
+
+    for (fi, f) in faces.iter().enumerate() {
+        let FaceKind::Tri(t) = f else {
+            for [e0, e1] in edges(f.as_slice()) {
+                edge_adj.insert(minmax(e0, e1), EdgeKind::NonManifold);
+            }
+            continue;
+        };
+
+        for [e0, e1] in edges(t) {
+            edge_adj
+                .entry(minmax(e0, e1))
+                .and_modify(|v| v.insert(fi))
+                .or_insert(EdgeKind::Boundary(fi));
+        }
+    }
+
+    let mut dissolved = 0;
+    for &e @ [e0, e1] in es {
+        let &[f0, f1] = match edge_adj.get(&e) {
+            None | Some(EdgeKind::NonManifold) | Some(EdgeKind::Boundary(_)) => continue,
+            Some(EdgeKind::Manifold(fs)) => fs,
+        };
+        assert_ne!(f0, f1);
+        let FaceKind::Tri(mut tri_a) = faces[f0] else {
+            continue;
+        };
+        let Some(corner_a) = tri_a.into_iter().find(|&v| v != e0 && v != e1) else {
+            continue;
+        };
+        let FaceKind::Tri(tri_b) = faces[f1] else {
+            continue;
+        };
+        let Some(corner_b) = tri_b.into_iter().find(|&v| v != e0 && v != e1) else {
+            continue;
+        };
+
+        // repeat faces
+        if corner_a == corner_b {
+            continue;
+        }
+
+        while tri_a[0] != corner_a {
+            tri_a.rotate_left(1);
+        }
+        if tri_a.iter().any(|&v| v == corner_b) {
+            // would introduce a singlet
+            continue;
+        }
+
+        let new_quad: [usize; 4] = std::array::from_fn(|i| match i {
+            0 | 1 => tri_a[i],
+            2 => corner_b,
+            _ => tri_a[2],
+        });
+
+        faces[f0] = FaceKind::Quad(new_quad);
+        faces[f1] = FaceKind::empty();
+        dissolved += 1;
+    }
+    faces.retain(|v| !v.is_empty());
+    dissolved
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum EdgeKind {
     Boundary(usize),

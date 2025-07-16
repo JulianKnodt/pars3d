@@ -17,6 +17,9 @@ pub mod kdtree;
 /// Remesh an input mesh with a vertex field into a new mesh.
 pub mod instant_meshes;
 
+/// A data structure which tracks collapsible edges.
+pub mod collapsible;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum VertexNormalWeightingKind {
     Uniform,
@@ -35,6 +38,58 @@ pub fn barycentric_areas(fs: &[FaceKind], vs: &[[F; 3]], dst: &mut Vec<F>) {
             }
         }
     }
+}
+
+/// For a given set of faces, computes an adjacency map between them.
+pub fn edge_kinds(fs: &[FaceKind]) -> BTreeMap<[usize; 2], EdgeKind> {
+    let mut edges: BTreeMap<[usize; 2], EdgeKind> = BTreeMap::new();
+    for (fi, f) in fs.iter().enumerate() {
+        for e in f.edges_ord() {
+            edges
+                .entry(e)
+                .and_modify(|ek| {
+                    ek.insert(fi);
+                })
+                .or_insert_with(|| EdgeKind::Boundary(fi));
+        }
+    }
+    edges
+}
+
+/// Deletes triangles which lay on a non-manifold edge and share all the same vertices with
+/// another triangle.
+pub fn delete_non_manifold_duplicates(fs: &mut Vec<FaceKind>) -> usize {
+    let mut to_del = vec![];
+    let ek = edge_kinds(fs);
+    for (fi, f) in fs.iter().enumerate() {
+        if to_del.contains(&fi) {
+            continue;
+        }
+        let Some(e) = f.edges_ord().find(|e| ek[e].is_non_manifold()) else {
+            continue;
+        };
+
+        let other = f
+            .edges_ord()
+            .filter(|&oe| oe != e)
+            .find_map(|oe| ek[&oe].opposite(fi));
+        let Some(other) = other else {
+            continue;
+        };
+        assert_ne!(other, fi);
+        let del = f.edges_ord().all(|e| ek[&e].as_slice().contains(&other));
+        if !del {
+            continue;
+        }
+        to_del.push(fi);
+        to_del.push(other);
+    }
+    to_del.sort();
+    let num_del = to_del.len();
+    while let Some(d) = to_del.pop() {
+        fs.swap_remove(d);
+    }
+    num_del
 }
 
 /// Computes vertex normals into dst for a set of faces and vertices
@@ -197,6 +252,12 @@ impl Mesh {
             num_split += 1;
         }
         num_split
+    }
+
+    /// Deletes triangles which lay on a non-manifold edge and share all the same vertices with
+    /// another triangle.
+    pub fn delete_non_manifold_duplicates(&mut self) -> usize {
+        delete_non_manifold_duplicates(&mut self.f)
     }
 
     /// Splits any UV polygon which is self intersecting
@@ -421,18 +482,7 @@ impl Mesh {
 
     /// Returns the associated face set with each edge.
     pub fn edge_kinds(&self) -> BTreeMap<[usize; 2], EdgeKind> {
-        let mut edges: BTreeMap<[usize; 2], EdgeKind> = BTreeMap::new();
-        for (fi, f) in self.f.iter().enumerate() {
-            for e in f.edges_ord() {
-                edges
-                    .entry(e)
-                    .and_modify(|ek| {
-                        ek.insert(fi);
-                    })
-                    .or_insert_with(|| EdgeKind::Boundary(fi));
-            }
-        }
-        edges
+        edge_kinds(&self.f)
     }
 
     /// Returns the associated face with each edge by each edge's position.
@@ -452,16 +502,15 @@ impl Mesh {
         edges
     }
 
-    /// Non-unique iterator over boundary vertices
+    /// Returns non-manifold edges and faces on those non-manifold edges
     pub fn non_manifold_faces(&self) -> impl Iterator<Item = ([usize; 2], Vec<usize>)> + '_ {
-        let mut edges: BTreeMap<[usize; 2], Vec<usize>> = BTreeMap::new();
-        for (fi, f) in self.f.iter().enumerate() {
-            for [e0, e1] in f.edges() {
-                let fs = edges.entry(std::cmp::minmax(e0, e1)).or_default();
-                fs.push(fi);
+        self.edge_kinds().into_iter().filter_map(|(e, v)| {
+            if let EdgeKind::NonManifold(fs) = v {
+                Some((e, fs))
+            } else {
+                None
             }
-        }
-        edges.into_iter().filter(|(_, v)| v.len() > 2)
+        })
     }
 
     /// Given a lower bound on how many points should be returned, samples from each face based

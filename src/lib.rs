@@ -206,8 +206,12 @@ pub(crate) fn sub<const N: usize>(a: [F; N], b: [F; N]) -> [F; N] {
     std::array::from_fn(|i| a[i] - b[i])
 }
 
+pub fn dist_sq<const N: usize>(a: [F; N], b: [F; N]) -> F {
+    length_sq(sub(b, a))
+}
+
 pub fn dist<const N: usize>(a: [F; N], b: [F; N]) -> F {
-    length(sub(b, a))
+    dist_sq(a, b).max(0.).sqrt()
 }
 
 pub(crate) fn cross([x, y, z]: [F; 3], [a, b, c]: [F; 3]) -> [F; 3] {
@@ -230,9 +234,12 @@ pub(crate) fn tri_area_2d([a, b, c]: [[F; 2]; 3]) -> F {
 pub(crate) fn quad_area_2d([a, b, c, d]: [[F; 2]; 4]) -> F {
     cross_2d(sub(a, c), sub(b, d)) / 2.
 }
+pub fn length_sq<const N: usize>(v: [F; N]) -> F {
+    v.iter().map(|v| v * v).sum::<F>()
+}
 
 pub fn length<const N: usize>(v: [F; N]) -> F {
-    v.iter().map(|v| v * v).sum::<F>().max(0.).sqrt()
+    length_sq(v).max(0.).sqrt()
 }
 
 /// Normalizes a vector, returning a zero vector if it has 0 norm
