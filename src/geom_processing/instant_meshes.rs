@@ -5,9 +5,11 @@ Based off of Wenzel Jakob's Instant Meshes, Python Version
 */
 
 use crate::aabb::AABB;
-use crate::{F, FaceKind, add, cross, dist, dist_sq, divk, dot, kmul, normalize, sub};
+use crate::geom_processing as gp;
+use crate::{F, FaceKind, add, cross, dist, dist_sq, divk, dot, kmul, lerp, normalize, sub};
+use std::collections::BTreeSet;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Args {
     pub orientation_smoothing_iters: usize,
     pub pos_smoothing_iters: usize,
@@ -16,7 +18,10 @@ pub struct Args {
     /// Force vertices to remain on boundaries of the mesh as much as possible.
     pub dirichlet_boundary: bool,
     // TODO von-neumann boundary condition for orientation field
+    /// Where to save edge grid to, empty implies do not save
+    pub save_grid: String,
 }
+
 impl Default for Args {
     fn default() -> Self {
         Args {
@@ -25,6 +30,7 @@ impl Default for Args {
             scale: 0.01,
             dissolve_edges: false,
             dirichlet_boundary: true,
+            save_grid: String::new(),
         }
     }
 }
@@ -55,10 +61,22 @@ pub fn instant_mesh(
 
     for p in &mut pos_field {
         let t = rand().fract();
-        *p = add(kmul(1. - t, aabb.min), kmul(t, aabb.max));
+        *p = lerp(t, aabb.min, aabb.max);
     }
 
-    let vv_adj = crate::adjacency::vertex_vertex_adj(nv, f);
+    #[allow(unused_mut)]
+    let mut vv_adj = crate::adjacency::vertex_vertex_adj(nv, f).laplacian(f, v);
+
+    let bd_verts = if args.dirichlet_boundary {
+        gp::boundary_vertices(f).collect::<BTreeSet<_>>()
+    } else {
+        BTreeSet::new()
+    };
+    let bd_edges = if args.dirichlet_boundary {
+        gp::boundary_edges(f).collect::<BTreeSet<_>>()
+    } else {
+        BTreeSet::new()
+    };
 
     // smooth orientation field
     println!(
@@ -78,16 +96,20 @@ pub fn instant_mesh(
         for &vi in &order {
             let mut o = orient_field[vi];
             let n = vn[vi];
-            let mut w = 0;
-            for &adj_vi in vv_adj.adj(vi) {
+            let mut w_sum = 0.;
+            #[cfg(feature = "rand")]
+            vv_adj.adj_mut(vi).shuffle(&mut rng);
+
+            for (adj_vi, w) in vv_adj.adj_data(vi) {
+                assert!(w.is_finite());
                 let adj_vi = adj_vi as usize;
                 let [o_base, compat] =
                     compat_orientation_extrinsic_4(o, n, orient_field[adj_vi], vn[adj_vi]);
-                o = add(kmul(w as F, o_base), compat);
+                o = add(kmul(w_sum as F, o_base), kmul(w, compat));
                 // project to tangent plane
                 o = sub(o, kmul(dot(o, n), n));
                 o = normalize(o);
-                w += 1;
+                w_sum += w;
             }
             orient_field[vi] = o;
         }
@@ -100,7 +122,11 @@ pub fn instant_mesh(
         "Smoothing position field for {} iters",
         args.pos_smoothing_iters
     );
-    for _it in 0..args.pos_smoothing_iters {
+    for it in 0..args.pos_smoothing_iters {
+        println!("{it}");
+        let t = (it + 1) as F / args.pos_smoothing_iters as F;
+        let t = t.sqrt();
+
         #[cfg(feature = "rand")]
         order.shuffle(&mut rng);
         for &vi in &order {
@@ -108,8 +134,10 @@ pub fn instant_mesh(
             let mut p = pos_field[vi];
             let n = vn[vi];
             let vert = v[vi];
-            let mut w = 0;
-            for &adj_vi in vv_adj.adj(vi) {
+            let mut w_sum = 0.;
+            #[cfg(feature = "rand")]
+            vv_adj.adj_mut(vi).shuffle(&mut rng);
+            for (adj_vi, w) in vv_adj.adj_data(vi) {
                 let adj_vi = adj_vi as usize;
                 let (p_compat, _err) = compat_pos_extrinsic_4(
                     o,
@@ -121,15 +149,33 @@ pub fn instant_mesh(
                     pos_field[adj_vi],
                     vn[adj_vi],
                     v[adj_vi],
+                    //
                     args.scale,
                 );
-                p = divk(add(kmul(w as F, p_compat[0]), p_compat[1]), (w + 1) as F);
+                p = add(kmul(w_sum, p_compat[0]), kmul(w, p_compat[1]));
                 p = sub(p, kmul(dot(n, sub(p, vert)), n));
-                w += 1;
+                w_sum += w;
+                p = divk(p, w_sum);
             }
             pos_field[vi] = lattice_op(p, o, n, vert, args.scale, RoundMode::Round);
+
+            if bd_verts.contains(&vi) {
+                let p = pos_field[vi];
+                let nearest_pt = bd_edges
+                    .iter()
+                    .map(|e| {
+                        let ev = e.map(|vi| v[vi]);
+                        let nearest_pt = crate::nearest_pt_on_line(p, ev);
+                        let d = dist(p, nearest_pt);
+                        (nearest_pt, d)
+                    })
+                    .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+                    .unwrap();
+                pos_field[vi] = lerp(t, p, nearest_pt.0);
+            }
         }
     }
+    println!();
 
     // output verts
     let mut to_del = vec![];
@@ -181,7 +227,10 @@ pub fn instant_mesh(
 
     // collapse adjacent vertices
     // (TODO use barycentric area weighting?)
-    let mut c = super::collapsible::Collapsible::new_with(pos_field.len(), |vi| (pos_field[vi], 1));
+    let mut c = super::collapsible::Collapsible::new_with(pos_field.len(), |vi| {
+        let w = if bd_verts.contains(&vi) { 512. } else { 1. };
+        (kmul(w, pos_field[vi]), w)
+    });
     for f in &out_faces {
         c.add_face(f.as_slice());
     }
@@ -221,22 +270,51 @@ pub fn instant_mesh(
         a_dist.partial_cmp(&b_dist).unwrap().reverse()
     });
 
-    /*
-    let wf = crate::visualization::colored_wireframe(
-        can_dissolve.iter().copied(),
-        |vi| pos_field[vi],
-        |[_, _]| [1., 0., 0.],
-        0.001,
-    );
-    let out_tmp = crate::visualization::wireframe_to_mesh(wf);
-    let tmp_scene = out_tmp.into_scene();
-    crate::save("tmp.ply", &tmp_scene).unwrap();
-    */
+    if !args.save_grid.is_empty() {
+        let wf = crate::visualization::colored_wireframe(
+            nbr_edges.iter().copied(),
+            |vi| pos_field[vi],
+            |[_, _]| [1., 0., 0.],
+            0.001,
+        );
+        let out_tmp = crate::visualization::wireframe_to_mesh(wf);
+        let tmp_scene = out_tmp.into_scene();
+        if let Err(_) = crate::save(&args.save_grid, &tmp_scene) {
+            eprintln!("[WARN]: Failed to save edge grid to {}", args.save_grid);
+        }
+    }
 
     // dissolve edges
     crate::tri_to_quad::dissolve_edges(&mut out_faces, &can_dissolve);
 
-    let _num_del = crate::geom_processing::delete_non_manifold_duplicates(&mut out_faces);
+    let _num_del = gp::delete_non_manifold_duplicates(&mut out_faces);
+    println!("{_num_del}");
+
+    let vv_adj = crate::adjacency::vertex_vertex_adj(pos_field.len(), &mut out_faces);
+
+    for (vi, _) in c.vertices() {
+        if bd_verts.contains(&vi) {
+            continue;
+        }
+        pos_field[vi] = match vv_adj.degree(vi) {
+            2 => {
+                let mut avg = [0.; 3];
+                for &nbr in vv_adj.adj(vi) {
+                    avg = add(pos_field[nbr as usize], avg);
+                }
+                kmul(0.5, avg)
+            }
+            3 => {
+                let mut avg = [0.; 3];
+                for &nbr in vv_adj.adj(vi) {
+                    avg = add(pos_field[nbr as usize], avg);
+                }
+                //pos_field[vi] = divk(avg, 3.);
+                lerp(0.9, pos_field[vi], divk(avg, 3.))
+            }
+            _ => continue,
+        }
+    }
 
     (pos_field, out_faces)
 }
@@ -301,6 +379,7 @@ fn compat_pos_extrinsic_4(
             let term1 = add(p1, kmul(scale, add(cond(a1, o1), cond(b1, t1))));
             (term0, term1, dist_sq(term0, term1))
         })
+        .inspect(|v| assert!(v.2.is_finite(), "{v:?} {o1:?} {p1:?} {n1:?} {v1:?}"))
         .min_by(|a, b| a.2.partial_cmp(&b.2).unwrap())
         .unwrap();
     ([term0, term1], err)

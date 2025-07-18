@@ -56,6 +56,16 @@ pub fn edge_kinds(fs: &[FaceKind]) -> BTreeMap<[usize; 2], EdgeKind> {
     edges
 }
 
+pub fn boundary_edges(fs: &[FaceKind]) -> impl Iterator<Item = [usize; 2]> + '_ {
+    edge_kinds(fs)
+        .into_iter()
+        .filter_map(|(k, v)| v.is_boundary().then_some(k))
+}
+
+pub fn boundary_vertices(fs: &[FaceKind]) -> impl Iterator<Item = usize> + '_ {
+    boundary_edges(fs).flat_map(|v| v.into_iter())
+}
+
 /// Deletes triangles which lay on a non-manifold edge and share all the same vertices with
 /// another triangle.
 pub fn delete_non_manifold_duplicates(fs: &mut Vec<FaceKind>) -> usize {
@@ -121,6 +131,10 @@ pub fn vertex_normals(
 }
 
 impl Mesh {
+    /// Computes vertex normals into mesh.n for its faces and vertices
+    pub fn vertex_normals(&mut self, kind: VertexNormalWeightingKind) -> bool {
+        vertex_normals(&self.f, &self.v, &mut self.n, kind)
+    }
     #[inline]
     pub fn triangulate_with_new_edges(&mut self, mut cb: impl FnMut([usize; 2])) {
         let nf = self.f.len();
@@ -473,11 +487,14 @@ impl Mesh {
         self.num_edge_kinds().1
     }
 
-    /// Non-unique iterator over boundary vertices
+    /// Non-unique iterator over boundary edges
     pub fn boundary_edges(&self) -> impl Iterator<Item = [usize; 2]> + '_ {
-        self.edge_kinds()
-            .into_iter()
-            .filter_map(|(k, v)| v.is_boundary().then_some(k))
+        boundary_edges(&self.f)
+    }
+
+    /// Boundary vertices of this mesh
+    pub fn boundary_vertices(&self) -> impl Iterator<Item = usize> + '_ {
+        boundary_vertices(&self.f)
     }
 
     /// Returns the associated face set with each edge.
