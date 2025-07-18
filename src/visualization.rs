@@ -123,6 +123,42 @@ pub fn face_segmentation_wireframes<'a>(
     colored_wireframe(edges.into_iter(), |vi| vertices[vi], |_| [0.; 3], width)
 }
 
+// for each position, constructs a set of arrows based on a set of directions with a given
+// global scale.
+pub fn arrows(
+    ps: &[[F; 3]],
+    dirs: &[[F; 3]],
+    scale: F,
+    tip_and_base_color: Option<[[F; 3]; 2]>,
+) -> (Vec<[F; 3]>, Vec<[F; 3]>, Vec<[usize; 4]>) {
+    let mut verts = vec![];
+    let mut colors = vec![];
+    let mut faces = vec![];
+
+    for (pi, &p) in ps.iter().enumerate() {
+        let (mut vs, mut vcs, mut fs) = frustum_to_quad_mesh(
+            4,
+            p,
+            crate::normalize(dirs[pi]),
+            0.0016,
+            0.00016,
+            -crate::length(dirs[pi]) * scale,
+            0.,
+            tip_and_base_color,
+        );
+        let curr_v = verts.len();
+        verts.append(&mut vs);
+        colors.append(&mut vcs);
+        for f in &mut fs {
+            for vi in f {
+                *vi += curr_v;
+            }
+        }
+        faces.append(&mut fs);
+    }
+    (verts, colors, faces)
+}
+
 /// Uses a fixed set of high contrast colors to color each face group.
 /// Face group should be O(1). Outputs a color for each face, which can be applied with
 /// Mesh::with_face_coloring. `palette` can be arbitrary, but one example is
@@ -522,4 +558,70 @@ fn test_raw_edge_vis() {
     use std::fs::File;
     let f = File::create("raw_edge_vis.ply").unwrap();
     ply.write(f).unwrap();
+}
+
+pub fn frustum_to_quad_mesh(
+    pts: usize,
+    center: [F; 3],
+    axis: [F; 3],
+    bot_r: F,
+    top_r: F,
+    down: F,
+    up: F,
+    top_bot_color: Option<[[F; 3]; 2]>,
+) -> (Vec<[F; 3]>, Vec<[F; 3]>, Vec<[usize; 4]>) {
+    let mut vertices = vec![];
+    let mut colors = vec![];
+    use super::quat::{quat_from_to, quat_rot};
+
+    let (axis, up, down, bot_r, top_r) = if super::dot(axis, [0., 1., 0.]) < 0. {
+        (axis, up, down, bot_r, top_r)
+    } else {
+        (axis.map(core::ops::Neg::neg), -down, -up, top_r, bot_r)
+    };
+
+    let r_axis = if axis == [0., -1., 0.] {
+        [0., 1., 0.]
+    } else {
+        axis
+    };
+    let q = quat_from_to([0., 1., 0.], r_axis);
+
+    let t = 2. * (std::f64::consts::PI as F);
+    let [up, down] = [up, down].map(|v| kmul(v, axis));
+    for i in 0..pts {
+        let i = i as F / pts as F;
+
+        let r0 = [(i * t).cos(), 0., (i * t).sin()];
+        let r0 = quat_rot(r0, q);
+        vertices.push(add(kmul(top_r, r0), down));
+        vertices.push(add(kmul(bot_r, r0), up));
+        if let Some([t, b]) = top_bot_color {
+            colors.push(b);
+            colors.push(t);
+        }
+    }
+
+    for v in &mut vertices {
+        *v = add(center, *v);
+    }
+
+    let mut faces = vec![];
+    for i in 0..pts {
+        faces.push([
+            i * 2,
+            i * 2 + 1,
+            (i * 2 + 3) % vertices.len(),
+            (i * 2 + 2) % vertices.len(),
+        ]);
+    }
+
+    (vertices, colors, faces)
+}
+pub fn cylinder_caps(n: usize) -> [impl Iterator<Item = usize> + Clone; 2] {
+    std::array::from_fn(|i| {
+        (0..n)
+            .map(move |v| if i == 0 { v } else { n - v - 1 })
+            .filter(move |v| v % 2 == i)
+    })
 }

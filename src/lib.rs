@@ -198,8 +198,12 @@ pub fn divk<const N: usize>(v: [F; N], k: F) -> [F; N] {
     v.map(|v| v / k)
 }
 
-pub(crate) fn add<const N: usize>(a: [F; N], b: [F; N]) -> [F; N] {
+pub fn add<const N: usize>(a: [F; N], b: [F; N]) -> [F; N] {
     std::array::from_fn(|i| a[i] + b[i])
+}
+
+pub(crate) fn lerp<const N: usize>(t: F, s: [F; N], e: [F; N]) -> [F; N] {
+    add(kmul(1. - t, s), kmul(t, e))
 }
 
 pub(crate) fn sub<const N: usize>(a: [F; N], b: [F; N]) -> [F; N] {
@@ -214,7 +218,7 @@ pub fn dist<const N: usize>(a: [F; N], b: [F; N]) -> F {
     dist_sq(a, b).max(0.).sqrt()
 }
 
-pub(crate) fn cross([x, y, z]: [F; 3], [a, b, c]: [F; 3]) -> [F; 3] {
+pub fn cross([x, y, z]: [F; 3], [a, b, c]: [F; 3]) -> [F; 3] {
     [
         diff_of_prod(y, c, z, b),
         diff_of_prod(z, a, x, c),
@@ -478,6 +482,18 @@ pub fn matmul<const N: usize>(ta: [[F; N]; N], tb: [[F; N]; N]) -> [[F; N]; N] {
         }
     }
     out
+}
+
+/// Computes the value `t` such that `s + (s-e)t = nearest point to p on line`
+pub fn nearest_on_line(p: [F; 3], [s, e]: [[F; 3]; 2]) -> F {
+    let dir = sub(e, s);
+    dot(dir, sub(p, s)) / dot(dir, dir)
+}
+
+/// Computes the nearest point on the line for a point p
+pub fn nearest_pt_on_line(p: [F; 3], [s, e]: [[F; 3]; 2]) -> [F; 3] {
+    let t = nearest_on_line(p, [s, e]).clamp(0., 1.);
+    add(s, kmul(t, sub(e, s)))
 }
 
 pub fn rotate_on_axis(v: [F; 3], axis: [F; 3], s: F, c: F) -> [F; 3] {
