@@ -1,4 +1,4 @@
-use super::{F, FaceKind, Mesh, dot, normalize, sub};
+use super::{F, FaceKind, Mesh, dist, dot, normalize, sub};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Structure for maintaining adjacencies of a mesh with fixed topology.
@@ -114,11 +114,67 @@ impl Mesh {
 }
 
 impl<D> Adj<D> {
+    pub fn uniform(self) -> Adj<F>
+    where
+        D: Copy,
+    {
+        self.map(|_, _, _, _| 1.)
+    }
+    pub fn laplacian(self, f: &[FaceKind], v: &[[F; 3]]) -> Adj<F>
+    where
+        D: Copy,
+    {
+        const EPS: F = 2e-6;
+        let mut per_edge_weights = BTreeMap::new();
+        for f in f.iter() {
+            for pvni @ [pi, _, ni] in f.incident_edges() {
+                let [p, v, n] = pvni.map(|vi| v[vi]);
+                let a = dist(p, v);
+                let b = dist(v, n);
+                let c = dist(p, n);
+                let area = crate::herons_area([a, b, c]);
+                let v = a * a + b * b - c * c;
+                let cot_c = v / (4. * area + EPS);
+                let ew = per_edge_weights
+                    .entry(std::cmp::minmax(pi, ni))
+                    .or_insert(0.);
+                *ew += cot_c;
+            }
+        }
+
+        let mut per_vert_weights = vec![0.; v.len()];
+        for f in f.iter() {
+            if f.len() == 0 {
+                continue;
+            }
+            let mut total_area = 0.;
+            for t in f.as_triangle_fan() {
+                let [v0, v1, v2] = t.map(|vi| v[vi]);
+                let es = [dist(v0, v1), dist(v1, v2), dist(v2, v0)];
+                total_area += crate::herons_area(es);
+            }
+            total_area /= f.len() as F;
+            for &vi in f.as_slice() {
+                per_vert_weights[vi] += total_area;
+            }
+        }
+
+        fn softplus(x: F) -> F {
+            if x > 1. { x } else { (1. + x.exp()).ln() }
+        }
+
+        self.map(|_, vi0, vi1, _| {
+            let voro = per_vert_weights[vi0];
+            let l = per_edge_weights[&std::cmp::minmax(vi0, vi1)];
+            softplus(l) / (2. * voro + EPS)
+        })
+    }
+
     pub fn len(&self) -> usize {
         self.idx_count.len()
     }
     /// Modifies the data for this vertex adjacency based on a function which takes an ordered
-    /// edge.
+    /// edge. Allocates one vector for the new data.
     pub fn map<U>(self, f: impl Fn(&Self, usize, usize, D) -> U) -> Adj<U>
     where
         U: Default + Copy,
@@ -156,6 +212,19 @@ impl<D> Adj<D> {
         let cnt = cnt as usize;
 
         &self.adj[idx..idx + cnt]
+    }
+
+    /// Returns adjacent vertices to this vertex as a mutable slice.
+    #[allow(unused)]
+    pub(crate) fn adj_mut(&mut self, v: usize) -> &mut [u32] {
+        let (idx, cnt) = self.idx_count[v];
+        if cnt == 0 {
+            return &mut [];
+        }
+        let idx = idx as usize;
+        let cnt = cnt as usize;
+
+        &mut self.adj[idx..idx + cnt]
     }
 
     pub fn data(&self, v: usize) -> &[D] {
