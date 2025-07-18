@@ -356,6 +356,8 @@ impl FaceKind {
             _ => Self::Poly(vec![0; num_verts]),
         }
     }
+
+    /// Offset each index in this face by o.
     pub fn offset(&mut self, o: i32) {
         for v in self.as_mut_slice() {
             if o < 0 {
