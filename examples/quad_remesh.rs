@@ -167,6 +167,8 @@ fn main() -> std::io::Result<()> {
 
     let vv_adj = m.vertex_vertex_adj().uniform();
     let mut ri = 0;
+    assert_ne!(zero_normals.len(), m.v.len());
+
     // stupid way to spread normals to where there are zero values
     while let Some(vi) = zero_normals.pop() {
         let mut total_w = 0.;
@@ -179,7 +181,7 @@ fn main() -> std::io::Result<()> {
             total_w += w;
             ns = add(ns, kmul(w, adj_n));
         }
-        if total_w == 0. {
+        if total_w == 0. || pars3d::length(ns) == 0. {
             zero_normals.push(vi);
             let l = zero_normals.len();
             // always swap with a different element so it never gets totally stuck.
@@ -188,6 +190,10 @@ fn main() -> std::io::Result<()> {
             continue;
         }
         vn[vi] = normalize(ns);
+    }
+
+    for &n in vn.iter() {
+      assert_ne!(pars3d::length(n), 0.);
     }
 
     let mut field = if !field_file.is_empty() {

@@ -171,7 +171,6 @@ pub fn instant_mesh(
             debug_assert!(pos_field[vi].into_iter().all(F::is_finite));
 
             if bd_verts.contains(&vi) {
-                assert!(false);
                 let p = pos_field[vi];
                 let nearest_pt = bd_edges
                     .iter()
