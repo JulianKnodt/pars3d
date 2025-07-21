@@ -113,9 +113,10 @@ pub fn vertex_normals(
     dst.fill([0.; 3]);
     for f in fs {
         let normal = f.normal(&vs);
-        if length(normal) < 1e-10 {
+        if length(normal) == 0. {
             continue;
         }
+        let normal = normalize(normal);
         let area = match kind {
             VertexNormalWeightingKind::Uniform => 1.,
             VertexNormalWeightingKind::Area => f.area(&vs),
