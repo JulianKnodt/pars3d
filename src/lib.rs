@@ -487,7 +487,12 @@ pub fn matmul<const N: usize>(ta: [[F; N]; N], tb: [[F; N]; N]) -> [[F; N]; N] {
 /// Computes the value `t` such that `s + (s-e)t = nearest point to p on line`
 pub fn nearest_on_line(p: [F; 3], [s, e]: [[F; 3]; 2]) -> F {
     let dir = sub(e, s);
-    dot(dir, sub(p, s)) / dot(dir, dir)
+    let denom = dot(dir, dir);
+    if denom.abs() < 1e-10 {
+        // any value works (s approx equals e)
+        return 0.;
+    }
+    dot(dir, sub(p, s)) / denom
 }
 
 /// Computes the nearest point on the line for a point p

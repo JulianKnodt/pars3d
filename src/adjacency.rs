@@ -166,7 +166,7 @@ impl<D> Adj<D> {
         self.map(|_, vi0, vi1, _| {
             let voro = per_vert_weights[vi0];
             let l = per_edge_weights[&std::cmp::minmax(vi0, vi1)];
-            softplus(l) / (2. * voro + EPS)
+            1e-4 + softplus(l) / (2. * voro + EPS)
         })
     }
 

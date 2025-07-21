@@ -145,7 +145,8 @@ fn main() -> std::io::Result<()> {
 
     let scene = load(&src).expect("Failed to load input scene");
     let mut m = scene.into_flattened_mesh();
-    //m.geometry_only();
+    let og_verts = m.v.clone();
+    let new_vert_map = m.geometry_only();
     m.triangulate();
     m.f.retain_mut(|f| !f.canonicalize());
     for v in &mut m.v {
@@ -153,7 +154,7 @@ fn main() -> std::io::Result<()> {
         v[2] = -v[2];
         v[0] = -v[0];
     }
-    //let (_s, _t) = m.normalize();
+    let (s, t) = m.normalize();
 
     let mut vn = vec![];
     pars3d::geom_processing::vertex_normals(&m.f, &m.v, &mut vn, Default::default());
@@ -209,6 +210,23 @@ fn main() -> std::io::Result<()> {
             }
             field.push(vec);
         }
+        // correct if geometry consolidation caused the field to be a different size
+        if og_verts.len() != m.v.len() && field.len() == og_verts.len() {
+            let mut new_field = vec![[0.; 3]; m.v.len()];
+            let mut ws = vec![0; m.v.len()];
+            for (vi, v) in og_verts.into_iter().enumerate() {
+                let new_idx = new_vert_map[&v.map(F::to_bits)];
+                let old_field = field[vi];
+                new_field[new_idx] = add(new_field[new_idx], old_field);
+                ws[new_idx] += 1;
+            }
+            for (vi, f) in new_field.iter_mut().enumerate() {
+                assert_ne!(ws[vi], 0);
+                *f = divk(*f, ws[vi] as F);
+            }
+            field = new_field;
+        }
+
         if field.len() != m.v.len() {
             eprintln!(
                 "Expected same # lines in --field <CSV> as mesh, got {} in field vs {} in mesh",
@@ -247,7 +265,7 @@ fn main() -> std::io::Result<()> {
                 ri = (ri + 1) % l;
                 continue;
             }
-            field[vi] = divk(fs, total_w);
+            field[vi] = normalize(fs);
         }
 
         field
@@ -284,7 +302,7 @@ fn main() -> std::io::Result<()> {
             .unwrap();
         m.v = new_bary.iter().map(|b| b.eval(&m.v)).collect();
         field = new_bary.iter().map(|b| b.eval(&field)).collect();
-        vn = new_bary.iter().map(|b| b.eval(&vn)).collect();
+        vn = new_bary.iter().map(|b| normalize(b.eval(&vn))).collect();
     }
     if subdivs != 0 {
         println!(
@@ -314,7 +332,7 @@ fn main() -> std::io::Result<()> {
         let (v, c, f) = pars3d::visualization::arrows(
             &m.v,
             &field,
-            0.005,
+            0.1,
             Some([[1., 0.86, 0.], [0.25, 0.05, 0.05]]),
         );
         let f = f
@@ -330,6 +348,6 @@ fn main() -> std::io::Result<()> {
     m.v = new_v;
     m.f = new_f;
 
-    //m.denormalize(s, t);
+    m.denormalize(s, t);
     save(dst, &m.into_scene())
 }

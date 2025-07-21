@@ -604,7 +604,7 @@ impl Mesh {
     /// Strips all non-geometry attributes from this mesh, leaving only the geometry.
     /// Note that vertices at bitwise identical positions will be unified.
     /// The face order will be preserved exactly with the input mesh.
-    pub fn geometry_only(&mut self) {
+    pub fn geometry_only(&mut self) -> HashMap<[U; 3], usize> {
         let v = std::mem::take(&mut self.v);
 
         let mut new_v = vec![];
@@ -637,7 +637,9 @@ impl Mesh {
             face_mesh_idx: std::mem::take(&mut self.face_mesh_idx),
             face_mat_idx: std::mem::take(&mut self.face_mat_idx),
             ..Default::default()
-        }
+        };
+
+        new_map
     }
 
     pub fn clear_vertex_normals(&mut self) {
