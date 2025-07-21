@@ -511,7 +511,16 @@ pub fn parse_mtl(p: impl AsRef<Path>, idx: usize) -> io::Result<Vec<(String, MTL
         match kind.as_str() {
             ht if ht.starts_with('#') => continue,
             "kd" | "ks" | "ka" | "ke" | "tf" => match [iter.next(), iter.next(), iter.next()] {
-                [None, _, _] | [_, None, _] | [_, _, None] => panic!("Unsupported {kind} {l}"),
+                [Some(v), None, None] => {
+                    *match kind.as_str() {
+                        "kd" => &mut curr_mtl.kd,
+                        "ks" => &mut curr_mtl.ks,
+                        "ka" => &mut curr_mtl.ka,
+                        "ke" => &mut curr_mtl.ke,
+                        "tf" => continue,
+                        _ => unreachable!(),
+                    } = [pf(v); 3];
+                }
                 [Some(r), Some(g), Some(b)] => {
                     *match kind.as_str() {
                         "kd" => &mut curr_mtl.kd,
@@ -522,6 +531,7 @@ pub fn parse_mtl(p: impl AsRef<Path>, idx: usize) -> io::Result<Vec<(String, MTL
                         _ => unreachable!(),
                     } = [pf(r), pf(g), pf(b)];
                 }
+                [None, _, _] | [_, None, _] | [_, _, None] => panic!("Unsupported {kind} {l}"),
             },
             "map_kd" | "map_ka" | "map_ke" | "map_ks" | "disp" | "bump_normal" | "map_normal"
             | "bump" | "map_bump" | "map_ao" | "map_ns" | "refl" | "map_d" | "map_Pr"
