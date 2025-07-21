@@ -305,7 +305,7 @@ pub fn instant_mesh(
     let _num_del = gp::delete_non_manifold_duplicates(&mut out_faces);
     println!("{_num_del}");
 
-    let vv_adj = crate::adjacency::vertex_vertex_adj(pos_field.len(), &mut out_faces);
+    let vv_adj = crate::adjacency::vertex_vertex_adj(pos_field.len(), &out_faces);
 
     for (vi, _) in c.vertices() {
         if bd_verts.contains(&vi) {

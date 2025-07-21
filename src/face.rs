@@ -315,9 +315,9 @@ impl FaceKind {
                 .0;
             self.as_mut_slice().rotate_left(min_idx);
         }
-        *self = match self.as_slice() {
-            &[a, b, c] => Self::Tri([a, b, c]),
-            &[a, b, c, d] => Self::Quad([a, b, c, d]),
+        *self = match *self.as_slice() {
+            [a, b, c] => Self::Tri([a, b, c]),
+            [a, b, c, d] => Self::Quad([a, b, c, d]),
             _ => return false,
         };
         false
@@ -361,7 +361,7 @@ impl FaceKind {
     pub fn offset(&mut self, o: i32) {
         for v in self.as_mut_slice() {
             if o < 0 {
-                *v -= o.abs() as usize;
+                *v -= o.unsigned_abs() as usize;
             } else {
                 *v += o as usize;
             }

@@ -196,13 +196,12 @@ pub fn greedy_face_coloring<'a>(
     for &g in &uniq_groups {
         let nbrs = group_adj(g);
         let color = (0..)
-            .filter(|&v| {
+            .find(|&v| {
                 nbrs.iter()
                     .copied()
                     .filter(|nbr| uniq_unord[nbr] < uniq_unord[&g])
                     .all(|nbr| coloring[uniq_unord[&nbr]] != v)
             })
-            .next()
             .unwrap();
         coloring.push(color);
     }

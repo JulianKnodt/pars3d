@@ -231,15 +231,15 @@ impl From<FBXMesh> for (Mesh, Vec<usize>) {
             let mut new_f = FaceKind::empty();
             for (o, &vi) in f.as_slice().iter().enumerate() {
                 let key = key_i!(offset + o, vi);
-                if !verts.contains_key(&key) {
+                verts.entry(key).or_insert_with(|| {
                     new_v.push(v[vi]);
                     new_uv.extend(uv.v(offset + o, vi).into_iter());
                     new_n.extend(n.v(offset + o, vi).into_iter());
 
                     // store remapped vertex index
                     remapping.push(vi);
-                    verts.insert(key, new_v.len() - 1);
-                }
+                    new_v.len() - 1
+                });
                 new_f.insert(verts[&key]);
             }
             new_fs.push(new_f);

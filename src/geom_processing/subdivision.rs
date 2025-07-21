@@ -95,11 +95,11 @@ fn add_triples(
 pub fn loop_subdivision(ts: &[[usize; 3]]) -> (Vec<BarycentricRepr>, Vec<[usize; 3]>) {
     let nv = ts
         .iter()
-        .flat_map(|t| t.into_iter().copied().map(|vi| vi + 1))
+        .flat_map(|t| t.iter().copied().map(|vi| vi + 1))
         .max()
         .unwrap_or(0);
     let mut out_vs = vec![];
-    out_vs.extend((0..nv).map(|vi| BarycentricRepr::Vertex(vi)));
+    out_vs.extend((0..nv).map(BarycentricRepr::Vertex));
     let mut out_ts = vec![];
 
     let mut edge_tri_map = BTreeMap::new();

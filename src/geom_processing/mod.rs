@@ -112,14 +112,14 @@ pub fn vertex_normals(
     dst.resize(vs.len(), [0.; 3]);
     dst.fill([0.; 3]);
     for f in fs {
-        let normal = f.normal(&vs);
+        let normal = f.normal(vs);
         if length(normal) == 0. {
             continue;
         }
         let normal = normalize(normal);
         let area = match kind {
             VertexNormalWeightingKind::Uniform => 1.,
-            VertexNormalWeightingKind::Area => f.area(&vs),
+            VertexNormalWeightingKind::Area => f.area(vs),
         };
         for &vi in f.as_slice() {
             dst[vi] = add(dst[vi], kmul(area, normal));

@@ -162,7 +162,7 @@ impl<T, UF: UnionFindOp> Collapsible<T, UF> {
         self.vertices.union(src, dst);
 
         let [data_dst, data_src] = unsafe { self.data.get_disjoint_unchecked_mut([src, dst]) };
-        let new_data = merge(&data_dst, &data_src);
+        let new_data = merge(data_dst, data_src);
         *data_src = new_data.clone();
         *data_dst = new_data;
         // data_src should no longer be accessed

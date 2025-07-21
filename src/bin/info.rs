@@ -16,7 +16,7 @@ fn main() -> std::io::Result<()> {
         } else if dst_json.is_none() {
             dst_json = Some(v)
         } else {
-          help!();
+            help!();
         };
     }
     let Some(src) = src else {

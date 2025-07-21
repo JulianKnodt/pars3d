@@ -17,11 +17,10 @@ impl FBXScene {
 
         //let samplers =
 
-        let anim = Animation {
+        Animation {
             name: a_l.name.clone(),
             ..Default::default()
-        };
-        anim
+        }
     }
 
     pub fn channel_for_anim_curve_node(&self, a_cn_idx: usize) -> Channel {

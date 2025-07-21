@@ -126,7 +126,7 @@ pub fn trace_curve<'a>(
             .filter(|v| v.is_finite())
             // only allow forward direction (w/ some eps so can't intersect repeat edge)
             .filter(|&v| v > 1e-5)
-            .min_by(|a, b| a.partial_cmp(&b).unwrap());
+            .min_by(|a, b| a.partial_cmp(b).unwrap());
         let Some(nearest) = nearest else {
             if did_flip {
                 return (vec![], vec![], vec![]);
