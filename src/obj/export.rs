@@ -26,7 +26,7 @@ fn write_mtls(
         use std::fs::exists;
         let mtl_path = match mtl_output_kind {
             OutputKind::None => continue,
-            OutputKind::ReuseAbsolute if exists(&path).unwrap_or(false) => {
+            OutputKind::ReuseAbsolute if exists(path).unwrap_or(false) => {
                 if path.is_absolute() {
                     out.push(PathBuf::from(&path));
                     continue;
@@ -34,7 +34,7 @@ fn write_mtls(
                 out.push(path.canonicalize()?);
                 continue;
             }
-            OutputKind::ReuseRelative if exists(&path).unwrap_or(false) => {
+            OutputKind::ReuseRelative if exists(path).unwrap_or(false) => {
                 // if original path was absolute don't switch to relative.
                 if path.is_absolute() {
                     out.push(PathBuf::from(&path));

@@ -162,7 +162,7 @@ impl Mesh {
             let new_nfs = self.f.len();
 
             self.face_mesh_idx
-                .extend((curr_nfs..new_nfs).map(|_| mesh_idx).flatten());
+                .extend((curr_nfs..new_nfs).filter_map(|_| mesh_idx));
 
             if let Some(mi) = mat_idx {
                 let last_range = self.face_mat_idx.last_mut().unwrap();
@@ -443,7 +443,7 @@ impl Mesh {
                     continue;
                 }
                 let cnt = edges.entry(e).or_insert(0);
-                *cnt = *cnt + 1u32;
+                *cnt *= 1u32;
             }
         }
         let mut num_bd = 0;
@@ -467,7 +467,7 @@ impl Mesh {
             for e in f.edges_ord() {
                 let [e0, e1] = e.map(|vi| self.v[vi].map(F::to_bits));
                 let cnt = edges.entry(std::cmp::minmax(e0, e1)).or_default();
-                *cnt = *cnt + 1u32;
+                *cnt += 1u32;
             }
         }
         let mut num_bd = 0;
@@ -629,7 +629,7 @@ impl Scene {
 fn cumulative_sum<'a>(vs: impl Iterator<Item = &'a mut F>) {
     let mut agg = 0.;
     for v in vs {
-        *v = *v + agg;
+        *v += agg;
         agg = *v;
     }
 }

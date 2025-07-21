@@ -202,6 +202,8 @@ pub fn add<const N: usize>(a: [F; N], b: [F; N]) -> [F; N] {
     std::array::from_fn(|i| a[i] + b[i])
 }
 
+/// Linear interpolate a value of `t` between start (s) and end (e).
+#[inline]
 pub(crate) fn lerp<const N: usize>(t: F, s: [F; N], e: [F; N]) -> [F; N] {
     add(kmul(1. - t, s), kmul(t, e))
 }
@@ -250,7 +252,7 @@ pub fn length<const N: usize>(v: [F; N]) -> F {
 #[inline]
 pub fn normalize<const N: usize>(v: [F; N]) -> [F; N] {
     let sum: F = v.iter().map(|v| v * v).sum();
-    if sum < 1e-20 {
+    if sum == 0. {
         return [0.; N];
     }
     let s = sum.sqrt();

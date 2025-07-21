@@ -144,7 +144,7 @@ impl FaceKind {
         match self {
             Self::Tri(t) => FaceKind::Tri(t.map(f)),
             Self::Quad(q) => FaceKind::Quad(q.map(f)),
-            Self::Poly(p) => FaceKind::Poly(p.into_iter().map(|&v| f(v)).collect()),
+            Self::Poly(p) => FaceKind::Poly(p.iter().map(|&v| f(v)).collect()),
         }
     }
     pub fn from_iter(mut it: impl Iterator<Item = usize>) -> Self {
@@ -240,7 +240,7 @@ impl FaceKind {
             Tri([a, b, c]) if a == b || b == c || a == c => true,
             Tri(_) => false,
             &Quad([a, b, c, d] | [d, a, b, c] | [c, d, a, b] | [b, c, d, a]) if a == b => {
-                return Self::Tri([a, c, d]).is_degenerate();
+                Self::Tri([a, c, d]).is_degenerate()
             }
             &Quad([a, _, c, _] | [_, a, _, c]) if a == c => true,
             Quad(_) => false,
@@ -361,9 +361,9 @@ impl FaceKind {
     pub fn offset(&mut self, o: i32) {
         for v in self.as_mut_slice() {
             if o < 0 {
-                *v = *v - (o.abs() as usize);
+                *v -= o.abs() as usize;
             } else {
-                *v = *v + o as usize;
+                *v += o as usize;
             }
         }
     }

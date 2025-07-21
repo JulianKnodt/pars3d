@@ -14,30 +14,30 @@ pub enum ScalarFn<const N: usize> {
 impl<const N: usize> ScalarFn<N> {
     pub fn start(&self) -> [F; N] {
         use ScalarFn::*;
-        match self {
-            &Constant(c) => c,
-            &Linear(s, _) => s,
+        match *self {
+            Constant(c) => c,
+            Linear(s, _) => s,
         }
     }
     pub fn end(&self) -> [F; N] {
         use ScalarFn::*;
-        match self {
-            &Constant(c) => c,
-            &Linear(_, e) => e,
+        match *self {
+            Constant(c) => c,
+            Linear(_, e) => e,
         }
     }
     pub fn lerp(&self, t: F) -> [F; N] {
         use ScalarFn::*;
-        match self {
-            &Constant(c) => c,
-            &Linear(s, e) => add(kmul(1. - t, s), kmul(t, e)),
+        match *self {
+            Constant(c) => c,
+            Linear(s, e) => add(kmul(1. - t, s), kmul(t, e)),
         }
     }
     pub fn split(&self) -> [Self; 2] {
         use ScalarFn::*;
-        match self {
-            &Constant(c) => [Constant(c); 2],
-            &Linear(s, e) => {
+        match *self {
+            Constant(c) => [Constant(c); 2],
+            Linear(s, e) => {
                 let mid = self.lerp(0.5);
                 [Linear(s, mid), Linear(mid, e)]
             }
@@ -45,9 +45,9 @@ impl<const N: usize> ScalarFn<N> {
     }
     pub fn reverse(&self) -> Self {
         use ScalarFn::*;
-        match self {
-            &Constant(c) => Constant(c),
-            &Linear(s, e) => Linear(e, s),
+        match *self {
+            Constant(c) => Constant(c),
+            Linear(s, e) => Linear(e, s),
         }
     }
 }

@@ -193,7 +193,7 @@ fn main() -> std::io::Result<()> {
     }
 
     for &n in vn.iter() {
-      assert_ne!(pars3d::length(n), 0.);
+        assert_ne!(pars3d::length(n), 0.);
     }
 
     let mut field = if !field_file.is_empty() {

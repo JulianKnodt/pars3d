@@ -169,7 +169,7 @@ pub fn trace_curve<'a>(
         let min_bary = edge_bary
             .iter()
             .enumerate()
-            .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+            .min_by(|a, b| a.1.partial_cmp(b.1).unwrap())
             .unwrap()
             .0;
         let opp_e = match min_bary {
@@ -183,10 +183,7 @@ pub fn trace_curve<'a>(
         // TODO test if it's an internal edge of a face, then need to have some different
         // operation?
 
-        let opp_f = edge_adj(opp_e)
-            .into_iter()
-            .copied()
-            .find(|&v| v != curr_face);
+        let opp_f = edge_adj(opp_e).iter().copied().find(|&v| v != curr_face);
         // for now break until hit a boundary
         let Some(opp_f) = opp_f else {
             //break;
@@ -211,8 +208,8 @@ pub fn trace_curve<'a>(
             return (vec![], vec![], vec![]);
         }
         assert_ne!(new_world_dir, [0., 0., 0.]);
-        let curr_n = FaceKind::Tri(tri).normal(&vs);
-        let new_n = FaceKind::Tri(new_tri).normal(&vs);
+        let curr_n = FaceKind::Tri(tri).normal(vs);
+        let new_n = FaceKind::Tri(new_tri).normal(vs);
         let new_world_dir = normalize(quat_rot(new_world_dir, quat_from_to(curr_n, new_n)));
         curr_dir = dir_to_barycentric(new_world_dir, new_tri.map(|vi| vs[vi]));
         if curve.bend_amt != 0. {

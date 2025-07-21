@@ -327,7 +327,10 @@ pub fn parse(p: impl AsRef<Path>, split_by_object: bool, split_by_group: bool) -
                 [Some(x), Some(y), Some(z)] => {
                     curr_obj.v.push([x, y, z].map(pf));
                     match std::array::from_fn(|_| iter.next()) {
-                        [Some(r), Some(g), Some(b)] => {
+                        [Some(r), Some(g), Some(b), None] => {
+                            curr_obj.vc.push([r, g, b].map(pf));
+                        }
+                        [Some(r), Some(g), Some(b), Some(_a)] => {
                             curr_obj.vc.push([r, g, b].map(pf));
                         }
                         _ => {}
@@ -752,15 +755,15 @@ impl ObjObject {
             }
             assert_ne!(f.v.len(), 1);
             assert_ne!(f.v.len(), 2);
-            if let Some(&(_, mat_idx)) = self.mat.iter().find(|(r, _)| r.contains(&fi)) {
-                if Some(mat_idx) != curr_mat {
-                    let mtl_name = mtl_names
-                        .get(mat_idx)
-                        .map(|m| m.0.clone())
-                        .unwrap_or_else(|| format!("default_mat{mat_idx}"));
-                    writeln!(dst, "usemtl {mtl_name}")?;
-                    curr_mat = Some(mat_idx);
-                }
+            if let Some(&(_, mat_idx)) = self.mat.iter().find(|(r, _)| r.contains(&fi))
+                && Some(mat_idx) != curr_mat
+            {
+                let mtl_name = mtl_names
+                    .get(mat_idx)
+                    .map(|m| m.0.clone())
+                    .unwrap_or_else(|| format!("default_mat{mat_idx}"));
+                writeln!(dst, "usemtl {mtl_name}")?;
+                curr_mat = Some(mat_idx);
             }
 
             dst.write_all(b"f ")?;

@@ -133,10 +133,10 @@ pub fn instant_mesh(
         #[cfg(feature = "rand")]
         order.shuffle(&mut rng);
         for &vi in &order {
-            let o = orient_field[vi];
-            let mut p = pos_field[vi];
-            let n = vn[vi];
-            let vert = v[vi];
+            let o = unsafe { *orient_field.get_unchecked(vi) };
+            let mut p = unsafe { *pos_field.get_unchecked(vi) };
+            let n = unsafe { *vn.get_unchecked(vi) };
+            let vert = unsafe { *v.get_unchecked(vi) };
             let mut w_sum = 0.;
             #[cfg(feature = "rand")]
             vv_adj.adj_mut(vi).shuffle(&mut rng);
@@ -145,16 +145,17 @@ pub fn instant_mesh(
                     continue;
                 }
                 let adj_vi = adj_vi as usize;
+                debug_assert_ne!(vn[adj_vi], [0.; 3]);
                 let (p_compat, _err) = compat_pos_extrinsic_4(
                     o,
                     p,
                     n,
                     vert,
                     //
-                    orient_field[adj_vi],
-                    pos_field[adj_vi],
-                    vn[adj_vi],
-                    v[adj_vi],
+                    unsafe { *orient_field.get_unchecked(adj_vi) },
+                    unsafe { *pos_field.get_unchecked(adj_vi) },
+                    unsafe { *vn.get_unchecked(adj_vi) },
+                    unsafe { *v.get_unchecked(adj_vi) },
                     //
                     args.scale,
                 );
@@ -167,7 +168,8 @@ pub fn instant_mesh(
 
                 debug_assert!(p.into_iter().all(F::is_finite));
             }
-            pos_field[vi] = lattice_op(p, o, n, vert, args.scale, RoundMode::Round);
+            *unsafe { pos_field.get_unchecked_mut(vi) } =
+                lattice_op(p, o, n, vert, args.scale, RoundMode::Round);
             debug_assert!(pos_field[vi].into_iter().all(F::is_finite));
 
             if bd_verts.contains(&vi) {
@@ -467,6 +469,7 @@ pub enum RoundMode {
 }
 
 impl RoundMode {
+    #[inline]
     pub fn apply(self, f: F) -> F {
         match self {
             RoundMode::Round => f.round(),

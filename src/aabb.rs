@@ -146,7 +146,7 @@ impl AABB<F, 2> {
             }
 
             for adj in [t[(i + 2) % 3], t[(i + 1) % 3]] {
-                for _ in self.line_segment_isect([p, adj]) {
+                if self.line_segment_isect([p, adj]).next().is_some() {
                     return true;
                 }
             }
@@ -167,7 +167,7 @@ impl AABB<F, 2> {
         }
         impl PartialOrd for OrdFloat {
             fn partial_cmp(&self, o: &Self) -> Option<std::cmp::Ordering> {
-                Some(self.cmp(&o))
+                Some(self.cmp(o))
             }
         }
         poly.clear();

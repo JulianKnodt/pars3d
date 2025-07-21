@@ -107,9 +107,9 @@ impl OFF {
             };
             write!(dst, "{} ", fs.len())?;
             for r in rest {
-                write!(dst, "{} ", r)?;
+                write!(dst, "{r} ")?;
             }
-            writeln!(dst, "{}", last)?;
+            writeln!(dst, "{last}")?;
         }
         Ok(())
     }

@@ -144,7 +144,7 @@ impl<D> Adj<D> {
 
         let mut per_vert_weights = vec![0.; v.len()];
         for f in f.iter() {
-            if f.len() == 0 {
+            if f.is_empty() {
                 continue;
             }
             let mut total_area = 0.;
@@ -278,6 +278,7 @@ impl<D> Adj<D> {
         }
     }
 
+    #[inline]
     pub fn adj_data(&self, v: usize) -> impl Iterator<Item = (u32, D)> + '_
     where
         D: Copy,
@@ -366,7 +367,7 @@ impl<D> Adj<D> {
             }
         }
         assert_ne!(best, F::NEG_INFINITY);
-        return (best_vi, best);
+        (best_vi, best)
     }
 
     /// Returns all pairs of edges once, such that e0 < e1
@@ -434,7 +435,7 @@ impl<D> Adj<D> {
         let mut out = vec![u32::MAX; self.idx_count.len()];
         let mut curr = 0;
         while let Some(fst) = unseen.pop_first() {
-            out[fst as usize] = curr;
+            out[fst] = curr;
             let mut stack = self.adj(fst).to_vec();
             while let Some(next) = stack.pop() {
                 if !unseen.remove(&(next as usize)) {

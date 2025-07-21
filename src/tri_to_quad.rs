@@ -240,7 +240,7 @@ pub fn dissolve_edges(faces: &mut Vec<FaceKind>, es: &[[usize; 2]]) -> usize {
         while tri_a[0] != corner_a {
             tri_a.rotate_left(1);
         }
-        if tri_a.iter().any(|&v| v == corner_b) {
+        if tri_a.contains(&corner_b) {
             // would introduce a singlet
             continue;
         }
