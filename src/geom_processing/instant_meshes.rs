@@ -66,6 +66,7 @@ pub fn instant_mesh(
 
     #[allow(unused_mut)]
     let mut vv_adj = crate::adjacency::vertex_vertex_adj(nv, f).laplacian(f, v);
+    //.uniform();
 
     let bd_verts = if args.dirichlet_boundary {
         gp::boundary_vertices(f).collect::<BTreeSet<_>>()
@@ -111,7 +112,9 @@ pub fn instant_mesh(
                 o = normalize(o);
                 w_sum += w;
             }
+            debug_assert!(o.into_iter().all(F::is_finite));
             orient_field[vi] = o;
+            assert!((crate::length(o) - 1.).abs() < 1e-3);
         }
     }
     // make const
@@ -138,6 +141,9 @@ pub fn instant_mesh(
             #[cfg(feature = "rand")]
             vv_adj.adj_mut(vi).shuffle(&mut rng);
             for (adj_vi, w) in vv_adj.adj_data(vi) {
+                if w == 0. {
+                    continue;
+                }
                 let adj_vi = adj_vi as usize;
                 let (p_compat, _err) = compat_pos_extrinsic_4(
                     o,
@@ -153,13 +159,19 @@ pub fn instant_mesh(
                     args.scale,
                 );
                 p = add(kmul(w_sum, p_compat[0]), kmul(w, p_compat[1]));
-                p = sub(p, kmul(dot(n, sub(p, vert)), n));
                 w_sum += w;
-                p = divk(p, w_sum);
+                if w_sum != 0. {
+                    p = divk(p, w_sum);
+                }
+                p = sub(p, kmul(dot(n, sub(p, vert)), n));
+
+                debug_assert!(p.into_iter().all(F::is_finite));
             }
             pos_field[vi] = lattice_op(p, o, n, vert, args.scale, RoundMode::Round);
+            debug_assert!(pos_field[vi].into_iter().all(F::is_finite));
 
             if bd_verts.contains(&vi) {
+                assert!(false);
                 let p = pos_field[vi];
                 let nearest_pt = bd_edges
                     .iter()
@@ -171,7 +183,9 @@ pub fn instant_mesh(
                     })
                     .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
                     .unwrap();
+                debug_assert!(nearest_pt.0.into_iter().all(F::is_finite));
                 pos_field[vi] = lerp(t, p, nearest_pt.0);
+                debug_assert!(pos_field[vi].into_iter().all(F::is_finite));
             }
         }
     }
@@ -379,7 +393,15 @@ fn compat_pos_extrinsic_4(
             let term1 = add(p1, kmul(scale, add(cond(a1, o1), cond(b1, t1))));
             (term0, term1, dist_sq(term0, term1))
         })
-        .inspect(|v| assert!(v.2.is_finite(), "{v:?} {o1:?} {p1:?} {n1:?} {v1:?}"))
+        .inspect(|v| {
+            assert!(
+                v.2.is_finite(),
+                r#"{v:?}
+          {o0:?} {p0:?} {n0:?} {v0:?}
+          {o1:?} {p1:?} {n1:?} {v1:?}
+          "#
+            )
+        })
         .min_by(|a, b| a.2.partial_cmp(&b.2).unwrap())
         .unwrap();
     ([term0, term1], err)
@@ -479,6 +501,16 @@ def lattice_op(p, o, n, target, scale, op = np.floor):
 */
 
 fn intermediate_pos(p0: [F; 3], n0: [F; 3], p1: [F; 3], n1: [F; 3]) -> [F; 3] {
+    assert!(
+        (crate::length(n0) - 1.).abs() < 1e-3,
+        "{}",
+        crate::length(n0)
+    );
+    assert!(
+        (crate::length(n1) - 1.).abs() < 1e-3,
+        "{}",
+        crate::length(n1)
+    );
     let n0p0 = dot(n0, p0);
     let n1p0 = dot(n1, p0);
     let n0p1 = dot(n0, p1);
