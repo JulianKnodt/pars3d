@@ -185,3 +185,77 @@ fn test_append_json() {
     append_json(&mut v, 2, "other", "derp");
     assert_eq!(v, "{\n  \"test\": 2,\n  \"other\": \"derp\"\n}");
 }
+
+/// Parses arguments from a command line application.
+/// Used for building CLI applications for pars3d.
+#[macro_export]
+macro_rules! parse_args {
+  ($( $StateName: ident ( $($flags: expr),+ ) => $field: ident : $t: ty = $def: expr $( => $auto:expr )?, )+) => {{
+    #[derive(Debug)]
+    struct Args {
+      $(pub $field: $t,)+
+    }
+    impl Default for Args {
+      fn default() -> Self {
+        Self {
+          $($field: $def,)+
+        }
+      }
+    }
+
+    #[derive(PartialEq, Eq, Clone, Copy, Debug)]
+    pub enum State {
+      Empty,
+      $($StateName,)+
+    }
+
+    macro_rules! help {
+      ($err: tt) => {{
+        eprintln!("[ERROR]: {}", format!($err));
+        help!();
+      }};
+      () => {{
+        return Ok(());
+      }}
+    }
+
+    let mut args = Args::default();
+    let mut state = State::Empty;
+
+    for v in std::env::args().skip(1) {
+      match v.as_str() {
+        "-h" | "--help" => help!(),
+        $($($flags)+ => {
+          if state != State::Empty {
+            help!("Expected {state:?}");
+          }
+          $(if true {
+            args.$field = $auto;
+            continue;
+          })?
+          state = State::$StateName;
+          continue;
+        },)+
+        v if v.starts_with("-") => help!("Unknown flag {v}"),
+        _ => {}
+      }
+
+      match state {
+        $(State::$StateName => {
+          args.$field = match v.parse::<$t>() {
+            Ok(s) => s,
+            Err(e) => help!("Failed to parse ({v:?}), err {e:?}"),
+          };
+          state = State::Empty;
+        })+
+        State::Empty => help!("No positional arguments supported"),
+      }
+    }
+
+    if state != State::Empty {
+      help!("Expecting parameter for {state:?}, but did not get any value");
+    }
+
+    args
+  }}
+}
