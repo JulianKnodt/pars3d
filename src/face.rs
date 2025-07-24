@@ -13,6 +13,18 @@ pub enum FaceKind<T = usize> {
     Poly(Vec<T>),
 }
 
+// TODO shrink this to 32 or smaller
+const _: () = assert!(
+    std::mem::size_of::<FaceKind<usize>>() == 40,
+    "Size of FaceKind is too large",
+);
+
+// TODO shrink this to 16 or smaller
+const _: () = assert!(
+    std::mem::size_of::<FaceKind<u32>>() == 24,
+    "Size of FaceKind is too large",
+);
+
 impl<T> FaceKind<T> {
     pub fn as_slice(&self) -> &[T] {
         use FaceKind::*;
