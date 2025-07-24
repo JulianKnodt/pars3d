@@ -190,14 +190,17 @@ pub fn save(v: impl AsRef<Path>, scene: &mesh::Scene) -> std::io::Result<()> {
     }
 }
 
+#[inline]
 pub fn kmul<const N: usize>(k: F, v: [F; N]) -> [F; N] {
     v.map(|v| v * k)
 }
 
+#[inline]
 pub fn divk<const N: usize>(v: [F; N], k: F) -> [F; N] {
     v.map(|v| v / k)
 }
 
+#[inline]
 pub fn add<const N: usize>(a: [F; N], b: [F; N]) -> [F; N] {
     std::array::from_fn(|i| a[i] + b[i])
 }
@@ -208,7 +211,8 @@ pub(crate) fn lerp<const N: usize>(t: F, s: [F; N], e: [F; N]) -> [F; N] {
     add(kmul(1. - t, s), kmul(t, e))
 }
 
-pub(crate) fn sub<const N: usize>(a: [F; N], b: [F; N]) -> [F; N] {
+#[inline]
+pub fn sub<const N: usize>(a: [F; N], b: [F; N]) -> [F; N] {
     std::array::from_fn(|i| a[i] - b[i])
 }
 
@@ -259,12 +263,9 @@ pub fn normalize<const N: usize>(v: [F; N]) -> [F; N] {
     v.map(|v| v / s)
 }
 
-pub(crate) fn dot<const N: usize>(a: [F; N], b: [F; N]) -> F {
-    let mut out = 0.;
-    for i in 0..N {
-        out += a[i] * b[i];
-    }
-    out
+#[inline]
+pub fn dot<const N: usize>(a: [F; N], b: [F; N]) -> F {
+    (0..N).map(|i| a[i] * b[i]).sum::<F>()
 }
 
 pub(crate) fn append_one([a, b, c]: [F; 3]) -> [F; 4] {
