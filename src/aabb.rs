@@ -31,6 +31,9 @@ impl<const N: usize> AABB<F, N> {
     pub fn diag(&self) -> [F; N] {
         sub(self.max, self.min)
     }
+    pub fn center(&self) -> [F; N] {
+        add(self.min, kmul(0.5, self.diag()))
+    }
     pub fn from_slice(ps: &[[F; N]]) -> Self {
         let mut s = Self::new();
         for &p in ps {
