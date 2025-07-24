@@ -5,7 +5,7 @@ fn main() {
 
 #[cfg(feature = "rand")]
 fn main() -> std::io::Result<()> {
-    use pars3d::{F, add, cross, divk, kmul, load, normalize, save};
+    use pars3d::{F, add, cross, dist, dot, kmul, load, normalize, save, sub};
     use std::io::{BufRead, BufReader};
 
     let mut scale = 0.02;
@@ -14,6 +14,8 @@ fn main() -> std::io::Result<()> {
     let mut save_arrows = String::new();
     let mut save_grid = String::new();
     let mut rotate_90 = false;
+    let mut use_color_field = false;
+    let mut orient_iters = 100;
     macro_rules! help {
         ($( $err: tt )?) => {{
             $(eprintln!("[ERROR]: {}", format!($err));)*
@@ -27,7 +29,9 @@ fn main() -> std::io::Result<()> {
               [--save-arrows <DST> = None]"
               [--save-grid <DST> = None]
               [--stats <DST> = None]
-              [--rotate-90 = false]"#);
+              [--rotate-90 = false]
+              [--color-field = false]
+              [--orient-iters <INT> = {orient_iters}]"#);
             return Ok(());
         }};
     }
@@ -43,6 +47,7 @@ fn main() -> std::io::Result<()> {
         Input,
         Output,
         Stats,
+        OrientIters,
     }
 
     let mut state = State::Empty;
@@ -87,6 +92,14 @@ fn main() -> std::io::Result<()> {
                 rotate_90 = true;
                 continue;
             }
+            "--color-field" => {
+                use_color_field = true;
+                continue;
+            }
+            "--orient-iters" => {
+                state = State::OrientIters;
+                continue;
+            }
             v if v.starts_with('-') => help!("Unknown flag {v}"),
             _ => {}
         };
@@ -101,6 +114,12 @@ fn main() -> std::io::Result<()> {
                 subdivs = match v.parse::<usize>() {
                     Ok(s) => s,
                     Err(e) => help!("Failed to parse subdivs ({v:?}) as usize, err: {e}"),
+                };
+            }
+            State::OrientIters => {
+                orient_iters = match v.parse::<usize>() {
+                    Ok(s) => s,
+                    Err(e) => help!("Failed to parse orient iters ({v:?}) as usize, err: {e}"),
                 };
             }
             State::Field => {
@@ -145,16 +164,42 @@ fn main() -> std::io::Result<()> {
 
     let scene = load(&src).expect("Failed to load input scene");
     let mut m = scene.into_flattened_mesh();
+
+    let mut color_field = if use_color_field {
+        vec![[0.; 3]; m.v.len()]
+    } else {
+        vec![]
+    };
+    for f in m.f.iter() {
+        if !use_color_field {
+            break;
+        }
+        for vis @ [vi0, vi1] in f.all_pairs_ord() {
+            let [c0, c1] = vis.map(|vi| m.vert_colors[vi]);
+            let [p0, p1] = vis.map(|vi| m.v[vi]);
+
+            fn luma(rgb: [F; 3]) -> F {
+                dot(rgb, [0.299, 0.587, 0.114])
+            }
+            let delta = (luma(c0) - luma(c1)).abs() / dist(p0, p1).max(1e-5);
+            let e = kmul(delta, sub(p0, p1));
+            color_field[vi0] = add(color_field[vi0], e);
+            color_field[vi1] = add(color_field[vi1], e.map(core::ops::Neg::neg));
+        }
+    }
+
     let og_verts = m.v.clone();
     let new_vert_map = m.geometry_only();
-    m.triangulate();
-    m.f.retain_mut(|f| !f.canonicalize());
+    /*
     for v in &mut m.v {
         v.swap(0, 2);
         v[2] = -v[2];
         v[0] = -v[0];
     }
+    */
     let (s, t) = m.normalize();
+    m.triangulate();
+    m.f.retain_mut(|f| !f.canonicalize());
 
     let mut vn = vec![];
     pars3d::geom_processing::vertex_normals(&m.f, &m.v, &mut vn, Default::default());
@@ -165,7 +210,7 @@ fn main() -> std::io::Result<()> {
         .map(|i_n| i_n.0)
         .collect::<Vec<_>>();
 
-    let vv_adj = m.vertex_vertex_adj().uniform();
+    let vv_adj = m.vertex_vertex_adj().laplacian(&m.f, &m.v);
     let mut ri = 0;
     assert_ne!(zero_normals.len(), m.v.len());
 
@@ -192,11 +237,24 @@ fn main() -> std::io::Result<()> {
         vn[vi] = normalize(ns);
     }
 
-    for &n in vn.iter() {
-        assert_ne!(pars3d::length(n), 0.);
-    }
-
-    let mut field = if !field_file.is_empty() {
+    let mut field = if use_color_field {
+        if !field_file.is_empty() {
+            eprintln!("Please specify only one of `--color-field` or `--field`.");
+            return Ok(());
+        }
+        m.copy_attribs(&og_verts, new_vert_map, &color_field)
+        /*
+        let avg = new_field.iter().copied().map(pars3d::length).sum::<F>() / new_field.len() as F;
+        let mut total_reset = 0;
+        for v in new_field.iter_mut() {
+          if pars3d::length(*v) < 1.5 * avg {
+            *v = normalize(std::array::from_fn(|_| rand::random()));
+            total_reset += 1;
+          }
+        }
+        println!("{total_reset}/{}", new_field.len());
+        */
+    } else if !field_file.is_empty() {
         let f = std::fs::File::open(&field_file)?;
         let mut field = vec![];
         for l in BufReader::new(f).lines() {
@@ -218,19 +276,7 @@ fn main() -> std::io::Result<()> {
         }
         // correct if geometry consolidation caused the field to be a different size
         if og_verts.len() != m.v.len() && field.len() == og_verts.len() {
-            let mut new_field = vec![[0.; 3]; m.v.len()];
-            let mut ws = vec![0; m.v.len()];
-            for (vi, v) in og_verts.into_iter().enumerate() {
-                let new_idx = new_vert_map[&v.map(F::to_bits)];
-                let old_field = field[vi];
-                new_field[new_idx] = add(new_field[new_idx], old_field);
-                ws[new_idx] += 1;
-            }
-            for (vi, f) in new_field.iter_mut().enumerate() {
-                assert_ne!(ws[vi], 0);
-                *f = divk(*f, ws[vi] as F);
-            }
-            field = new_field;
+            field = m.copy_attribs(&og_verts, new_vert_map, &field);
         }
 
         if field.len() != m.v.len() {
@@ -325,20 +371,64 @@ fn main() -> std::io::Result<()> {
     }
     //pars3d::save(&"ref.obj", &m.clone().into_scene());
 
+    if !save_arrows.is_empty() {
+        let mut wf = pars3d::Mesh::new_geometry(m.v.clone(), m.f.clone());
+        wf.vert_colors = field
+            .iter()
+            .map(|&d| kmul(0.5, add(d, [1.; 3])))
+            .collect::<Vec<_>>();
+        wf.denormalize(s, t);
+        save(&save_arrows, &wf.into_scene())?;
+    }
+
     use pars3d::geom_processing::instant_meshes as im;
 
     let mut args = im::Args::default();
+    args.s = s;
+    args.t = t;
     args.scale = scale;
-    args.orientation_smoothing_iters = if field_file.is_empty() { 100 } else { 10 };
+    args.dissolve_edges = true;
+    args.orientation_smoothing_iters = orient_iters;
     args.pos_smoothing_iters = 100;
     args.save_grid = save_grid;
-    let (new_v, new_f) = im::instant_mesh(&m.v, &m.f, &vn, &mut field, rand::random, &args);
+
+    args.locked = if use_color_field {
+        let avg = field.iter().copied().map(pars3d::length).sum::<F>() / field.len() as F;
+        let locked = field
+            .iter()
+            .map(|&f| pars3d::length(f) > 2.4 * avg)
+            .collect::<Vec<_>>();
+        for (i, &l) in locked.iter().enumerate() {
+            if l {
+                continue;
+            }
+            field[i] = normalize(std::array::from_fn(|_| rand::random()));
+        }
+        locked
+        //vec![]
+    } else {
+        vec![]
+    };
+    if !args.locked.is_empty() {
+        eprintln!(
+            "[INFO]: Locked {}/{} vertices",
+            args.locked.iter().filter(|v| **v).count(),
+            field.len()
+        );
+    }
+    let (new_v, new_f) = im::instant_mesh(&m.v, &m.f, &vn, &mut field, &args);
 
     if !save_arrows.is_empty() {
+        let mut wf = pars3d::Mesh::new_geometry(m.v, m.f);
+        wf.vert_colors = field
+            .iter()
+            .map(|&d| kmul(0.5, add(d, [1.; 3])))
+            .collect::<Vec<_>>();
+        /*
         let (v, c, f) = pars3d::visualization::arrows(
             &m.v,
             &field,
-            0.1,
+            0.01,
             Some([[1., 0.86, 0.], [0.25, 0.05, 0.05]]),
         );
         let f = f
@@ -347,8 +437,9 @@ fn main() -> std::io::Result<()> {
             .collect::<Vec<_>>();
         let mut wf = pars3d::Mesh::new_geometry(v, f);
         wf.vert_colors = c;
-        //wf.denormalize(s,t);
-        save(save_arrows, &wf.into_scene())?;
+        */
+        wf.denormalize(s, t);
+        save(&save_arrows, &wf.into_scene())?;
     }
 
     m.v = new_v;

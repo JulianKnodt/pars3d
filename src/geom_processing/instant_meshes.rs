@@ -4,7 +4,6 @@
 Based off of Wenzel Jakob's Instant Meshes, Python Version
 */
 
-use crate::aabb::AABB;
 use crate::geom_processing as gp;
 use crate::{F, FaceKind, add, cross, dist, dist_sq, divk, dot, kmul, lerp, normalize, sub};
 use std::collections::BTreeSet;
@@ -20,6 +19,11 @@ pub struct Args {
     // TODO von-neumann boundary condition for orientation field
     /// Where to save edge grid to, empty implies do not save
     pub save_grid: String,
+
+    pub s: F,
+    pub t: [F; 3],
+
+    pub locked: Vec<bool>,
 }
 
 impl Default for Args {
@@ -31,6 +35,9 @@ impl Default for Args {
             dissolve_edges: false,
             dirichlet_boundary: true,
             save_grid: String::new(),
+            s: 1.,
+            t: [0.; 3],
+            locked: vec![],
         }
     }
 }
@@ -39,34 +46,25 @@ pub fn instant_mesh(
     v: &[[F; 3]],
     f: &[FaceKind],
     vn: &[[F; 3]],
-    field: &mut [[F; 3]],
-    mut rand: impl FnMut() -> F,
+    orient_field: &mut [[F; 3]],
 
     args: &Args,
 ) -> (Vec<[F; 3]>, Vec<FaceKind>) {
     if v.is_empty() || f.is_empty() {
         return (vec![], vec![]);
     }
-    assert_eq!(field.len(), v.len());
+    assert_eq!(orient_field.len(), v.len());
     assert_eq!(vn.len(), v.len());
     let nv = v.len();
 
-    let aabb = AABB::from_slice(v);
-    let mut orient_field = vec![[0.; 3]; nv];
-    let mut pos_field = vec![[0.; 3]; nv];
-
-    for (i, &vec) in field.iter().enumerate() {
-        orient_field[i] = normalize(vec);
-    }
-
-    for p in &mut pos_field {
-        let t = rand().fract();
-        *p = lerp(t, aabb.min, aabb.max);
-    }
+    //let mut pos_field = vec![[0.; 3]; nv];
+    let mut pos_field = v.to_vec();
 
     #[allow(unused_mut)]
-    let mut vv_adj = crate::adjacency::vertex_vertex_adj(nv, f).laplacian(f, v);
-    //.uniform();
+    let mut vv_adj = crate::adjacency::vertex_vertex_adj(nv, f)
+        //
+        //.uniform();
+        .laplacian(f, v);
 
     let bd_verts = if args.dirichlet_boundary {
         gp::boundary_vertices(f).collect::<BTreeSet<_>>()
@@ -92,15 +90,22 @@ pub fn instant_mesh(
     use rand::prelude::SliceRandom;
 
     for _it in 0..args.orientation_smoothing_iters {
+        //let t = (_it + 1) as F / args.pos_smoothing_iters as F;
+        //let t = t;
+        println!("orientation: {_it}");
         #[cfg(feature = "rand")]
         order.shuffle(&mut rng);
         for &vi in &order {
+            if args.locked.get(vi).copied() == Some(true) {
+                continue;
+            }
             let mut o = orient_field[vi];
+            //let og_len = crate::length(o);
             let n = vn[vi];
             let mut w_sum = 0.;
+
             #[cfg(feature = "rand")]
             vv_adj.adj_mut(vi).shuffle(&mut rng);
-
             for (adj_vi, w) in vv_adj.adj_data(vi) {
                 assert!(w.is_finite());
                 let adj_vi = adj_vi as usize;
@@ -109,25 +114,35 @@ pub fn instant_mesh(
                 o = add(kmul(w_sum as F, o_base), kmul(w, compat));
                 // project to tangent plane
                 o = sub(o, kmul(dot(o, n), n));
+
+                // different smoothness tests
                 o = normalize(o);
+                //o = kmul((1. - t) * og_len + t, normalize(o));
+                //o = lerp(t, og, normalize(o));
+
+                //assert!(dot(o, n).abs() < 1e-8, "{}", dot(o, n));
                 w_sum += w;
             }
-            debug_assert!(o.into_iter().all(F::is_finite));
             orient_field[vi] = o;
-            assert!((crate::length(o) - 1.).abs() < 1e-3);
+            debug_assert!(o.into_iter().all(F::is_finite));
         }
     }
+
+    for v in orient_field.iter_mut() {
+        *v = normalize(*v);
+    }
+
     // make const
-    let orient_field = orient_field;
+    let orient_field: &_ = orient_field;
 
     // smooth position field
     println!(
         "Smoothing position field for {} iters",
         args.pos_smoothing_iters
     );
-    for it in 0..args.pos_smoothing_iters {
-        println!("{it}");
-        let t = (it + 1) as F / args.pos_smoothing_iters as F;
+    for _it in 0..args.pos_smoothing_iters {
+        println!("position: {_it}");
+        let t = (_it + 1) as F / args.pos_smoothing_iters as F;
         let t = t.sqrt();
 
         #[cfg(feature = "rand")]
@@ -292,7 +307,8 @@ pub fn instant_mesh(
             |[_, _]| [1., 0., 0.],
             0.001,
         );
-        let out_tmp = crate::visualization::wireframe_to_mesh(wf);
+        let mut out_tmp = crate::visualization::wireframe_to_mesh(wf);
+        out_tmp.denormalize(args.s, args.t);
         let tmp_scene = out_tmp.into_scene();
         if let Err(_) = crate::save(&args.save_grid, &tmp_scene) {
             eprintln!("[WARN]: Failed to save edge grid to {}", args.save_grid);
@@ -382,26 +398,16 @@ fn compat_pos_extrinsic_4(
     let p0 = lattice_op(p0, o0, n0, mid, scale, RoundMode::Floor);
     let p1 = lattice_op(p1, o1, n1, mid, scale, RoundMode::Floor);
 
-    let combos: [[bool; 4]; 16] =
-        std::array::from_fn(|i| [i / 8 == 0, (i / 4) % 2 == 0, (i / 2) % 2 == 0, i % 2 == 0]);
+    let combos = (0..16).map(|i| [i / 8 == 0, (i / 4) % 2 == 0, (i / 2) % 2 == 0, i % 2 == 0]);
+    #[inline]
     fn cond(b: bool, x: [F; 3]) -> [F; 3] {
         if b { x } else { [0.; 3] }
     }
     let (term0, term1, err) = combos
-        .into_iter()
         .map(|[a0, b0, a1, b1]| {
             let term0 = add(p0, kmul(scale, add(cond(a0, o0), cond(b0, t0))));
             let term1 = add(p1, kmul(scale, add(cond(a1, o1), cond(b1, t1))));
             (term0, term1, dist_sq(term0, term1))
-        })
-        .inspect(|v| {
-            assert!(
-                v.2.is_finite(),
-                r#"{v:?}
-          {o0:?} {p0:?} {n0:?} {v0:?}
-          {o1:?} {p1:?} {n1:?} {v1:?}
-          "#
-            )
         })
         .min_by(|a, b| a.2.partial_cmp(&b.2).unwrap())
         .unwrap();
@@ -502,13 +508,14 @@ def lattice_op(p, o, n, target, scale, op = np.floor):
     return p + scale * (o * op(np.dot(o, d) / scale) + t * op(np.dot(t, d) / scale))
 */
 
+#[inline]
 fn intermediate_pos(p0: [F; 3], n0: [F; 3], p1: [F; 3], n1: [F; 3]) -> [F; 3] {
-    assert!(
+    debug_assert!(
         (crate::length(n0) - 1.).abs() < 1e-3,
         "{}",
         crate::length(n0)
     );
-    assert!(
+    debug_assert!(
         (crate::length(n1) - 1.).abs() < 1e-3,
         "{}",
         crate::length(n1)
