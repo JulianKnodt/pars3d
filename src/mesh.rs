@@ -1,5 +1,5 @@
 use super::anim::Animation;
-use super::{F, FaceKind, U, add, kmul, sub};
+use super::{F, FaceKind, U, add, divk, kmul, sub};
 
 use std::array::from_fn;
 use std::collections::hash_map::Entry;
@@ -640,6 +640,27 @@ impl Mesh {
         };
 
         new_map
+    }
+
+    pub fn copy_attribs<const N: usize>(
+        &mut self,
+        og_v: &[[F; 3]],
+        new_vert_map: HashMap<[U; 3], usize>,
+        og_attribs: &[[F; N]],
+    ) -> Vec<[F; N]> {
+        let mut new = vec![[0.; N]; self.v.len()];
+        let mut ws = vec![0; self.v.len()];
+        for (vi, v) in og_v.into_iter().enumerate() {
+            let new_idx = new_vert_map[&v.map(F::to_bits)];
+            let old_val = og_attribs[vi];
+            new[new_idx] = add(new[new_idx], old_val);
+            ws[new_idx] += 1;
+        }
+        for (vi, val) in new.iter_mut().enumerate() {
+            debug_assert_ne!(ws[vi], 0);
+            *val = divk(*val, ws[vi] as F);
+        }
+        new
     }
 
     pub fn clear_vertex_normals(&mut self) {
