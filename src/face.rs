@@ -128,6 +128,42 @@ impl<T> FaceKind<T> {
         rest.array_windows::<2>().map(move |&[v1, v2]| [v0, v1, v2])
     }
 
+    /// Iterate over this face, returning each index with its tri indices
+    pub fn iter_with_tri_idxs(
+        &self,
+    ) -> impl Iterator<Item = (T, Option<Result<[usize; 2], usize>>)> + '_
+    where
+        T: Copy,
+    {
+        let (v0, rest) = self
+            .as_slice()
+            .split_first()
+            .map(|(&v, r)| (Some(v), r))
+            .unwrap_or_else(|| (None, &[]));
+        let (v1, rest) = rest
+            .split_first()
+            .map(|(&v, r)| (Some(v), r))
+            .unwrap_or_else(|| (None, &[]));
+        let (vn, rest) = rest
+            .split_last()
+            .map(|(&v, r)| (Some(v), r))
+            .unwrap_or_else(|| (None, &[]));
+        let num_tris = self.num_tris();
+
+        let rest_it = rest
+            .into_iter()
+            .enumerate()
+            .map(|(i, &v)| (v, Some(Ok([i, i + 1]))));
+        let last_it = vn
+            .into_iter()
+            .map(move |vn| (vn, Some(Err(num_tris.saturating_sub(1)))));
+        v0.into_iter()
+            .map(|v0| (v0, None))
+            .chain(v1.into_iter().map(|v1| (v1, Some(Err(0)))))
+            .chain(rest_it)
+            .chain(last_it)
+    }
+
     /// Iterates over all possible triangles rooted at each index.
     pub fn all_triangle_splits(&self) -> impl Iterator<Item = [T; 3]> + '_
     where
