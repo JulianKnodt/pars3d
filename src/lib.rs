@@ -405,6 +405,7 @@ pub fn barycentric_n<const N: usize>(p: [F; N], a: [F; N], b: [F; N], c: [F; N])
     if denom.abs() < 1e-16 {
         return [1., 0., 0.];
     }
+    // note that division is kept here to retain accuracy
     let v = diff_of_prod(d11, d20, d01, d21) / denom;
     let w = diff_of_prod(d00, d21, d01, d20) / denom;
     [1.0 - v - w, v, w]

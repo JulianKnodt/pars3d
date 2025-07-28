@@ -330,30 +330,38 @@ fn test_line_segment_isect() {
 }
 
 impl AABB<i32, 2> {
+    #[inline]
     pub fn width(&self) -> usize {
         (self.max[0] - self.min[0]).max(0) as usize
     }
+    #[inline]
     pub fn width_range(&self) -> Range<i32> {
         self.min[0]..self.max[0]
     }
+    #[inline]
     pub fn height(&self) -> usize {
         (self.max[1] - self.min[1]).max(0) as usize
     }
+    #[inline]
     pub fn height_range(&self) -> Range<i32> {
         self.min[1]..self.max[1]
     }
+    #[inline]
     pub fn area(&self) -> usize {
         self.width() * self.height()
     }
+    #[inline]
     pub fn iter_coords(&self) -> impl Iterator<Item = [i32; 2]> + '_ {
         let [lx, ly] = self.min;
         let [hx, hy] = self.max;
         (ly..hy).flat_map(move |y| (lx..hx).map(move |x| [x, y]))
     }
+    #[inline]
     pub fn expand_by(&mut self, v: i32) {
         self.min = self.min.map(|val| val - v);
         self.max = self.max.map(|val| val + v);
     }
+    #[inline]
     pub fn intersect(&self, o: &Self) -> Self {
         Self {
             min: from_fn(|i| self.min[i].max(o.min[i])),
