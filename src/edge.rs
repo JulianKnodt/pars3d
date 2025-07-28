@@ -6,6 +6,11 @@ pub enum EdgeKind<T = usize> {
     NonManifold(Vec<T>),
 }
 
+const _: () = assert!(
+    std::mem::size_of::<EdgeKind>() == 24,
+    "Size of EdgeKind is too large",
+);
+
 impl<T> EdgeKind<T> {
     pub fn as_slice(&self) -> &[T] {
         match self {
@@ -57,7 +62,8 @@ impl<T> EdgeKind<(usize, T)> {
                 (fi, new())
             };
         }
-        let new = match std::mem::replace(self, Self::empty()) {
+        let prev = std::mem::replace(self, Self::empty());
+        let new = match prev {
             EdgeKind::Boundary(f) if f.0 != fi => EdgeKind::Manifold([f, nt!()]),
             EdgeKind::Manifold([f0, f1]) if f0.0 != fi && f1.0 != fi => {
                 EdgeKind::NonManifold(vec![f0, f1, nt!()])
@@ -67,22 +73,28 @@ impl<T> EdgeKind<(usize, T)> {
                 1 => EdgeKind::Manifold([fs.pop().unwrap(), nt!()]),
                 _ => {
                     fs.push(nt!());
-                    return true;
+                    EdgeKind::NonManifold(fs)
                 }
             },
-            _ => return false,
+            _ => {
+                *self = prev;
+                return false;
+            }
         };
         *self = new;
         true
     }
+
     pub fn get_mut_or_insert_with(&mut self, fi: usize, new: impl Fn() -> T) -> &mut T {
         self.insert_if_new(fi, new);
-        &mut self
-            .as_mut_slice()
-            .iter_mut()
-            .find(|f| f.0 == fi)
-            .unwrap()
-            .1
+        unsafe {
+            &mut self
+                .as_mut_slice()
+                .iter_mut()
+                .find(|f| f.0 == fi)
+                .unwrap_unchecked()
+                .1
+        }
     }
 }
 
