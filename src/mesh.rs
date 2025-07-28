@@ -758,25 +758,30 @@ impl Mesh {
     /// indicates no mapping.
     pub fn delete_unused_vertices(&mut self) -> (usize, Vec<usize>) {
         let curr_len = self.v.len();
-        // use BTreeSet to retain order
-        let mut used: BTreeSet<usize> = BTreeSet::new();
-        for f in &self.f {
-            used.extend(f.as_slice().iter());
-        }
+        // either use btreeset or vec here, but must remain in sorted order
+        let mut used: Vec<usize> = self
+            .f
+            .iter()
+            .flat_map(|f| f.as_slice().iter().copied())
+            .collect();
+        used.sort_unstable();
+        used.dedup();
+        let num_used = used.len();
 
         let mut remap = vec![usize::MAX; self.v.len()];
-        for (new_vi, &og_vi) in used.iter().enumerate() {
-            remap[og_vi] = new_vi;
+        for (new_vi, og_vi) in used.into_iter().enumerate() {
+            *unsafe { remap.get_unchecked_mut(og_vi) } = new_vi;
         }
+        let remap = remap;
         for f in &mut self.f {
-            f.remap(|vi| remap[vi]);
+            f.remap(|vi| unsafe { *remap.get_unchecked(vi) });
         }
 
         macro_rules! clear_vec {
             ($vec: expr) => {{
                 let mut i = 0;
                 $vec.retain(|_| {
-                    let keep = used.contains(&i);
+                    let keep = unsafe { *remap.get_unchecked(i) } != usize::MAX;
                     i += 1;
                     keep
                 });
@@ -784,7 +789,7 @@ impl Mesh {
         }
 
         clear_vec!(&mut self.v);
-        assert_eq!(self.v.len(), used.len());
+        assert_eq!(self.v.len(), num_used);
 
         clear_vec!(&mut self.n);
         for i in 0..MAX_UV {
@@ -794,7 +799,7 @@ impl Mesh {
         clear_vec!(&mut self.joint_weights);
         clear_vec!(&mut self.vert_colors);
 
-        (curr_len - used.len(), remap)
+        (curr_len - num_used, remap)
     }
 
     /// Deletes empty faces from this mesh.

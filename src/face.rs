@@ -240,6 +240,7 @@ impl FaceKind {
         }
     }
     /// Returns each edge in sorted order in this face: minmax(vi0, vi1), minmax(vi1, vi2), ...
+    #[inline]
     pub fn edges_ord(&self) -> impl Iterator<Item = [usize; 2]> + '_ {
         self.edges().map(|[a, b]| std::cmp::minmax(a, b))
     }
