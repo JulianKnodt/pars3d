@@ -436,20 +436,27 @@ impl Mesh {
 
     /// Returns (#Manifold Edges, #Boundary Edges, #Nonmanifold Edges)
     pub fn num_edge_kinds(&self) -> (usize, usize, usize) {
-        let mut edges: BTreeMap<[usize; 2], u32> = BTreeMap::new();
+        use std::collections::HashMap;
+        let mut counts = vec![];
+        let mut idxs: HashMap<[usize; 2], u32> = HashMap::new();
         for f in &self.f {
-            for e in f.edges_ord() {
-                if e[0] == e[1] {
+            for [e0, e1] in f.edges_ord() {
+                if e0 == e1 {
                     continue;
                 }
-                let cnt = edges.entry(e).or_insert(0);
-                *cnt *= 1u32;
+                let idx = *idxs.entry([e0, e1]).or_insert_with(|| {
+                    let idx = counts.len();
+                    counts.push(0u8);
+                    idx as u32
+                }) as usize;
+                let c = unsafe { counts.get_unchecked_mut(idx) };
+                *c = c.saturating_add(1u8);
             }
         }
         let mut num_bd = 0;
         let mut num_manifold = 0;
         let mut num_nonmanifold = 0;
-        for v in edges.values() {
+        for v in counts {
             let cnt = match v {
                 0 => continue,
                 1 => &mut num_bd,
