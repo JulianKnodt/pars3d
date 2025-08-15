@@ -190,7 +190,9 @@ fn test_append_json() {
 /// Used for building CLI applications for pars3d.
 #[macro_export]
 macro_rules! parse_args {
-  ($( $StateName: ident ( $($flags: expr),+ ) => $field: ident : $t: ty = $def: expr $( => $auto:expr )?, )+) => {{
+  (
+    $desc: expr,
+  $( $StateName: ident ( $($flags: expr),+) => $field: ident : $t: ty = $def: expr $( => $auto:expr )?, )+) => {{
     #[derive(Debug)]
     struct Args {
       $(pub $field: $t,)+
@@ -209,12 +211,16 @@ macro_rules! parse_args {
       $($StateName,)+
     }
 
+    // For use in binaries
+    #[allow(non_local_definitions)]
+    #[macro_export]
     macro_rules! help {
       ($err: tt) => {{
         eprintln!("[ERROR]: {}", format!($err));
         help!();
       }};
       () => {{
+        eprintln!($desc);
         return Ok(());
       }}
     }
@@ -225,7 +231,8 @@ macro_rules! parse_args {
     for v in std::env::args().skip(1) {
       match v.as_str() {
         "-h" | "--help" => help!(),
-        $($($flags)+ => {
+        "UNMATCHABLE" => help!("???"),
+        $($($flags |)+ "UNMATCHABLE" => {
           if state != State::Empty {
             help!("Expected {state:?}");
           }
@@ -235,7 +242,7 @@ macro_rules! parse_args {
           })?
           state = State::$StateName;
           continue;
-        },)+
+        })+
         v if v.starts_with("-") => help!("Unknown flag {v}"),
         _ => {}
       }
