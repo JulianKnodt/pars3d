@@ -297,7 +297,8 @@ impl Mesh {
                 let [ti2, ti3] = [[f1, f2, f3], [f1, f3, f0]];
                 let t23 = [ti2, ti3].map(|ti| ti.map(|vi| self.uv[channel][vi]));
                 let [n2, n3] = t23.map(tri_area_2d);
-                if n0.signum() == n1.signum() && n2.signum() == n3.signum() {
+                let degen = [n0, n1, n2, n3].into_iter().any(|a| a.abs() < 1e-6);
+                if !degen && n0.signum() == n1.signum() && n2.signum() == n3.signum() {
                     continue;
                 }
 
