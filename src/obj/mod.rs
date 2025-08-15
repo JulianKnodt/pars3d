@@ -34,6 +34,13 @@ pub struct PolyMeshFace {
     pub vt: Vec<VertTIdx>,
 }
 
+/// A line in the OBJ file
+#[derive(Debug, PartialEq, Default, Clone)]
+pub struct Line {
+    pub v: Vec<VertIdx>,
+    pub vt: Vec<VertIdx>,
+}
+
 /// Represents a single OBJ file, as well as materials for that OBJ file.
 #[derive(Default, Clone)]
 pub struct Obj {
@@ -56,6 +63,9 @@ pub struct ObjObject {
     pub vn: Vec<Vec3>,
 
     pub f: Vec<PolyMeshFace>,
+
+    /// Line elements
+    pub l: Vec<Line>,
 
     /// # faces -> Material
     /// May have repeat material idxs,
@@ -297,6 +307,44 @@ fn parse_poly_face(fs: &[&str], num_v: usize, num_vt: usize, num_vn: usize) -> P
     let vn: Vec<_> = vn.into_iter().flatten().collect();
     PolyMeshFace { v, vt, vn }
 }
+
+fn parse_line(l: &[&str], num_v: usize, num_vt: usize) -> Line {
+    let pusize = |v: &str| match v.parse::<i64>() {
+        Ok(x) if x < 0 => {
+            let x = (-x) as usize;
+            assert!(x <= num_v, "{x} {num_v}");
+            num_v - x + 1
+        }
+        Ok(x) => x as usize,
+        Err(e) => panic!("Invalid face {v}: {e:?}"),
+    };
+    let popt = |v: Option<&str>, lim: usize| match v?.parse::<i64>() {
+        Ok(x) if x < 0 => {
+            let x = (-x) as usize;
+            assert!(x <= lim, "{x} {lim}");
+            Some(lim - x + 1)
+        }
+        Ok(x) => Some(x as usize),
+        Err(e) if e.kind() == &std::num::IntErrorKind::Empty => None,
+        Err(e) => panic!("Invalid face {}: {e:?}", v.unwrap()),
+    };
+
+    let split_slash = |v: &str| -> (usize, Option<usize>) {
+        let mut iter = v.split('/');
+        match [iter.next(), iter.next()] {
+            [None, _] => panic!("Missing vertex index in {v}"),
+            [Some(a), b] => (pusize(a), popt(b, num_vt)),
+        }
+    };
+    let (v, vt): (Vec<_>, Vec<_>) = l
+        .iter()
+        .map(|f| split_slash(f))
+        .map(|(v, vt)| (v - 1, (vt.map(|vt| vt - 1))))
+        .unzip();
+    let vt: Vec<_> = vt.into_iter().flatten().collect();
+    Line { v, vt }
+}
+
 /// Parses a file specified by path `p`.
 /// If split_by_object, will return different objects for each group.
 pub fn parse(p: impl AsRef<Path>, split_by_object: bool, split_by_group: bool) -> io::Result<Obj> {
@@ -463,13 +511,12 @@ pub fn parse(p: impl AsRef<Path>, split_by_object: bool, split_by_group: bool) -
                 curr_mtl = Some(mtl_idx);
             }
             "l" => {
-                static mut DID_WARN_LINES: bool = false;
-                unsafe {
-                    if !DID_WARN_LINES {
-                        eprintln!("Line elements not currently handled: {l}");
-                        DID_WARN_LINES = true;
-                    }
-                }
+                let co = &curr_obj;
+                curr_obj.l.push(parse_line(
+                    &iter.collect::<Vec<_>>(),
+                    co.v.len(),
+                    co.vt.len(),
+                ));
             }
             // TODO
             k => eprintln!("[ERROR]: Unknown line in OBJ {l} with {k:?}"),
