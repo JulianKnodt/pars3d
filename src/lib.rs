@@ -241,6 +241,37 @@ pub(crate) fn tri_area_2d([a, b, c]: [[F; 2]; 3]) -> F {
     cross_2d(sub(b, a), sub(c, a)) / 2.
 }
 
+/// Computes the signed volume of a tetrahedron
+pub fn signed_tet_vol([a,b,c,d]: [[F;3]; 4]) -> F {
+  let [b, c, d] = [b,c,d].map(|v| sub(v, a));
+  dot(b, cross(c, d)) / 6.
+}
+
+#[test]
+fn test_signed_det_vol() {
+  let v = signed_tet_vol([
+    [0.,0.,0.],
+    [1.,0.,0.],
+    [0.,1.,0.],
+    [0.,0.,1.],
+  ]);
+  assert_eq!(v, 1. / 6.);
+  let v = signed_tet_vol([
+    [0.,0.,0.],
+    [1.,0.,0.],
+    [0.,0.,1.],
+    [0.,1.,0.],
+  ]);
+  assert_eq!(v, -1. / 6.);
+  let v = signed_tet_vol([
+    [0.,0.,0.],
+    [0.,0.,1.],
+    [1.,0.,0.],
+    [0.,1.,0.],
+  ]);
+  assert_eq!(v, 1. / 6.);
+}
+
 pub(crate) fn quad_area_2d([a, b, c, d]: [[F; 2]; 4]) -> F {
     cross_2d(sub(a, c), sub(b, d)) / 2.
 }
