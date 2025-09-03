@@ -12,6 +12,7 @@ fn main() -> std::io::Result<()> {
       Output("-o", "--output"; "Output SVG") => output : String = String::new(),
       Width("-w", "--width"; "SVG rendered line width") => width : F = 1.0,
       UseXY("--use-xy"; "Use XY of mesh instead of UV") => use_xy: bool = false,
+      Rescale("-r", "--rescale-n1_1-to-0_1"; "Rescale [-1,1] to [0,1]") => rescale: bool = false,
     );
 
     if args.input.is_empty() || args.output.is_empty() {
@@ -26,10 +27,21 @@ fn main() -> std::io::Result<()> {
     let mesh = &scene.meshes[0];
     let width = args.width;
 
+    macro_rules! rescale {
+        ($arr: expr) => {{
+            let arr = $arr;
+            if args.rescale {
+                arr.map(|v| (v + 1.) / 2.)
+            } else {
+                arr
+            }
+        }};
+    }
+
     if args.use_xy {
-        let get_xy = |i: usize| std::array::from_fn(|d: usize| mesh.v[i][d]);
+        let get_xy = |i: usize| rescale!(std::array::from_fn(|d: usize| mesh.v[i][d]));
         save_uv(&args.output, get_xy, &mesh.f, width)
     } else {
-        save_uv(&args.output, |i| mesh.uv[0][i], &mesh.f, width)
+        save_uv(&args.output, |i| rescale!(mesh.uv[0][i]), &mesh.f, width)
     }
 }
