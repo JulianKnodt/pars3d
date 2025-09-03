@@ -13,6 +13,7 @@ fn main() -> std::io::Result<()> {
       Width("-w", "--width"; "SVG rendered line width") => width : F = 1.0,
       UseXY("--use-xy"; "Use XY of mesh instead of UV") => use_xy: bool = false => true,
       Rescale("-r", "--rescale-n1_1-to-0_1"; "Rescale [-1,1] to [0,1]") => rescale: bool = false => true,
+      Zoom("--zoom"; "Zoom by a specific scale around the center") => zoom: F = 1.,
       Stats("--stats"; "Unused") => stats: String = String::new(),
     );
 
@@ -30,7 +31,7 @@ fn main() -> std::io::Result<()> {
 
     macro_rules! rescale {
         ($arr: expr) => {{
-            let arr = $arr;
+            let arr = $arr.map(|v| v * args.zoom);
             if args.rescale {
                 arr.map(|v| (v + 1.) / 2.)
             } else {
