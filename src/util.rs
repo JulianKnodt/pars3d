@@ -227,6 +227,7 @@ macro_rules! parse_args {
             msg.push_str($flags);
             msg.push_str(" ");
           )+
+          msg.push_str(": ");
           msg.push_str($help);
           msg.push_str(&format!(" = `{}`", $def));
           eprintln!("{msg}");

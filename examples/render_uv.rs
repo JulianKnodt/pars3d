@@ -11,8 +11,9 @@ fn main() -> std::io::Result<()> {
       Input("-i", "--input"; "Input Mesh") => input : String = String::new(),
       Output("-o", "--output"; "Output SVG") => output : String = String::new(),
       Width("-w", "--width"; "SVG rendered line width") => width : F = 1.0,
-      UseXY("--use-xy"; "Use XY of mesh instead of UV") => use_xy: bool = false,
-      Rescale("-r", "--rescale-n1_1-to-0_1"; "Rescale [-1,1] to [0,1]") => rescale: bool = false,
+      UseXY("--use-xy"; "Use XY of mesh instead of UV") => use_xy: bool = false => true,
+      Rescale("-r", "--rescale-n1_1-to-0_1"; "Rescale [-1,1] to [0,1]") => rescale: bool = false => true,
+      Stats("--stats"; "Unused") => stats: String = String::new(),
     );
 
     if args.input.is_empty() || args.output.is_empty() {
