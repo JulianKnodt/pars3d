@@ -407,9 +407,10 @@ impl KVs {
           },
           "Vertices", &[Data::F64Arr(_)] => |c: usize| {
               let v_arr: &[f64] = self.kvs[c].values[0].as_f64_arr().unwrap();
-              let v = v_arr
+              let v = unsafe { v_arr
+                  .as_chunks_unchecked::<3>()
+                  }
                   .iter()
-                  .array_chunks::<3>()
                   .map(|[a, b, c]| [*a as F, *b as F, *c as F]);
               out.v.clear();
               out.v.extend(v);
@@ -417,9 +418,9 @@ impl KVs {
           },
           "Normals", &[Data::F64Arr(_)] => |c: usize| {
               let v_arr: &[f64] = self.kvs[c].values[0].as_f64_arr().unwrap();
-              let v = v_arr
-                  .iter()
-                  .array_chunks::<3>()
+              let v = unsafe { v_arr
+                  .as_chunks_unchecked::<3>()
+                  }.iter()
                   .map(|[a, b, c]| [*a as F, *b as F, *c as F]);
               out.n.clear();
               out.n.extend(v);
@@ -813,7 +814,7 @@ impl KVs {
                       unreachable!();
                     };
                     assert_eq!(ns.len() % 3, 0);
-                    let iter = ns.array_chunks::<3>().map(|n| n.map(|v| v as F));
+                    let iter = unsafe { ns.as_chunks_unchecked::<3>() }.iter().map(|n| n.map(|v| v as F));
                     out.n.values.extend(iter);
                 },
                 "NormalsIndex", &[Data::I32Arr(_)] => |c: usize| {
@@ -848,7 +849,7 @@ impl KVs {
                     unreachable!();
                   };
                   assert_eq!(arr.len() % 2, 0);
-                  let uvs = arr.array_chunks::<2>().map(|uv| uv.map(|v| v as F));
+                  let uvs = unsafe { arr.as_chunks_unchecked::<2>() }.iter().map(|uv| uv.map(|v| v as F));
                   out.uv.values.extend(uvs);
               },
               "UVIndex", &[Data::I32Arr(_)] => |c: usize| {
@@ -925,7 +926,10 @@ impl KVs {
                   let Some(v) = self.kvs[c].values[0].as_f64_arr() else {
                       unreachable!();
                   };
-                  let vc = v.array_chunks::<3>().map(|v| v.map(|v| v as F));
+                  let chunks = unsafe {
+                    v.as_chunks_unchecked::<3>()
+                  };
+                  let vc = chunks.iter().map(|v| v.map(|v| v as F));
                   out.color.values.extend(vc);
               },
               "ColorIndex", &[Data::I32Arr(_)] => |c: usize| {

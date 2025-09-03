@@ -4,7 +4,6 @@
 #![feature(iter_array_chunks)]
 #![feature(cmp_minmax)]
 #![feature(binary_heap_into_iter_sorted)]
-#![feature(array_chunks)]
 #![feature(ascii_char)]
 #![feature(ascii_char_variants)]
 #![feature(assert_matches)]
@@ -242,34 +241,19 @@ pub(crate) fn tri_area_2d([a, b, c]: [[F; 2]; 3]) -> F {
 }
 
 /// Computes the signed volume of a tetrahedron
-pub fn signed_tet_vol([a,b,c,d]: [[F;3]; 4]) -> F {
-  let [b, c, d] = [b,c,d].map(|v| sub(v, a));
-  dot(b, cross(c, d)) / 6.
+pub fn signed_tet_vol([a, b, c, d]: [[F; 3]; 4]) -> F {
+    let [b, c, d] = [b, c, d].map(|v| sub(v, a));
+    dot(b, cross(c, d)) / 6.
 }
 
 #[test]
 fn test_signed_det_vol() {
-  let v = signed_tet_vol([
-    [0.,0.,0.],
-    [1.,0.,0.],
-    [0.,1.,0.],
-    [0.,0.,1.],
-  ]);
-  assert_eq!(v, 1. / 6.);
-  let v = signed_tet_vol([
-    [0.,0.,0.],
-    [1.,0.,0.],
-    [0.,0.,1.],
-    [0.,1.,0.],
-  ]);
-  assert_eq!(v, -1. / 6.);
-  let v = signed_tet_vol([
-    [0.,0.,0.],
-    [0.,0.,1.],
-    [1.,0.,0.],
-    [0.,1.,0.],
-  ]);
-  assert_eq!(v, 1. / 6.);
+    let v = signed_tet_vol([[0., 0., 0.], [1., 0., 0.], [0., 1., 0.], [0., 0., 1.]]);
+    assert_eq!(v, 1. / 6.);
+    let v = signed_tet_vol([[0., 0., 0.], [1., 0., 0.], [0., 0., 1.], [0., 1., 0.]]);
+    assert_eq!(v, -1. / 6.);
+    let v = signed_tet_vol([[0., 0., 0.], [0., 0., 1.], [1., 0., 0.], [0., 1., 0.]]);
+    assert_eq!(v, 1. / 6.);
 }
 
 pub(crate) fn quad_area_2d([a, b, c, d]: [[F; 2]; 4]) -> F {
