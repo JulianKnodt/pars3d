@@ -1,4 +1,4 @@
-use super::{F, add, cross_2d, kmul, sub};
+use super::{F, add, kmul, sub};
 use core::ops::Range;
 use std::array::from_fn;
 
@@ -131,7 +131,7 @@ impl AABB<F, 2> {
 
     pub(crate) fn line_segment_isect(&self, l: [[F; 2]; 2]) -> impl Iterator<Item = [F; 2]> + '_ {
         let c = self.corners();
-        (0..4).filter_map(move |i| line_segment_isect([c[i], c[(i + 1) % 4]], l))
+        (0..4).filter_map(move |i| super::line_segment_isect([c[i], c[(i + 1) % 4]], l))
     }
 
     /// Returns true if this aabb intersects the tri t.
@@ -297,38 +297,6 @@ fn test_intersection_poly_complex() {
     );
     assert_eq!(1.4375, super::poly_area_2d(&buf));
 }
-
-fn line_segment_isect([a0, a1]: [[F; 2]; 2], [b0, b1]: [[F; 2]; 2]) -> Option<[F; 2]> {
-    // they could also lie directly on the line, but that's annoying to check
-    if a0 == a1 || b0 == b1 {
-        return None;
-    }
-    let a_dir = sub(a1, a0);
-    let b_dir = sub(b1, b0);
-
-    let denom = cross_2d(a_dir, b_dir);
-    if denom == 0. {
-        // they're parallel
-        return None;
-    }
-    let t = cross_2d(sub(b0, a0), b_dir) / denom;
-    let u = cross_2d(sub(b0, a0), a_dir) / denom;
-
-    let valid = (0.0..=1.0).contains(&t) && (0.0..=1.0).contains(&u);
-    valid.then(|| add(a0, kmul(t, a_dir)))
-}
-
-#[test]
-fn test_line_segment_isect() {
-    let isect = line_segment_isect([[-1., 0.], [1., 0.]], [[0., 1.], [0., -1.]]);
-    assert_eq!(Some([0., 0.]), isect);
-    let isect = line_segment_isect([[-1., 0.], [1., 0.]], [[0., -1.], [0., 1.]]);
-    assert_eq!(Some([0., 0.]), isect);
-
-    let isect = line_segment_isect([[-1., 0.], [1., 0.]], [[0.5, 100.], [-0.5, -100.]]);
-    assert_eq!(Some([0., 0.]), isect);
-}
-
 impl AABB<i32, 2> {
     #[inline]
     pub fn width(&self) -> usize {

@@ -136,6 +136,7 @@ impl Mesh {
     pub fn vertex_normals(&mut self, kind: VertexNormalWeightingKind) -> bool {
         vertex_normals(&self.f, &self.v, &mut self.n, kind)
     }
+
     #[inline]
     pub fn triangulate_with_new_edges(&mut self, mut cb: impl FnMut([usize; 2])) {
         let nf = self.f.len();
@@ -640,4 +641,38 @@ fn cumulative_sum<'a>(vs: impl Iterator<Item = &'a mut F>) {
         *v += agg;
         agg = *v;
     }
+}
+
+pub fn star_shaped_quad_kernel(vis: [[F; 2]; 4]) -> [[F;2]; 4] {
+    // for each vertex, reproject it to opposite side if it is not in right place
+    std::array::from_fn(|vi|{
+        let v = vis[vi];
+        let vn = vis[(vi + 1) % 4];
+        // tc = to_check
+        let vnn = vis[(vi + 2) % 4];
+        let vnnn = vis[(vi + 3) % 4];
+
+        // TODO need to be really careful of winding here
+        if crate::cross_2d(sub(vnn, vn), sub(v, vn)) < 0. {
+            let (_, _, isect) = super::line_isect([vn, vnn], [vnnn, v]).unwrap();
+            isect
+        } else if crate::cross_2d(sub(vnnn, vnn), sub(v, vnn)) < 0. {
+            let (_, _, isect) = super::line_isect([vnnn, vnn], [v, vn]).unwrap();
+            isect
+        } else {
+            v
+        }
+    })
+}
+
+#[test]
+fn test_star_shaped_quad_kernel() {
+    //let uvs = [[0., 0.], [1., 2.], [0., 1.], [-1., 2.]];
+    let uvs = [[-1., 0.], [0., -1.], [1., 0.], [0., 1.]];
+    let kernel = star_shaped_quad_kernel(uvs);
+    for [u,v] in kernel {
+      print!("({u}, {v}),");
+    }
+    println!();
+    todo!();
 }

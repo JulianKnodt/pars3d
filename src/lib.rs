@@ -557,3 +557,42 @@ fn poly_area_2d(p: &[[F; 2]]) -> F {
     let n = p.len();
     (0..n).map(|i| cross_2d(p[i], p[(i + 1) % n])).sum::<F>() / 2.
 }
+
+// given two lines, compute their intersection
+fn line_isect([a0, a1]: [[F; 2]; 2], [b0, b1]: [[F; 2]; 2]) -> Option<(F, F, [F; 2])> {
+    // they could also lie directly on the line, but that's annoying to check
+    if a0 == a1 || b0 == b1 {
+        return None;
+    }
+    let a_dir = sub(a1, a0);
+    let b_dir = sub(b1, b0);
+
+    let denom = cross_2d(a_dir, b_dir);
+    if denom == 0. {
+        // they're parallel
+        return None;
+    }
+    let t = cross_2d(sub(b0, a0), b_dir) / denom;
+    let u = cross_2d(sub(b0, a0), a_dir) / denom;
+
+    Some((t, u, add(a0, kmul(t, a_dir))))
+}
+
+// given two lines, compute their intersection
+fn line_segment_isect(a: [[F; 2]; 2], b: [[F; 2]; 2]) -> Option<[F; 2]> {
+    // they could also lie directly on the line, but that's annoying to check
+    let (t, u, isect) = line_isect(a, b)?;
+    let valid = (0.0..=1.0).contains(&t) && (0.0..=1.0).contains(&u);
+    valid.then_some(isect)
+}
+
+#[test]
+fn test_line_segment_isect() {
+    let isect = line_segment_isect([[-1., 0.], [1., 0.]], [[0., 1.], [0., -1.]]);
+    assert_eq!(Some([0., 0.]), isect);
+    let isect = line_segment_isect([[-1., 0.], [1., 0.]], [[0., -1.], [0., 1.]]);
+    assert_eq!(Some([0., 0.]), isect);
+
+    let isect = line_segment_isect([[-1., 0.], [1., 0.]], [[0.5, 100.], [-0.5, -100.]]);
+    assert_eq!(Some([0., 0.]), isect);
+}
