@@ -192,7 +192,7 @@ fn test_append_json() {
 macro_rules! parse_args {
   (
     $desc: expr,
-  $( $StateName: ident ( $($flags: expr),+) => $field: ident : $t: ty = $def: expr $( => $auto:expr )?, )+) => {{
+  $( $StateName: ident ( $($flags: expr),+ ; $help: expr) => $field: ident : $t: ty = $def: expr $( => $auto:expr )?, )+) => {{
     #[derive(Debug)]
     struct Args {
       $(pub $field: $t,)+
@@ -221,6 +221,16 @@ macro_rules! parse_args {
       }};
       () => {{
         eprintln!($desc);
+        $(
+          let mut msg = String::from("\t");
+          $(
+            msg.push_str($flags);
+            msg.push_str(" ");
+          )+
+          msg.push_str($help);
+          msg.push_str(&format!(" = `{}`", $def));
+          eprintln!("{msg}");
+        )+
         return Ok(());
       }}
     }

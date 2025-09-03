@@ -7,11 +7,11 @@ fn main() {
 fn main() -> std::io::Result<()> {
     use pars3d::{F, load, parse_args, svg::save_uv};
     let args = parse_args!(
-      "[INFO]: Save the UV of a mesh into an SVG",
-      Input("-i", "--input") => input : String = String::new(),
-      Output("-o", "--output") => output : String = String::new(),
-      Width("-w", "--width") => width : F = 1.0,
-      UseXY("--use-xy") => use_xy: bool = false,
+      "[render_uv]: Save the UV of a mesh into an SVG:",
+      Input("-i", "--input"; "Input Mesh") => input : String = String::new(),
+      Output("-o", "--output"; "Output SVG") => output : String = String::new(),
+      Width("-w", "--width"; "SVG rendered line width") => width : F = 1.0,
+      UseXY("--use-xy"; "Use XY of mesh instead of UV") => use_xy: bool = false,
     );
 
     if args.input.is_empty() || args.output.is_empty() {

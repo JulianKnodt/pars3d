@@ -6,9 +6,9 @@ use std::collections::BTreeSet;
 fn main() -> std::io::Result<()> {
     let args = parse_args!(
       "[INFO]: Outputs the wireframe of <arg1> to <arg2>",
-      Input("-i", "--input") => input : String = String::new(),
-      Output("-o", "--output") => output : String = String::new(),
-      Width("-w", "--width") => width : F = 1.5e-3,
+      Input("-i", "--input"; "Input Mesh") => input : String = String::new(),
+      Output("-o", "--output"; "Output path to wireframe mesh") => output : String = String::new(),
+      Width("-w", "--width"; "Wireframe thickness") => width : F = 1.5e-3,
     );
 
     if args.input.is_empty() {
