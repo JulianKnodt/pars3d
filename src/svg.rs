@@ -7,7 +7,7 @@ use svg::{
 /// Save a 2D SVG of a UV map
 pub fn save_uv(
     dst: impl AsRef<std::path::Path>,
-    uvs: &[[F; 2]],
+    uvs: impl Fn(usize) -> [F; 2],
     // TODO figure out how to add colors to this
     faces: &[FaceKind],
     stroke_width: F,
@@ -20,10 +20,10 @@ pub fn save_uv(
             continue;
         }
         let s = f.as_slice();
-        let [u0, v0] = uvs[s[0]].map(|v| v * sz);
+        let [u0, v0] = uvs(s[0]).map(|v| v * sz);
         let mut data = Data::new().move_to((u0, v0));
         for &vi in &s[1..] {
-            let [u, v] = uvs[vi].map(|v| v * sz);
+            let [u, v] = uvs(vi).map(|v| v * sz);
             data = data.line_to((u, v));
         }
         data = data.line_to((u0, v0)).close();

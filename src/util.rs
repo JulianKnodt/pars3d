@@ -236,6 +236,7 @@ macro_rules! parse_args {
           if state != State::Empty {
             help!("Expected {state:?}");
           }
+          // this `if true` is here to prevent compiler complaints
           $(if true {
             args.$field = $auto;
             continue;
