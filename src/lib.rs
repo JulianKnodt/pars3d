@@ -647,7 +647,7 @@ pub fn line_plane_isect((n, d): ([F; 3], F), [o, dir]: [[F; 3]; 2]) -> (F, [F; 3
 pub(crate) fn plane_eq(a: [F; 3], b: [F; 3], c: [F; 3]) -> ([F; 3], F) {
     let n = cross(sub(c, a), sub(b, a));
     let n = normalize(n);
-    (n, dot(n, a))
+    (n, -dot(n, a))
 }
 
 #[test]
@@ -657,9 +657,27 @@ fn test_line_plane_isect() {
   assert_eq!(pos, [0., 0., 0.]);
   assert_eq!(t, 1.);
 
+  let p = ([0.,-1.,0.], 0.);
+  let (t, pos) = line_plane_isect(p, [[0., 1., 0.], [0., -1., 0.]]);
+  assert_eq!(pos, [0., 0., 0.]);
+  assert_eq!(t, 1.);
+
   let (t, pos) = line_plane_isect(p, [[0.5, 0.5, 0.], [-0.5, -0.5, 0.]]);
   assert_eq!(pos, [0., 0., 0.]);
   assert_eq!(t, 1.);
+}
+
+#[test]
+fn test_line_plane_isect_tri() {
+  let tri = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+  let pl = plane_eq(tri[0], tri[1], tri[2]);
+  println!("{pl:?}");
+  let ray = [[-1.0, 3.0, 0.0], [1.0, -4.0, 0.0]];
+  assert_eq!(
+    line_plane_isect(pl, ray).1,
+    line_tri_isect(tri, ray).3
+  );
+
 }
 
 /// Intersect a ray with a triangle.
