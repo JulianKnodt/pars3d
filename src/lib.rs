@@ -596,3 +596,62 @@ fn test_line_segment_isect() {
     let isect = line_segment_isect([[-1., 0.], [1., 0.]], [[0.5, 100.], [-0.5, -100.]]);
     assert_eq!(Some([0., 0.]), isect);
 }
+
+
+/// Intersect a ray with a triangle
+pub fn line_tri_plane_isect([v0, v1, v2]: [[F;3]; 3], [o, d]: [[F;3]; 2]) -> (F, F, F, [F;3]) {
+  let e1 = sub(v1, v0);
+  let e2 = sub(v2, v0);
+  let h = cross(d, e2);
+  let a = dot(e1, h);
+  /*
+  if -EPS < a && a < EPS {
+    // parallel ray
+    return None;
+  }
+  */
+  let f = a.recip();
+  let s = sub(o, v0);
+  let u = f * dot(s, h);
+  /*
+  if u < 0. || u > 1. {
+    return None;
+  }
+  */
+  let q = cross(s, e1);
+  let v = f * dot(d, q);
+  /*
+  if u < 0. || u + v > 1. {
+    return None;
+  }
+  */
+  let t = f * dot(e2, q);
+  /*
+  if t < EPS {
+    return None;
+  }
+  */
+  let pos = add(o, kmul(t, d));
+  (u, v, t, pos)
+}
+
+#[test]
+fn test_line_tri_plane_isect() {
+  let tri = [[-1., -1., 0.], [0., 1., 0.], [1.,-1., 0.]];
+  let o = [0.,0.,-1.];
+  let d = [0.,0., 1.];
+  let (u,v, t, pos) = line_tri_plane_isect(tri, [o,d]);
+  println!("{u} {v} {t} {pos:?}");
+  assert!(t > 0.);
+  assert!((0.0..=1.0).contains(&u));
+  assert!((0.0..=1.0).contains(&(u+v)));
+
+  let tri = [[-1., -1., 0.], [0., 1., 0.], [1.,-1., 0.]];
+  let o = [5.,5.,-1.];
+  let d = [5.,5., 1.];
+  let (u,v, t, pos) = line_tri_plane_isect(tri, [o,d]);
+  assert!(!(0.0..=1.0).contains(&u));
+  assert!(!(0.0..=1.0).contains(&(u+v)));
+  assert!(t > 0.);
+  assert!(pos[2] == 0.);
+}
