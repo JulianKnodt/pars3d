@@ -399,6 +399,7 @@ pub fn barycentric_2d(p: [F; 2], [a, b, c]: [[F; 2]; 3]) -> [F; 3] {
     barycentric_n(p, a, b, c)
 }
 
+// ab - xy
 fn diff_of_prod(a: F, b: F, x: F, y: F) -> F {
     let xy = x * y;
     let dop = a.mul_add(b, -xy);
@@ -520,6 +521,44 @@ pub fn nearest_pt_on_line(p: [F; 3], [s, e]: [[F; 3]; 2]) -> [F; 3] {
     add(s, kmul(t, sub(e, s)))
 }
 
+// https://paulbourke.net/geometry/pointlineplane/
+pub fn nearest_pts_btwn_lines_3d([p1, p2]: [[F; 3]; 2], [p3, p4]: [[F; 3]; 2]) -> [[F; 3]; 2] {
+    pub fn d(
+        [xm, ym, zm]: [F; 3],
+        [xn, yn, zn]: [F; 3],
+        [xo, yo, zo]: [F; 3],
+        [xp, yp, zp]: [F; 3],
+    ) -> F {
+        (xm - xn) * (xo - xp) + (ym - yn) * (yo - yp) + (zm - zn) * (zo - zp)
+    }
+
+    let d4343 = d(p4, p3, p4, p3);
+    let d4321 = d(p4, p3, p2, p1);
+    let d1343 = d(p1, p3, p4, p3);
+    let numer = d1343 * d4321 - d(p1, p3, p2, p1) * d4343;
+    let denom = d(p2, p1, p2, p1) * d4343 - d4321 * d4321;
+
+    let t_a = numer / denom;
+    let t_b = (d1343 + t_a * d4321) / d4343;
+
+    let dir_a = sub(p2, p1);
+    let dir_b = sub(p4, p3);
+
+    let a_pt = add(p1, kmul(t_a, dir_a));
+    let b_pt = add(p3, kmul(t_b, dir_b));
+
+    [a_pt, b_pt]
+}
+
+#[test]
+fn test_nearest_pts_btwn_lines_3d() {
+  let pts = nearest_pts_btwn_lines_3d(
+    [[-1., -1., 0.], [ 1., -1., 0.]],
+    [[0.,   1., 1.], [0.,  1., -1.]],
+  );
+  assert_eq!(pts, [[0., -1., 0.], [0., 1., 0.]]);
+}
+
 pub fn rotate_on_axis(v: [F; 3], axis: [F; 3], s: F, c: F) -> [F; 3] {
     let r = add(kmul(c, v), kmul(dot(v, axis) * (1. - c), axis));
     add(r, kmul(s, cross(axis, v)))
@@ -597,61 +636,82 @@ fn test_line_segment_isect() {
     assert_eq!(Some([0., 0.]), isect);
 }
 
-
 /// Intersect a ray with a triangle
-pub fn line_tri_plane_isect([v0, v1, v2]: [[F;3]; 3], [o, d]: [[F;3]; 2]) -> (F, F, F, [F;3]) {
-  let e1 = sub(v1, v0);
-  let e2 = sub(v2, v0);
-  let h = cross(d, e2);
-  let a = dot(e1, h);
-  /*
-  if -EPS < a && a < EPS {
-    // parallel ray
-    return None;
-  }
-  */
-  let f = a.recip();
-  let s = sub(o, v0);
-  let u = f * dot(s, h);
-  /*
-  if u < 0. || u > 1. {
-    return None;
-  }
-  */
-  let q = cross(s, e1);
-  let v = f * dot(d, q);
-  /*
-  if u < 0. || u + v > 1. {
-    return None;
-  }
-  */
-  let t = f * dot(e2, q);
-  /*
-  if t < EPS {
-    return None;
-  }
-  */
-  let pos = add(o, kmul(t, d));
-  (u, v, t, pos)
+pub fn line_tri_isect([v0, v1, v2]: [[F; 3]; 3], [o, d]: [[F; 3]; 2]) -> (F, F, F, [F; 3]) {
+    let e1 = sub(v1, v0);
+    let e2 = sub(v2, v0);
+    let h = cross(d, e2);
+    let a = dot(e1, h);
+    //println!("a {a:?}");
+    /*
+    if -EPS < a && a < EPS {
+      // parallel ray
+      return None;
+    }
+    */
+    let f = a.recip();
+    let s = sub(o, v0);
+    let u = f * dot(s, h);
+    /*
+    if u < 0. || u > 1. {
+      return None;
+    }
+    */
+    let q = cross(s, e1);
+    let v = f * dot(d, q);
+    /*
+    if u < 0. || u + v > 1. {
+      return None;
+    }
+    */
+    let t = f * dot(e2, q);
+    /*
+    if t < EPS {
+      return None;
+    }
+    */
+    let pos = add(o, kmul(t, d));
+    (u, v, t, pos)
 }
 
 #[test]
-fn test_line_tri_plane_isect() {
-  let tri = [[-1., -1., 0.], [0., 1., 0.], [1.,-1., 0.]];
-  let o = [0.,0.,-1.];
-  let d = [0.,0., 1.];
-  let (u,v, t, pos) = line_tri_plane_isect(tri, [o,d]);
-  println!("{u} {v} {t} {pos:?}");
-  assert!(t > 0.);
-  assert!((0.0..=1.0).contains(&u));
-  assert!((0.0..=1.0).contains(&(u+v)));
+fn test_line_tri_isect() {
+    let tri = [[-1., -1., 0.], [0., 1., 0.], [1., -1., 0.]];
+    let o = [0., 0., -1.];
+    let d = [0., 0., 1.];
+    let (u, v, t, pos) = line_tri_isect(tri, [o, d]);
+    println!("{u} {v} {t} {pos:?}");
+    assert!(t > 0.);
+    assert!((0.0..=1.0).contains(&u));
+    assert!((0.0..=1.0).contains(&(u + v)));
 
-  let tri = [[-1., -1., 0.], [0., 1., 0.], [1.,-1., 0.]];
-  let o = [5.,5.,-1.];
-  let d = [5.,5., 1.];
-  let (u,v, t, pos) = line_tri_plane_isect(tri, [o,d]);
-  assert!(!(0.0..=1.0).contains(&u));
-  assert!(!(0.0..=1.0).contains(&(u+v)));
-  assert!(t > 0.);
-  assert!(pos[2] == 0.);
+    let tri = [[-1., -1., 0.], [0., 1., 0.], [1., -1., 0.]];
+    let o = [5., 5., -1.];
+    let d = [5., 5., 1.];
+    let (u, v, t, pos) = line_tri_isect(tri, [o, d]);
+    assert!(!(0.0..=1.0).contains(&u));
+    assert!(!(0.0..=1.0).contains(&(u + v)));
+    assert!(t > 0.);
+    assert!(pos[2] == 0.);
+
+    let tri = [[-1., -1., 0.], [1., -1., 0.], [0., 1., 0.]];
+    let o = [0., 0., -1.];
+    let d = [0., 0., 1.];
+    let (u, v, t, pos) = line_tri_isect(tri, [o, d]);
+    println!("{u} {v} {t} {pos:?}");
+    assert!(t > 0.);
+    assert!((0.0..=1.0).contains(&u));
+    assert!((0.0..=1.0).contains(&(u + v)));
+}
+
+#[test]
+fn test_line_tri_isect_on_tri_edge() {
+    let o = [-1., 3., 0.];
+    let at = [0., 1., 0.];
+
+    let tri = [[1., 0., 0.], [0., 0., -1.], [0., -1., 0.]];
+    let (u, v, t, _pos) = line_tri_isect(tri, [o, sub(at, o)]);
+    assert!((0.0..=1.0).contains(&(u + v)));
+    assert!(t >= 0.);
+    //println!("{u} {v} {t} {_pos:?}");
 }
