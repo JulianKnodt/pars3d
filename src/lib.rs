@@ -552,11 +552,11 @@ pub fn nearest_pts_btwn_lines_3d([p1, p2]: [[F; 3]; 2], [p3, p4]: [[F; 3]; 2]) -
 
 #[test]
 fn test_nearest_pts_btwn_lines_3d() {
-  let pts = nearest_pts_btwn_lines_3d(
-    [[-1., -1., 0.], [ 1., -1., 0.]],
-    [[0.,   1., 1.], [0.,  1., -1.]],
-  );
-  assert_eq!(pts, [[0., -1., 0.], [0., 1., 0.]]);
+    let pts = nearest_pts_btwn_lines_3d(
+        [[-1., -1., 0.], [1., -1., 0.]],
+        [[0., 1., 1.], [0., 1., -1.]],
+    );
+    assert_eq!(pts, [[0., -1., 0.], [0., 1., 0.]]);
 }
 
 pub fn rotate_on_axis(v: [F; 3], axis: [F; 3], s: F, c: F) -> [F; 3] {
@@ -636,7 +636,35 @@ fn test_line_segment_isect() {
     assert_eq!(Some([0., 0.]), isect);
 }
 
-/// Intersect a ray with a triangle
+/// Given the equation of a plane (dot(P,N) + d), where d = (dot(Point on Plane, N))
+/// And some ray, compute the intersection of the ray and the plane.
+/// If the ray and the plane are parallel, will return NaN first value.
+pub fn line_plane_isect((n, d): ([F; 3], F), [o, dir]: [[F; 3]; 2]) -> (F, [F; 3]) {
+    let t = -(dot(o, n) + d) / dot(dir, n);
+    (t, add(o, kmul(t, dir)))
+}
+
+pub(crate) fn plane_eq(a: [F; 3], b: [F; 3], c: [F; 3]) -> ([F; 3], F) {
+    let n = cross(sub(c, a), sub(b, a));
+    let n = normalize(n);
+    (n, dot(n, a))
+}
+
+#[test]
+fn test_line_plane_isect() {
+  let p = ([0.,1.,0.], 0.);
+  let (t, pos) = line_plane_isect(p, [[0., 1., 0.], [0., -1., 0.]]);
+  assert_eq!(pos, [0., 0., 0.]);
+  assert_eq!(t, 1.);
+
+  let (t, pos) = line_plane_isect(p, [[0.5, 0.5, 0.], [-0.5, -0.5, 0.]]);
+  assert_eq!(pos, [0., 0., 0.]);
+  assert_eq!(t, 1.);
+}
+
+/// Intersect a ray with a triangle.
+/// Returns the barycentric coordinate in the first two values,
+/// Returns ray distance in the third, and position in the last.
 pub fn line_tri_isect([v0, v1, v2]: [[F; 3]; 3], [o, d]: [[F; 3]; 2]) -> (F, F, F, [F; 3]) {
     let e1 = sub(v1, v0);
     let e2 = sub(v2, v0);

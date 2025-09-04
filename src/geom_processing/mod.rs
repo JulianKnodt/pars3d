@@ -643,9 +643,10 @@ fn cumulative_sum<'a>(vs: impl Iterator<Item = &'a mut F>) {
     }
 }
 
-pub fn star_shaped_quad_kernel(vis: [[F; 2]; 4]) -> [[F;2]; 4] {
+/// Computes the kernel for an arbitrary quad
+pub fn polygon_quad_kernel(vis: [[F; 2]; 4]) -> [[F; 2]; 4] {
     // for each vertex, reproject it to opposite side if it is not in right place
-    std::array::from_fn(|vi|{
+    std::array::from_fn(|vi| {
         let v = vis[vi];
         let vn = vis[(vi + 1) % 4];
         // tc = to_check
@@ -666,13 +667,137 @@ pub fn star_shaped_quad_kernel(vis: [[F; 2]; 4]) -> [[F;2]; 4] {
 }
 
 #[test]
-fn test_star_shaped_quad_kernel() {
+fn test_polygon_quad_kernel() {
     //let uvs = [[0., 0.], [1., 2.], [0., 1.], [-1., 2.]];
     let uvs = [[-1., 0.], [0., -1.], [1., 0.], [0., 1.]];
-    let kernel = star_shaped_quad_kernel(uvs);
-    for [u,v] in kernel {
-      print!("({u}, {v}),");
+    let kernel = polygon_quad_kernel(uvs);
+    for [u, v] in kernel {
+        print!("({u}, {v}),");
     }
     println!();
+    todo!();
+}
+
+/// Computes the kernel of an octahedron
+pub fn octahedron_kernel(vs: [[F; 3]; 6]) -> Vec<[F; 3]> {
+    // [l,r,f,b,u,d]
+    use super::line_plane_isect;
+
+    let mut out = vec![];
+    for vi in 0..6 {
+        let is_even = (vi % 2) == 0;
+        let base = vi - (vi % 2);
+
+        let v = vs[vi];
+        let opp = vs[if is_even { vi + 1 } else { vi - 1 }];
+
+        let r = vs[(if is_even { base + 2 } else { base + 3 }) % 6];
+        let l = vs[(if is_even { base + 3 } else { base + 2 }) % 6];
+
+        let u = vs[(if is_even { base + 5 } else { base + 4 }) % 6];
+        let d = vs[(if is_even { base + 4 } else { base + 5 }) % 6];
+
+        // for each edge from v to rlud and opp to rlud, if it is non-convex then need to run
+        // ray-tri intersection (need to intersect exactly 2 triangles, but a bit difficult to tell)
+
+        let mut any = false;
+        for [vn, vnnn, a, b] in [[r, l, u, d], [l, r, d, u], [u, d, l, r], [d, u, r, l]] {
+            /*
+            let vol = crate::signed_tet_vol([v, vn, opp, a]);
+            if vol < 0. {
+                continue;
+            }
+            */
+
+            // One of these will hit the tri directly likely
+            let ray = [v, sub(vn, v)];
+            let a_plane = crate::plane_eq(opp, vnnn, a);
+            let (u_t, u_pos) = line_plane_isect(a_plane, ray);
+            let b_plane = crate::plane_eq(opp, vnnn, b);
+            let (v_t, v_pos) = line_plane_isect(b_plane, ray);
+
+            println!("{u_t} {v_t} {u_pos:?} {v_pos:?} {a_plane:?} {b_plane:?}");
+            if u_t < 0. || v_t < 0. {
+                // not sure if this is correct
+                continue;
+            }
+            // TODO here need to check if it's positive?
+            let pos = if u_t < v_t { u_pos } else { v_pos };
+            /*
+            match (u_t, v_t) {
+            }
+            */
+
+            out.push(pos);
+            any = true;
+        }
+        if !any {
+            out.push(v);
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+fn one_hot<const N: usize>(v: F) -> [F; 3] {
+    let mut out = [0.; 3];
+    out[N] = v;
+    out
+}
+
+#[test]
+fn test_octahedron_kernel_basic() {
+    let uvs = [
+        one_hot::<0>(-1.),
+        one_hot::<0>(1.),
+        one_hot::<1>(-1.),
+        one_hot::<1>(1.),
+        one_hot::<2>(-1.),
+        one_hot::<2>(1.),
+    ];
+    let kernel = octahedron_kernel(uvs);
+    assert_eq!(kernel.len(), 6, "{kernel:?}");
+}
+
+#[test]
+fn test_octahedron_kernel_shifted_1d() {
+    let uvs = [
+        add(one_hot::<0>(-1.), [0., 3., 0.]),
+        one_hot::<0>(1.),
+        one_hot::<1>(-1.),
+        one_hot::<1>(1.),
+        one_hot::<2>(-1.),
+        one_hot::<2>(1.),
+    ];
+    for [x, y, z] in uvs {
+        print!("({x},{y},{z}),");
+    }
+    println!();
+    let kernel = octahedron_kernel(uvs);
+    for [x, y, z] in &kernel {
+        print!("({x},{y},{z}),");
+    }
+    assert_eq!(kernel.len(), 6);
+}
+
+#[test]
+fn test_octahedron_kernel_shifted_2d() {
+    let uvs = [
+        add(one_hot::<0>(-1.), [0., 3., 0.5]),
+        one_hot::<0>(1.),
+        one_hot::<1>(-1.),
+        one_hot::<1>(1.),
+        one_hot::<2>(-1.),
+        one_hot::<2>(1.),
+    ];
+    for [x, y, z] in uvs {
+        print!("({x},{y},{z}),");
+    }
+    println!();
+    let kernel = octahedron_kernel(uvs);
+    for [x, y, z] in &kernel {
+        print!("({x},{y},{z}),");
+    }
+    assert_eq!(kernel.len(), 6);
     todo!();
 }
