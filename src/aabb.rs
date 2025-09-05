@@ -131,7 +131,7 @@ impl AABB<F, 2> {
 
     pub(crate) fn line_segment_isect(&self, l: [[F; 2]; 2]) -> impl Iterator<Item = [F; 2]> + '_ {
         let c = self.corners();
-        (0..4).filter_map(move |i| super::line_segment_isect([c[i], c[(i + 1) % 4]], l))
+        (0..4).filter_map(move |i| super::isect::line_segment_isect([c[i], c[(i + 1) % 4]], l))
     }
 
     /// Returns true if this aabb intersects the tri t.

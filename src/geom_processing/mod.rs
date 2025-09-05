@@ -646,6 +646,7 @@ fn cumulative_sum<'a>(vs: impl Iterator<Item = &'a mut F>) {
 /// Computes the kernel for an arbitrary quad
 pub fn polygon_quad_kernel(vis: [[F; 2]; 4]) -> [[F; 2]; 4] {
     // for each vertex, reproject it to opposite side if it is not in right place
+    use crate::isect::line_isect;
     std::array::from_fn(|vi| {
         let v = vis[vi];
         let vn = vis[(vi + 1) % 4];
@@ -655,10 +656,10 @@ pub fn polygon_quad_kernel(vis: [[F; 2]; 4]) -> [[F; 2]; 4] {
 
         // TODO need to be really careful of winding here
         if crate::cross_2d(sub(vnn, vn), sub(v, vn)) < 0. {
-            let (_, _, isect) = super::line_isect([vn, vnn], [vnnn, v]).unwrap();
+            let (_, _, isect) = line_isect([vn, vnn], [vnnn, v]).unwrap();
             isect
         } else if crate::cross_2d(sub(vnnn, vnn), sub(v, vnn)) < 0. {
-            let (_, _, isect) = super::line_isect([vnnn, vnn], [v, vn]).unwrap();
+            let (_, _, isect) = line_isect([vnnn, vnn], [v, vn]).unwrap();
             isect
         } else {
             v
@@ -679,66 +680,67 @@ fn test_polygon_quad_kernel() {
 }
 
 /// Computes the kernel of an octahedron
-pub fn octahedron_kernel(vs: [[F; 3]; 6]) -> Vec<[F; 3]> {
+pub fn octahedron_kernel(vs: [[F; 3]; 6]) -> Vec<[F; 3]> /*[[F; 3]; 12]*/ {
     // [l,r,f,b,u,d]
-    use super::line_plane_isect;
+    use super::isect::{line_plane_isect, plane_eq};
 
     let mut out = vec![];
-    for vi in 0..6 {
-        let is_even = (vi % 2) == 0;
-        let base = vi - (vi % 2);
-
-        let v = vs[vi];
-        let opp = vs[if is_even { vi + 1 } else { vi - 1 }];
-
-        let r = vs[(if is_even { base + 2 } else { base + 3 }) % 6];
-        let l = vs[(if is_even { base + 3 } else { base + 2 }) % 6];
-
-        let u = vs[(if is_even { base + 5 } else { base + 4 }) % 6];
-        let d = vs[(if is_even { base + 4 } else { base + 5 }) % 6];
+    for vi in 0..2 {
+        let idxs = match vi {
+            0 => [0, 1, 2, 3, 4, 5],
+            1 => [1, 0, 3, 2, 4, 5],
+            2 => [2, 3, 5, 4, 1, 0],
+            3 => [3, 2, 4, 5, 1, 0],
+            4 => [4, 5, 0, 1, 3, 2],
+            5 => [5, 4, 1, 0, 3, 2],
+            _ => todo!(),
+        };
+        let [v, opp, r, l, u, d] = idxs.map(|idx| vs[idx]);
 
         // for each edge from v to rlud and opp to rlud, if it is non-convex then need to run
         // ray-tri intersection (need to intersect exactly 2 triangles, but a bit difficult to tell)
 
-        let mut any = false;
-        for [vn, vnnn, a, b] in [[r, l, u, d], [l, r, d, u], [u, d, l, r], [d, u, r, l]] {
-            /*
-            let vol = crate::signed_tet_vol([v, vn, opp, a]);
-            if vol < 0. {
-                continue;
-            }
-            */
-
+        for [vn, vnnn, a, b] in [[r, l, u, d], [l, r, d, u]] {
             // One of these will hit the tri directly likely
             let ray = [v, sub(vn, v)];
-            let a_plane = crate::plane_eq(opp, vnnn, a);
+            let a_plane = plane_eq(opp, vnnn, a);
             let (u_t, u_pos) = line_plane_isect(a_plane, ray);
 
-            let b_plane = crate::plane_eq(opp, vnnn, b);
+            let b_plane = plane_eq(opp, vnnn, b);
             let (v_t, v_pos) = line_plane_isect(b_plane, ray);
 
-            if u_t.is_nan() && v_t.is_nan() {
+            assert!(!u_t.is_nan());
+            assert!(!v_t.is_nan());
+
+            if !u_t.is_finite() && !v_t.is_finite() {
                 continue;
             }
 
-            //println!("{u_t} {v_t} {u_pos:?} {v_pos:?} {a_plane:?} {b_plane:?}");
-            if u_t < 0. || v_t < 0. {
-                // not sure if this is correct
+            if u_t < 0. && v_t < 0. {
                 continue;
             }
-            // TODO here need to check if it's positive?
-            let pos = if u_t < v_t { u_pos } else { v_pos };
-            /*
-            match (u_t, v_t) {
-            }
-            */
+
+            println!("{u_t} {u_pos:?} {v_t} {v_pos:?}");
+
+            let pos = if u_t < 0. {
+                assert!(v_t >= 0.);
+                v_pos
+            } else if v_t < 0. {
+                assert!(u_t >= 0.);
+                u_pos
+            } else if u_t < v_t {
+                u_pos
+            } else {
+                v_pos
+            };
 
             out.push(pos);
-            any = true;
         }
+        /*
         if !any {
             out.push(v);
         }
+        */
     }
     out
 }
@@ -750,6 +752,7 @@ fn one_hot<const N: usize>(v: F) -> [F; 3] {
     out
 }
 
+/*
 #[test]
 fn test_octahedron_kernel_basic() {
     let uvs = [
@@ -762,31 +765,43 @@ fn test_octahedron_kernel_basic() {
     ];
     let kernel = octahedron_kernel(uvs);
     assert_eq!(kernel.len(), 6, "{kernel:?}");
+    todo!("{kernel:?}");
 }
+*/
 
 #[test]
 fn test_octahedron_kernel_shifted_1d() {
     let uvs = [
+        //one_hot::<0>(-1.),
+        //add(one_hot::<0>(1.), [0., 3., 0.]),
         add(one_hot::<0>(-1.), [0., 3., 0.]),
         one_hot::<0>(1.),
         one_hot::<1>(-1.),
         one_hot::<1>(1.),
         one_hot::<2>(-1.),
         one_hot::<2>(1.),
+        /*
+        */
+
+        /*
+        one_hot::<0>(-1.),
+        one_hot::<0>(1.),
+        one_hot::<1>(-1.),
+        one_hot::<1>(1.),
+        one_hot::<2>(-1.),,
+        one_hot::<2>(1.),
+        */
     ];
-    /*
     for [x, y, z] in uvs {
         print!("({x},{y},{z}),");
     }
     println!();
-    */
     let kernel = octahedron_kernel(uvs);
-    /*
     for [x, y, z] in &kernel {
         print!("({x},{y},{z}),");
     }
-    */
     assert_eq!(kernel.len(), 6, "{kernel:?}");
+    todo!();
 }
 
 /*
