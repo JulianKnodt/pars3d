@@ -683,16 +683,17 @@ fn test_polygon_quad_kernel() {
 pub fn octahedron_kernel(vs: [[F; 3]; 6]) -> Vec<[F; 3]> /*[[F; 3]; 12]*/ {
     // [l,r,f,b,u,d]
     use super::isect::{line_plane_isect, plane_eq};
+    use super::octahedron_contains as in_oct;
 
     let mut out = vec![];
-    for vi in 0..2 {
+    for vi in 0..6 {
         let idxs = match vi {
             0 => [0, 1, 2, 3, 4, 5],
-            1 => [1, 0, 3, 2, 4, 5],
+            1 => [1, 0, 3, 2, 5, 4],
             2 => [2, 3, 5, 4, 1, 0],
-            3 => [3, 2, 4, 5, 1, 0],
+            3 => [3, 2, 4, 5, 0, 1],
             4 => [4, 5, 0, 1, 3, 2],
-            5 => [5, 4, 1, 0, 3, 2],
+            5 => [5, 4, 1, 0, 2, 3],
             _ => todo!(),
         };
         let [v, opp, r, l, u, d] = idxs.map(|idx| vs[idx]);
@@ -709,24 +710,14 @@ pub fn octahedron_kernel(vs: [[F; 3]; 6]) -> Vec<[F; 3]> /*[[F; 3]; 12]*/ {
             let b_plane = plane_eq(opp, vnnn, b);
             let (v_t, v_pos) = line_plane_isect(b_plane, ray);
 
-            assert!(!u_t.is_nan());
-            assert!(!v_t.is_nan());
+            let u_valid = u_t.is_finite() && u_t > 0. && in_oct(vs, u_pos);
+            let v_valid = v_t.is_finite() && v_t > 0. && in_oct(vs, v_pos);
 
-            if !u_t.is_finite() && !v_t.is_finite() {
-                continue;
-            }
-
-            if u_t < 0. && v_t < 0. {
-                continue;
-            }
-
-            println!("{u_t} {u_pos:?} {v_t} {v_pos:?}");
-
-            let pos = if u_t < 0. {
-                assert!(v_t >= 0.);
+            let pos = if !u_valid && !v_valid {
+                v
+            } else if !u_valid {
                 v_pos
-            } else if v_t < 0. {
-                assert!(u_t >= 0.);
+            } else if !v_valid {
                 u_pos
             } else if u_t < v_t {
                 u_pos

@@ -625,7 +625,7 @@ pub fn octahedron_contains([l, r, f, b, u, d]: [[F; 3]; 6], p: [F; 3]) -> bool {
     ];
 
     use isect::dist_to_plane;
-    tris.into_iter().all(|t| dist_to_plane(t, p) <= 0.)
+    tris.into_iter().all(|t| dist_to_plane(t, p) <= 1e-8)
 }
 
 #[test]
