@@ -48,15 +48,18 @@ pub fn line_plane_isect((n, d): ([F; 3], F), [o, dir]: [[F; 3]; 2]) -> (F, [F; 3
 }
 
 /// Given a triangle, computes the coefficients for the plane that passes through the triangle
-pub fn plane_eq(a: [F; 3], b: [F; 3], c: [F; 3]) -> ([F; 3], F) {
+pub fn plane_eq([a, b, c]: [[F; 3]; 3]) -> ([F; 3], F) {
     let n = cross(sub(c, a), sub(b, a));
     let n = normalize(n);
     (n, -dot(n, a))
 }
 
-pub fn dist_to_plane(tri: [[F; 3]; 3], p: [F; 3]) -> F {
-    let (n, d) = plane_eq(tri[0], tri[1], tri[2]);
+pub fn dist_to_plane_eq((n, d): ([F; 3], F), p: [F; 3]) -> F {
     dot(n, p) + d
+}
+
+pub fn dist_to_plane(tri: [[F; 3]; 3], p: [F; 3]) -> F {
+    dist_to_plane_eq(plane_eq(tri), p)
 }
 
 #[test]
@@ -79,7 +82,7 @@ fn test_line_plane_isect() {
 #[test]
 fn test_line_plane_isect_tri() {
     let tri = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
-    let pl = plane_eq(tri[0], tri[1], tri[2]);
+    let pl = plane_eq([tri[0], tri[1], tri[2]]);
     println!("{pl:?}");
     let ray = [[-1.0, 3.0, 0.0], [1.0, -4.0, 0.0]];
     assert_eq!(line_plane_isect(pl, ray).1, line_tri_isect(tri, ray).3);

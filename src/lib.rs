@@ -612,7 +612,7 @@ fn poly_area_2d(p: &[[F; 2]]) -> F {
     (0..n).map(|i| cross_2d(p[i], p[(i + 1) % n])).sum::<F>() / 2.
 }
 
-pub fn octahedron_contains([l, r, f, b, u, d]: [[F; 3]; 6], p: [F; 3]) -> bool {
+pub fn octahedron_contains([l, r, f, b, u, d]: [[F; 3]; 6], p: [F; 3], eps: F) -> bool {
     let tris = [
         [l, f, u],
         [l, d, f],
@@ -625,7 +625,7 @@ pub fn octahedron_contains([l, r, f, b, u, d]: [[F; 3]; 6], p: [F; 3]) -> bool {
     ];
 
     use isect::dist_to_plane;
-    tris.into_iter().all(|t| dist_to_plane(t, p) <= 1e-8)
+    tris.into_iter().all(|t| dist_to_plane(t, p) <= eps)
 }
 
 #[test]
@@ -638,6 +638,6 @@ fn test_octahedron_contains() {
         [0., 0., -1.],
         [0., 0., 1.],
     ];
-    let oct_contains = octahedron_contains(pts, [0.; 3]);
+    let oct_contains = octahedron_contains(pts, [0.; 3], 0.);
     assert!(oct_contains);
 }
