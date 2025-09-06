@@ -689,11 +689,11 @@ pub fn octahedron_kernel(vs: [[F; 3]; 6]) -> Vec<[F; 3]> /*[[F; 3]; 12]*/ {
     for vi in 0..6 {
         let idxs = match vi {
             0 => [0, 1, 2, 3, 4, 5],
-            1 => [1, 0, 3, 2, 5, 4],
+            1 => [1, 0, 3, 2, 4, 5],
             2 => [2, 3, 5, 4, 1, 0],
-            3 => [3, 2, 4, 5, 0, 1],
+            3 => [3, 2, 4, 5, 1, 0],
             4 => [4, 5, 0, 1, 3, 2],
-            5 => [5, 4, 1, 0, 2, 3],
+            5 => [5, 4, 1, 0, 3, 2],
             _ => todo!(),
         };
         let [v, opp, r, l, u, d] = idxs.map(|idx| vs[idx]);
@@ -702,6 +702,15 @@ pub fn octahedron_kernel(vs: [[F; 3]; 6]) -> Vec<[F; 3]> /*[[F; 3]; 12]*/ {
         // ray-tri intersection (need to intersect exactly 2 triangles, but a bit difficult to tell)
 
         for [vn, vnnn, a, b] in [[r, l, u, d], [l, r, d, u]] {
+            //let f_a = [v,a,vn];
+            let a_n = cross(sub(v,a), sub(vn, a));
+            //let f_b = [opp,vn,a];
+            let b_n = cross(sub(opp, vn), sub(a, vn));
+            if dot(a_n, b_n) > 0. {
+              continue;
+            }
+            println!("{:?}", dot(a_n, b_n));
+
             // One of these will hit the tri directly likely
             let ray = [v, sub(vn, v)];
             let a_plane = plane_eq(opp, vnnn, a);
@@ -710,8 +719,8 @@ pub fn octahedron_kernel(vs: [[F; 3]; 6]) -> Vec<[F; 3]> /*[[F; 3]; 12]*/ {
             let b_plane = plane_eq(opp, vnnn, b);
             let (v_t, v_pos) = line_plane_isect(b_plane, ray);
 
-            let u_valid = u_t.is_finite() && u_t > 0. && in_oct(vs, u_pos);
-            let v_valid = v_t.is_finite() && v_t > 0. && in_oct(vs, v_pos);
+            let u_valid = u_t.is_finite() && u_t > 0. /*&& in_oct(vs, u_pos)*/;
+            let v_valid = v_t.is_finite() && v_t > 0. /*&& in_oct(vs, v_pos)*/;
 
             let pos = if !u_valid && !v_valid {
                 v
@@ -743,7 +752,6 @@ fn one_hot<const N: usize>(v: F) -> [F; 3] {
     out
 }
 
-/*
 #[test]
 fn test_octahedron_kernel_basic() {
     let uvs = [
@@ -758,6 +766,7 @@ fn test_octahedron_kernel_basic() {
     assert_eq!(kernel.len(), 6, "{kernel:?}");
     todo!("{kernel:?}");
 }
+/*
 */
 
 #[test]
@@ -794,6 +803,8 @@ fn test_octahedron_kernel_shifted_1d() {
     assert_eq!(kernel.len(), 6, "{kernel:?}");
     todo!();
 }
+/*
+*/
 
 /*
 #[test]
