@@ -1,6 +1,7 @@
 use crate::isect::line_isect;
 use crate::{F, cross_2d, sub};
 
+/// https://dl.acm.org/doi/pdf/10.1145/322139.322142
 pub fn polygon_kernel(vs: &[[F; 2]], out: &mut Vec<[F; 2]>) {
     out.clear();
     out.extend(vs.iter().copied());
@@ -12,10 +13,11 @@ pub fn polygon_kernel(vs: &[[F; 2]], out: &mut Vec<[F; 2]>) {
         let v = vs[vi];
         let vn = vs[(vi + 1) % N];
         let vp = vs[(vi + N - 1) % N];
-        if orient(v,vn, vp) != Sign::Neg {
+        if orient(v, vn, vp) != Sign::Neg {
             continue;
         }
 
+        // TODO can hoist this buffer to parameters?
         let mut out_buf = vec![];
         let mut ki = 0;
         while ki < out.len() {
@@ -46,18 +48,18 @@ pub fn polygon_kernel(vs: &[[F; 2]], out: &mut Vec<[F; 2]>) {
 }
 #[derive(Debug, PartialEq, Eq, Ord, PartialOrd, Copy, Clone)]
 enum Sign {
-  Pos,
-  Neg,
-  Zero
+    Pos,
+    Neg,
+    Zero,
 }
 fn sign(x: F) -> Sign {
-  if x > 0. {
-    Sign::Pos
-  } else if x < 0. {
-    Sign::Neg
-  } else {
-    Sign::Zero
-  }
+    if x > 0. {
+        Sign::Pos
+    } else if x < 0. {
+        Sign::Neg
+    } else {
+        Sign::Zero
+    }
 }
 
 #[test]
@@ -68,19 +70,23 @@ fn test_quad_polygon_kernel() {
         [-1., 0.],
         [-3., -1.],
     ];
-    for [x,y] in verts {
-      print!("({x}, {y}), ");
-    }
-    println!();
     let mut out = vec![];
     polygon_kernel(verts, &mut out);
     assert_eq!(out.len(), 4);
-    for [x,y] in out {
-      print!("({x}, {y}), ");
-    }
 }
 
-/*
 #[test]
-fn test_complex_concave
-*/
+fn test_complex_concave() {
+    let verts = &[
+        [1., 2.],
+        [0., 1.],
+        [-1., 3.],
+        [-1., -3.],
+        [0., -1.],
+        [1., -3.],
+    ];
+
+    let mut out = vec![];
+    polygon_kernel(verts, &mut out);
+    assert_eq!(out.len(), 4);
+}
