@@ -20,6 +20,9 @@ pub mod instant_meshes;
 /// A data structure which tracks collapsible edges.
 pub mod collapsible;
 
+/// Compute the kernel of a general polygon.
+pub mod polygon_kernel;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum VertexNormalWeightingKind {
     Uniform,
@@ -672,9 +675,5 @@ fn test_polygon_quad_kernel() {
     //let uvs = [[0., 0.], [1., 2.], [0., 1.], [-1., 2.]];
     let uvs = [[-1., 0.], [0., -1.], [1., 0.], [0., 1.]];
     let kernel = polygon_quad_kernel(uvs);
-    for [u, v] in kernel {
-        print!("({u}, {v}),");
-    }
-    println!();
-    todo!();
+    assert_eq!(kernel.len(), 4);
 }
