@@ -1,6 +1,7 @@
 use super::*;
 
 // given two lines, compute their intersection
+// Returns the length along each line which the intersection occurs
 pub fn line_isect([a0, a1]: [[F; 2]; 2], [b0, b1]: [[F; 2]; 2]) -> Option<(F, F, [F; 2])> {
     // they could also lie directly on the line, but that's annoying to check
     if a0 == a1 || b0 == b1 {
