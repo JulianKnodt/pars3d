@@ -1,5 +1,5 @@
 use super::{MTL, Obj, ObjImage, ObjObject};
-use crate::mesh::{Material, Mesh, Node, Scene, Texture, TextureKind, Transform};
+use crate::mesh::{Line, Material, Mesh, Node, Scene, Texture, TextureKind, Transform};
 use crate::{FaceKind, append_one};
 use image::DynamicImage;
 
@@ -16,12 +16,14 @@ impl From<ObjObject> for Mesh {
                 .into_iter()
                 .map(|pmf| FaceKind::from(pmf.v))
                 .collect::<Vec<_>>();
+            let l = obj.l.into_iter().map(|l| Line::new(&l.v)).collect();
             return Self {
                 v,
                 face_mesh_idx: vec![0; f.len()],
                 f,
                 face_mat_idx: obj.mat,
                 vert_colors,
+                l,
                 ..Default::default()
             };
         }
@@ -37,22 +39,23 @@ impl From<ObjObject> for Mesh {
         let must_match_uvs = obj.f.iter().any(|f| !f.vt.is_empty());
         let must_match_nrm = obj.f.iter().any(|f| !f.vn.is_empty());
 
+        macro_rules! key_i {
+            ($o: expr, $i: expr) => {
+                (
+                    $o.v[$i],
+                    $o.vt.get($i).copied(),
+                    // NOTE: Do not use normals to split edges, seems it's a bit buggy
+                    //f.vn.get($i).copied().map(|vn| obj.vn[vn].map(F::to_bits)),
+                )
+            };
+        }
+
         for f in obj.f.into_iter() {
             if f.v.len() < 3 {
                 continue;
             }
-            macro_rules! key_i {
-                ($i: expr) => {
-                    (
-                        f.v[$i],
-                        f.vt.get($i).copied(),
-                        // NOTE: Do not use normals to split edges, seems it's a bit buggy
-                        //f.vn.get($i).copied().map(|vn| obj.vn[vn].map(F::to_bits)),
-                    )
-                };
-            }
             for i in 0..f.v.len() {
-                let key = key_i!(i);
+                let key = key_i!(f, i);
                 if !verts.contains_key(&key) {
                     v.push(obj.v[f.v[i]]);
                     if let Some(&vc) = obj.vc.get(f.v[i]) {
@@ -73,11 +76,34 @@ impl From<ObjObject> for Mesh {
             }
             let f = match f.v.len() {
                 0 | 1 | 2 => unreachable!(),
-                3 => FaceKind::Tri(from_fn(|i| verts[&key_i!(i)])),
-                4 => FaceKind::Quad(from_fn(|i| verts[&key_i!(i)])),
-                n => FaceKind::Poly((0..n).map(|i| verts[&key_i!(i)]).collect::<Vec<_>>()),
+                3 => FaceKind::Tri(from_fn(|i| verts[&key_i!(f, i)])),
+                4 => FaceKind::Quad(from_fn(|i| verts[&key_i!(f, i)])),
+                n => FaceKind::Poly((0..n).map(|i| verts[&key_i!(f, i)]).collect()),
             };
             fs.push(f);
+        }
+
+        let mut ls = vec![];
+        for l in obj.l.into_iter() {
+            if l.v.len() < 2 {
+                continue;
+            }
+            for i in 0..l.v.len() {
+                let key = key_i!(l, i);
+                if !verts.contains_key(&key) {
+                    v.push(obj.v[l.v[i]]);
+                    if let Some(vt) = key.1 {
+                        uv.push(obj.vt[vt]);
+                    }
+                    verts.insert(key, verts.len());
+                }
+            }
+            let l = match l.v.len() {
+                0 | 1 => unreachable!(),
+                2 => Line::Standard(from_fn(|i| verts[&key_i!(l, i)])),
+                n => Line::Poly((0..n).map(|i| verts[&key_i!(l, i)]).collect()),
+            };
+            ls.push(l);
         }
 
         Self {
@@ -85,6 +111,7 @@ impl From<ObjObject> for Mesh {
             face_mesh_idx: vec![0; fs.len()],
             f: fs,
             n,
+            l: ls,
             uv: [uv, vec![], vec![], vec![]],
 
             vert_colors,
@@ -116,7 +143,9 @@ impl From<Obj> for Scene {
             out.materials.push(mat);
         }
         for (i, o) in obj.objects.into_iter().enumerate() {
-            out.meshes.push(Mesh::from(o));
+            let mut new_mesh = Mesh::from(o);
+            new_mesh.face_mesh_idx.fill(i);
+            out.meshes.push(new_mesh);
             out.root_nodes.push(i);
             out.nodes.push(Node {
                 mesh: Some(i),

@@ -368,6 +368,27 @@ impl VertexAttrs {
     }
 }
 
+/// Enum to represent polylines in a mesh. 2 element lines are special cased to avoid heap
+/// allocations.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Line {
+    Standard([usize; 2]),
+    Poly(Vec<usize>),
+}
+
+impl Line {
+    pub fn new(pts: &[usize]) -> Self {
+        if let &[a, b] = pts {
+            return Self::new_from_endpoints(a, b);
+        }
+        todo!()
+    }
+    #[inline]
+    pub fn new_from_endpoints(a: usize, b: usize) -> Self {
+        Self::Standard(std::cmp::minmax(a, b))
+    }
+}
+
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct Mesh {
     /// Vertex positions.
@@ -383,6 +404,10 @@ pub struct Mesh {
 
     /// Faces.
     pub f: Vec<FaceKind>,
+
+    /// Lines without corresponding faces.
+    pub l: Vec<Line>,
+
     /// Which mesh did this face come from?
     /// Used when flattening a scene into a single mesh.
     pub face_mesh_idx: Vec<usize>,

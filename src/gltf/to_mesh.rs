@@ -30,6 +30,7 @@ impl From<GLTFMesh> for Mesh {
             name: String::new(),
             vert_colors: vec![],
             vertex_attrs: Default::default(),
+            l: vec![],
         }
     }
 }

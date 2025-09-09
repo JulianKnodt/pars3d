@@ -27,6 +27,7 @@ impl From<Ply> for Mesh {
             face_mat_idx: vec![],
             joint_idxs: vec![],
             joint_weights: vec![],
+            l: vec![],
 
             name: String::new(),
             vertex_attrs,

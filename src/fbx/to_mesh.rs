@@ -254,6 +254,7 @@ impl From<FBXMesh> for (Mesh, Vec<usize>) {
             name,
             face_mesh_idx: vec![],
             vert_colors: vec![],
+            l: vec![],
 
             face_mat_idx: match mat {
                 FBXMeshMaterial::None => vec![],
@@ -288,6 +289,7 @@ impl From<Mesh> for FBXMesh {
 
             joint_weights: _,
             vertex_attrs: _,
+            l: _,
         } = mesh;
 
         // FIXME? can change the output format if there are no repeats
