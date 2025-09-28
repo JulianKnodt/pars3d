@@ -128,6 +128,17 @@ impl<T> FaceKind<T> {
         rest.array_windows::<2>().map(move |&[v1, v2]| [v0, v1, v2])
     }
 
+    /// Iterate over triangles in this face rooted at the 0th index.
+    pub fn as_triangle_fan_from(&self, base: usize) -> impl Iterator<Item = [T; 3]> + '_
+    where
+        T: Copy + Default,
+    {
+        let mut iter = self.as_slice().iter().copied().cycle();
+        let v0 = iter.nth(base); // cannot unwrap here, in case its empty.
+        let iter = iter.take(self.len() - 1);
+        iter.map_windows::<_, _, 2>(move |&[v1, v2]| [v0.unwrap(), v1, v2])
+    }
+
     /// Iterate over this face, returning each index with its tri indices
     pub fn iter_with_tri_idxs(
         &self,
@@ -842,3 +853,23 @@ fn test_canonicalize_wrap() {
     q.canonicalize();
     assert_eq!(q, FaceKind::Tri([1, 2, 3]));
 }
+
+#[test]
+fn tri_fan_from_1() {
+  let f = FaceKind::Quad([0,1,2,3]);
+  let tris = f.as_triangle_fan_from(1).collect::<Vec<_>>();
+  assert_eq!(tris.len(), 2);
+  for t in &tris {
+    assert!(t.contains(&1));
+  }
+}
+
+
+
+
+
+
+
+
+
+

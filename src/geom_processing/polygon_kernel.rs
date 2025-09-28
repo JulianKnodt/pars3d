@@ -1,11 +1,10 @@
 use crate::isect::line_isect;
-use crate::{F, cross_2d, sub};
+use crate::{F, Sign, orient};
 
 /// https://dl.acm.org/doi/pdf/10.1145/322139.322142
 pub fn polygon_kernel(vs: &[[F; 2]], out: &mut Vec<[F; 2]>) {
     out.clear();
     out.extend(vs.iter().copied());
-    let orient = |a, b, c| sign(cross_2d(sub(a, c), sub(b, c)));
 
     #[allow(non_snake_case)]
     let N = vs.len();
@@ -13,7 +12,7 @@ pub fn polygon_kernel(vs: &[[F; 2]], out: &mut Vec<[F; 2]>) {
         let v = vs[vi];
         let vn = vs[(vi + 1) % N];
         let vp = vs[(vi + N - 1) % N];
-        if orient(v, vn, vp) != Sign::Neg {
+        if orient([v, vn, vp]) != Sign::Neg {
             continue;
         }
 
@@ -24,10 +23,10 @@ pub fn polygon_kernel(vs: &[[F; 2]], out: &mut Vec<[F; 2]>) {
             let k = out[ki];
             let kn = out[(ki + 1) % out.len()];
 
-            let t1 = orient(vp, v, k);
-            let t2 = orient(vp, v, kn);
-            let t3 = orient(v, vn, k);
-            let t4 = orient(v, vn, kn);
+            let t1 = orient([vp, v, k]);
+            let t2 = orient([vp, v, kn]);
+            let t3 = orient([v, vn, k]);
+            let t4 = orient([v, vn, kn]);
             if !(t1 == Sign::Neg || t3 == Sign::Neg) {
                 out_buf.push(k);
             }
@@ -44,21 +43,6 @@ pub fn polygon_kernel(vs: &[[F; 2]], out: &mut Vec<[F; 2]>) {
         }
         std::mem::swap(out, &mut out_buf);
         out_buf.clear();
-    }
-}
-#[derive(Debug, PartialEq, Eq, Ord, PartialOrd, Copy, Clone)]
-enum Sign {
-    Pos,
-    Neg,
-    Zero,
-}
-fn sign(x: F) -> Sign {
-    if x > 0. {
-        Sign::Pos
-    } else if x < 0. {
-        Sign::Neg
-    } else {
-        Sign::Zero
     }
 }
 

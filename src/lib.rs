@@ -7,6 +7,7 @@
 #![feature(ascii_char)]
 #![feature(ascii_char_variants)]
 #![feature(assert_matches)]
+#![feature(iter_map_windows)]
 
 #[cfg(not(feature = "f64"))]
 pub type U = u32;
@@ -91,6 +92,9 @@ pub mod mesh;
 
 /// Geometry processing on meshes. Often allocates.
 pub mod geom_processing;
+
+/// Grid operations.
+pub mod grid;
 
 /// Checks for intersection between various primitives
 pub mod isect;
@@ -236,7 +240,42 @@ pub fn cross([x, y, z]: [F; 3], [a, b, c]: [F; 3]) -> [F; 3] {
 }
 
 pub(crate) fn cross_2d([x, y]: [F; 2], [a, b]: [F; 2]) -> F {
+    // x * b - y * a
     diff_of_prod(x, b, y, a)
+}
+
+/// Given points [a,b,p], computes the orientation of p with respect to the edge a, b.
+pub fn orient([a, b, p]: [[F; 2]; 3]) -> Sign {
+    sign(cross_2d(sub(a, p), sub(b, p)))
+}
+
+#[derive(Debug, PartialEq, Eq, Ord, PartialOrd, Copy, Clone)]
+pub enum Sign {
+    Pos,
+    Neg,
+    Zero,
+}
+
+impl Sign {
+    pub fn is_zero(self) -> bool {
+        self == Sign::Zero
+    }
+    pub fn is_pos(self) -> bool {
+        self == Sign::Pos
+    }
+    pub fn is_neg(self) -> bool {
+        self == Sign::Neg
+    }
+}
+
+pub fn sign(x: F) -> Sign {
+    if x > 0. {
+        Sign::Pos
+    } else if x < 0. {
+        Sign::Neg
+    } else {
+        Sign::Zero
+    }
 }
 
 pub(crate) fn tri_area_2d([a, b, c]: [[F; 2]; 3]) -> F {
