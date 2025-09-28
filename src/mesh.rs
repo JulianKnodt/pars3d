@@ -538,8 +538,8 @@ impl Mesh {
     /// Triangulates this mesh in an arbitrary order.
     /// Will allocate if not all faces are triangles.
     /// Order of faces may not be preserved.
-    pub fn triangulate(&mut self) {
-        self.triangulate_with_new_edges(|_| {});
+    pub fn triangulate(&mut self, base: usize) {
+        self.triangulate_with_new_edges(|_| {}, base);
     }
 
     /// Normalize this mesh's geometry to lay within [-1, 1].

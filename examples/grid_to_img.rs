@@ -1,6 +1,6 @@
 use image::{self, GenericImageView};
 use pars3d::grid::grid_from_delta;
-use pars3d::{FaceKind, Mesh, parse_args, F};
+use pars3d::{F, FaceKind, Mesh, parse_args};
 
 fn main() -> std::io::Result<()> {
     let args = parse_args!(
@@ -42,10 +42,14 @@ fn main() -> std::io::Result<()> {
     let tmp_v = gv.into_iter().map(|[u, v]| [u, v, 0.]).collect::<Vec<_>>();
     let mut m = Mesh::new_geometry(tmp_v, faces);
     let ic = &input_col;
-    m.vert_colors = (0..h).flat_map(move |j| (0..w).map(move |i| {
-      let [r,g,b,_] = ic.get_pixel(i,j).0;
-      [r,g,b].map(|v| v as F / 255.)
-    })).collect();
+    m.vert_colors = (0..h)
+        .flat_map(move |j| {
+            (0..w).map(move |i| {
+                let [r, g, b, _] = ic.get_pixel(i, j).0;
+                [r, g, b].map(|v| v as F / 255.)
+            })
+        })
+        .collect();
 
     // have grid mesh, now convert it to to an image
 

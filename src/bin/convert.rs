@@ -58,7 +58,7 @@ fn main() {
     let mut scene = load(&src).expect("Failed to load scene");
     if triangulate {
         for m in &mut scene.meshes {
-            m.triangulate();
+            m.triangulate(0);
         }
     }
     save(dst, &scene).expect("Failed to save scene");

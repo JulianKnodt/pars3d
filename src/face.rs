@@ -856,20 +856,10 @@ fn test_canonicalize_wrap() {
 
 #[test]
 fn tri_fan_from_1() {
-  let f = FaceKind::Quad([0,1,2,3]);
-  let tris = f.as_triangle_fan_from(1).collect::<Vec<_>>();
-  assert_eq!(tris.len(), 2);
-  for t in &tris {
-    assert!(t.contains(&1));
-  }
+    let f = FaceKind::Quad([0, 1, 2, 3]);
+    let tris = f.as_triangle_fan_from(1).collect::<Vec<_>>();
+    assert_eq!(tris.len(), 2);
+    for t in &tris {
+        assert!(t.contains(&1));
+    }
 }
-
-
-
-
-
-
-
-
-
-

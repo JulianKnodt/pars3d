@@ -144,7 +144,7 @@ impl Mesh {
     }
 
     #[inline]
-    pub fn triangulate_with_new_edges(&mut self, mut cb: impl FnMut([usize; 2])) {
+    pub fn triangulate_with_new_edges(&mut self, mut cb: impl FnMut([usize; 2]), base: usize) {
         let nf = self.f.len();
         for i in 0..nf {
             if self.f[i].len() <= 3 {
@@ -155,17 +155,24 @@ impl Mesh {
 
             let f = &self.f[i];
             let s = f.as_slice();
-            let first = s[0];
-            for &v in &s[2..s.len() - 1] {
+            let first = s[base];
+            for (i, &v) in s.iter().enumerate() {
+                if i == base || (i + 1) % f.len() == base || (base + 1) % f.len() == i {
+                    continue;
+                }
                 cb([first, v])
             }
 
             let curr_nfs = self.f.len();
 
-            let t0 = f.as_triangle_fan().map(FaceKind::Tri).next().unwrap();
+            let t0 = f
+                .as_triangle_fan_from(base)
+                .map(FaceKind::Tri)
+                .next()
+                .unwrap();
             let f = std::mem::replace(&mut self.f[i], t0);
             self.f
-                .extend(f.as_triangle_fan().map(FaceKind::Tri).skip(1));
+                .extend(f.as_triangle_fan_from(base).map(FaceKind::Tri).skip(1));
             let new_nfs = self.f.len();
 
             self.face_mesh_idx
