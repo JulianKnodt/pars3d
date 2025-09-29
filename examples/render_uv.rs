@@ -25,7 +25,7 @@ fn main() -> std::io::Result<()> {
     }
     println!("[INFO]: Rendering UV of {} to {}", args.input, args.output);
 
-    let scene = load(&args.input).expect("Failed to load scene");
+    let scene = load(&args.input).expect(&format!("Failed to load scene {}", args.input));
     let mesh = &scene.meshes[0];
     let width = args.width;
 
