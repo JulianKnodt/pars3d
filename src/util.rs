@@ -241,7 +241,6 @@ macro_rules! parse_args {
 
     for v in std::env::args().skip(1) {
       match v.as_str() {
-        "-h" | "--help" => help!(),
         "UNMATCHABLE" => help!("???"),
         $($($flags |)+ "UNMATCHABLE" => {
           if state != State::Empty {
@@ -255,6 +254,7 @@ macro_rules! parse_args {
           state = State::$StateName;
           continue;
         })+
+        "-h" | "--help" => help!(),
         v if v.starts_with("-") => help!("Unknown flag {v}"),
         _ => {}
       }
