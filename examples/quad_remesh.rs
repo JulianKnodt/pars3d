@@ -198,7 +198,7 @@ fn main() -> std::io::Result<()> {
     }
     */
     let (s, t) = m.normalize();
-    m.triangulate();
+    m.triangulate(0);
     m.f.retain_mut(|f| !f.canonicalize());
 
     let mut vn = vec![];

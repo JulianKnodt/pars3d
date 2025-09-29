@@ -131,10 +131,10 @@ fn main() -> std::io::Result<()> {
 
     let a_scene = load(&src).expect(&format!("Failed to load {}", src));
     let mut a = a_scene.into_flattened_mesh();
-    a.triangulate();
+    a.triangulate(0);
     let b_scene = load(&dst).expect(&format!("Failed to load {}", dst));
     let mut b = b_scene.into_flattened_mesh();
-    b.triangulate();
+    b.triangulate(0);
 
     let a_aabb = a.aabb();
     let b_aabb = b.aabb();

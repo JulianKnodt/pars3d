@@ -36,7 +36,7 @@ fn main() -> std::io::Result<()> {
     let input_col = image::open(args.input_col).expect("Failed to load input color");
 
     let (gv, gf) = grid_from_delta(w, h, |[i, j]| {
-        [&input_pos_x, &input_pos_y].map(|input| f32::from_ne_bytes(input.get_pixel(i, j).0))
+        [&input_pos_x, &input_pos_y].map(|input| f32::from_ne_bytes(input.get_pixel(i, j).0) as F)
     });
     let faces = gf.into_iter().map(FaceKind::Quad).collect::<Vec<_>>();
     let tmp_v = gv.into_iter().map(|[u, v]| [u, v, 0.]).collect::<Vec<_>>();
