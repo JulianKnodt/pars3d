@@ -428,7 +428,7 @@ pub fn bake_vertex_colors_to_texture_exact(
     uvs: &[[F; 2]],
     faces: &[FaceKind],
     colors: &[[F; 3]],
-) -> image::ImageBuffer<Rgb<f32>, Vec<f32>> {
+) -> image::ImageBuffer<Rgb<u8>, Vec<u8>> {
     use std::collections::BTreeMap;
     assert_eq!(
         uvs.len(),
@@ -461,7 +461,7 @@ pub fn bake_vertex_colors_to_texture_exact(
     let mut poly = vec![];
     image::ImageBuffer::from_fn(w, h, |x, y| {
         let Some(tri_cands) = tri_per_pix.get(&[x as i32, y as i32]) else {
-            return Rgb([0.; 3]);
+            return Rgb([0; 3]);
         };
         assert!(!tri_cands.is_empty());
 
@@ -520,9 +520,9 @@ pub fn bake_vertex_colors_to_texture_exact(
         }
 
         if total_area == 0. {
-            return Rgb([0.; 3]);
+            return Rgb([0; 3]);
         }
         let rgb = kmul(total_area.recip(), all_color);
-        Rgb(rgb)
+        Rgb(rgb.map(|v| (v.clamp(0., 1.) * 255.) as u8))
     })
 }

@@ -17,11 +17,7 @@ fn main() -> std::io::Result<()> {
       Stats("--stats"; "Unused") => stats: String = String::new(),
     );
 
-    if args.input_pos_x.is_empty()
-        || args.input_pos_y.is_empty()
-        || args.output.is_empty()
-        || args.input_col.is_empty()
-    {
+    if args.output.is_empty() || args.input_col.is_empty() {
         help!();
     }
     println!(
@@ -29,16 +25,36 @@ fn main() -> std::io::Result<()> {
         args.input_pos_x, args.input_pos_y, args.input_col, args.output
     );
 
-    let input_pos_x = image::open(args.input_pos_x).expect("Failed to load input pos x");
-    let input_pos_y = image::open(args.input_pos_y).expect("Failed to load input pos y");
-    assert_eq!(input_pos_x.dimensions(), input_pos_y.dimensions());
-    let (w, h) = input_pos_x.dimensions();
+    let input_pos_x = if args.input_pos_x.is_empty() {
+        None
+    } else {
+        Some(image::open(args.input_pos_x).expect("Failed to load input pos x"))
+    };
+    let input_pos_y = if args.input_pos_y.is_empty() {
+        None
+    } else {
+        Some(image::open(args.input_pos_y).expect("Failed to load input pos y"))
+    };
+
+    if let Some(ipx) = input_pos_x.as_ref()
+        && let Some(ipy) = input_pos_y.as_ref()
+    {
+        assert_eq!(ipx.dimensions(), ipy.dimensions());
+    }
 
     let input_col = image::open(args.input_col).expect("Failed to load input color");
+    let (w, h) = input_col.dimensions();
 
     let (gv, gf) = grid_from_delta(w, h, |[i, j]| {
-        [&input_pos_x, &input_pos_y].map(|input| f32::from_ne_bytes(input.get_pixel(i, j).0) as F)
+        if let Some(ipx) = input_pos_x.as_ref()
+            && let Some(ipy) = input_pos_y.as_ref()
+        {
+            [&ipx, &ipy].map(|input| f32::from_ne_bytes(input.get_pixel(i, j).0) as F)
+        } else {
+            [0.5, 0.5]
+        }
     });
+
     let gv_3d = gv
         .iter()
         .copied()
@@ -76,8 +92,9 @@ fn main() -> std::io::Result<()> {
     });
 
     let mean_img = image::ImageBuffer::from_fn(args.width, args.height, |i, j| {
-        let p0 = out_img0.get_pixel(i, j).0;
-        let p1 = out_img1.get_pixel(i, j).0;
+        let to_float = |a: [u8; _]| a.map(|v| (v as F) / 255.);
+        let p0 = to_float(out_img0.get_pixel(i, j).0);
+        let p1 = to_float(out_img1.get_pixel(i, j).0);
         let mean = kmul(0.5, add(p0, p1));
         image::Rgb(mean.map(|v| (v * 255.) as u8))
     });
