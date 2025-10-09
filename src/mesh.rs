@@ -542,6 +542,13 @@ impl Mesh {
         self.triangulate_with_new_edges(|_| {}, base);
     }
 
+    /// Stores all triangles for this mesh in the destination vector.
+    pub fn triangles(&self, dst: &mut Vec<[usize; 3]>) {
+        for f in &self.f {
+            dst.extend(f.as_triangle_fan());
+        }
+    }
+
     /// Normalize this mesh's geometry to lay within [-1, 1].
     /// Outputs scale and translation to reposition back to the original dimension.
     pub fn normalize(&mut self) -> (F, [F; 3]) {
