@@ -1,5 +1,6 @@
+use crate::FaceKind;
 use crate::edge::EdgeKind;
-use crate::{F, add, kmul};
+use crate::{F, add, kmul, lerp};
 use std::cmp::minmax;
 use std::collections::BTreeMap;
 
@@ -221,6 +222,59 @@ fn tri_incident_edges([vi0, vi1, vi2]: [usize; 3]) -> [[usize; 3]; 3] {
         [vi0, vi1, vi2],
         [vi1, vi2, vi0],
     ]
+}
+
+/// Perform honeycomb subdivision, splitting mesh faces and vertices.
+pub fn honeycomb_subdivision<const N: usize>(
+    vs: &[[F; N]],
+    fs: &[FaceKind],
+    eps: F,
+) -> (Vec<[F; N]>, Vec<FaceKind>) {
+    let mut out_verts = vec![];
+    let mut out_faces = vec![];
+
+    let mut new_vert_corr = BTreeMap::new();
+    for f in fs {
+        for e @ [e0, e1] in f.edges_ord() {
+            if new_vert_corr.contains_key(&e) {
+                continue;
+            }
+
+            let v0 = lerp(eps, vs[e0], vs[e1]);
+            let v1 = lerp(eps, vs[e1], vs[e0]);
+            new_vert_corr.insert([e0, e1], out_verts.len());
+            out_verts.push(v0);
+            new_vert_corr.insert([e1, e0], out_verts.len());
+            out_verts.push(v1);
+        }
+    }
+
+    for f in fs {
+        let mut new_face = vec![];
+        for [e0, e1] in f.edges() {
+            new_face.push(new_vert_corr[&[e0, e1]]);
+            new_face.push(new_vert_corr[&[e1, e0]]);
+        }
+        out_faces.push(FaceKind::from(new_face));
+    }
+
+    use crate::adjacency::{Winding, vertex_face_adj};
+    let adj = vertex_face_adj(vs.len(), fs);
+    let mut winding = Winding::new();
+    for vi in 0..vs.len() {
+        adj.vertex_face_one_ring_ord(vi, |fi| fs[fi].as_slice(), &mut winding);
+        let mut new_face = vec![];
+        for (w, no_break) in winding.iter() {
+            if !no_break {
+                new_face.push(out_verts.len());
+                out_verts.push(vs[vi]);
+            }
+            new_face.push(new_vert_corr[&[vi, w]]);
+        }
+        out_faces.push(FaceKind::from(new_face));
+    }
+
+    (out_verts, out_faces)
 }
 
 /*

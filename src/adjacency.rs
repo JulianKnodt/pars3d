@@ -33,6 +33,23 @@ pub fn vertex_vertex_adj(nv: usize, f: &[FaceKind]) -> Adj<()> {
     from_nbr_vec(&mut nbrs)
 }
 
+pub fn vertex_face_adj(nv: usize, f: &[FaceKind]) -> Adj<()> {
+    let mut nbrs = vec![vec![]; nv];
+    for (fi, f) in f.iter().enumerate() {
+        let fi = fi as u32;
+        for e in f.edges() {
+            for vi in e {
+                let vi_nbr = &mut nbrs[vi];
+                if !vi_nbr.contains(&fi) {
+                    vi_nbr.push(fi);
+                }
+            }
+        }
+    }
+
+    from_nbr_vec(&mut nbrs)
+}
+
 fn from_nbr_vec(nbrs: &mut Vec<Vec<u32>>) -> Adj<()> {
     let mut idx_count = vec![];
     let mut adj = vec![];
@@ -79,20 +96,7 @@ impl Mesh {
     }
     /// Returns faces adjacent to each vertex in the input mesh
     pub fn vertex_face_adj(&self) -> Adj<()> {
-        let mut nbrs = vec![vec![]; self.v.len()];
-        for (fi, f) in self.f.iter().enumerate() {
-            let fi = fi as u32;
-            for e in f.edges() {
-                for vi in e {
-                    let vi_nbr = &mut nbrs[vi];
-                    if !vi_nbr.contains(&fi) {
-                        vi_nbr.push(fi);
-                    }
-                }
-            }
-        }
-
-        from_nbr_vec(&mut nbrs)
+        vertex_face_adj(self.v.len(), &self.f)
     }
     pub fn face_face_adj(&self) -> Adj<()> {
         let edge_adjs = self.edge_kinds();
@@ -382,7 +386,7 @@ impl<D> Adj<D> {
     /// Given that this adjacency represents vertices to faces, constructs a winding around each
     /// vertex, returning the final set in out, with no particular start. Note that the output
     /// order may be CW or CCW. `out` will be cleared.
-    pub fn vert_face_one_ring_ord<'a>(
+    pub fn vertex_face_one_ring_ord<'a>(
         &self,
         vi: usize,
         face_to_verts: impl Fn(usize) -> &'a [usize],
@@ -416,7 +420,7 @@ impl<D> Adj<D> {
                 (nexts.pop().unwrap(), true)
             };
             if !wraps {
-              out.elems.push((p, false));
+                out.elems.push((p, false));
             }
             out.elems.push((n, true));
             while let Some(ni) = nexts.iter().position(|v| v[0] == n || v[1] == n) {
