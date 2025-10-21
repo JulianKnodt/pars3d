@@ -52,6 +52,26 @@ fn from_nbr_vec(nbrs: &mut Vec<Vec<u32>>) -> Adj<()> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Winding {
+    elems: Vec<(usize, bool)>,
+}
+
+impl Winding {
+    pub fn new() -> Self {
+        Default::default()
+    }
+    /// iterate over vertices in this winding. Returns `false` if there is a non-consecutive
+    /// previous element.
+    pub fn iter(&self) -> impl Iterator<Item = (usize, bool)> + '_ {
+        self.elems.iter().copied()
+    }
+    /// Returns the number of breaks in the winding
+    pub fn num_breaks(&self) -> usize {
+        self.elems.iter().filter(|v| !v.1).count()
+    }
+}
+
 impl Mesh {
     /// Returns vertices adjacent to each vertex in the input mesh
     pub fn vertex_vertex_adj(&self) -> Adj<()> {
@@ -357,6 +377,59 @@ impl<D> Adj<D> {
             return Some(v_adj);
         }
         None
+    }
+
+    /// Given that this adjacency represents vertices to faces, constructs a winding around each
+    /// vertex, returning the final set in out, with no particular start. Note that the output
+    /// order may be CW or CCW. `out` will be cleared.
+    pub fn vert_face_one_ring_ord<'a>(
+        &self,
+        vi: usize,
+        face_to_verts: impl Fn(usize) -> &'a [usize],
+        out: &mut Winding,
+    ) {
+        let mut nexts = vec![];
+        let mut counts = std::collections::HashMap::<usize, u32>::new();
+        for &f in self.adj(vi) {
+            let adj_vs = face_to_verts(f as usize);
+            let n = adj_vs.len();
+            for i in 0..n {
+                let c = adj_vs[i];
+                let n = adj_vs[(i + 1) % n];
+                if c == vi || n == vi {
+                    continue;
+                }
+                nexts.push(std::cmp::minmax(c, n));
+                *counts.entry(c).or_default() += 1;
+                *counts.entry(n).or_default() += 1;
+            }
+        }
+        out.elems.clear();
+        while !nexts.is_empty() {
+            let ([mut n, p], wraps) = if let Some(rmi) = nexts
+                .iter()
+                .position(|[a, b]| counts[a] == 1 || counts[b] == 1)
+            {
+                let [a, b] = nexts.swap_remove(rmi);
+                (if counts[&a] == 1 { [b, a] } else { [a, b] }, false)
+            } else {
+                (nexts.pop().unwrap(), true)
+            };
+            if !wraps {
+              out.elems.push((p, false));
+            }
+            out.elems.push((n, true));
+            while let Some(ni) = nexts.iter().position(|v| v[0] == n || v[1] == n) {
+                let [a, b] = nexts.swap_remove(ni);
+                n = if a == n {
+                    b
+                } else {
+                    assert_eq!(b, n);
+                    a
+                };
+                out.elems.push((n, true));
+            }
+        }
     }
     /// Returns the approximate opposing vertex for a given previous vertex to
     /// vi. That is, which vertex is approximately going in the other direction

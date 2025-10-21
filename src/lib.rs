@@ -213,7 +213,7 @@ pub fn add<const N: usize>(a: [F; N], b: [F; N]) -> [F; N] {
 
 /// Linear interpolate a value of `t` between start (s) and end (e).
 #[inline]
-pub(crate) fn lerp<const N: usize>(t: F, s: [F; N], e: [F; N]) -> [F; N] {
+pub fn lerp<const N: usize>(t: F, s: [F; N], e: [F; N]) -> [F; N] {
     add(kmul(1. - t, s), kmul(t, e))
 }
 
