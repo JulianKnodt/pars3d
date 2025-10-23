@@ -224,10 +224,32 @@ fn tri_incident_edges([vi0, vi1, vi2]: [usize; 3]) -> [[usize; 3]; 3] {
     ]
 }
 
+pub trait HoneycombCheck<const N: usize> {
+    fn flip_winding(&self, f: &FaceKind, vs: &[[F; N]], vi: usize) -> bool;
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct HoneycombCheck3<'a> {
+    pub vertex_normals: &'a [[F; 3]],
+}
+
+impl<'a> HoneycombCheck<3> for HoneycombCheck3<'a> {
+    fn flip_winding(&self, f: &FaceKind, vs: &[[F; 3]], vi: usize) -> bool {
+        crate::dot(f.normal(vs), self.vertex_normals[vi]) < 0.
+    }
+}
+
+impl HoneycombCheck<2> for () {
+    fn flip_winding(&self, f: &FaceKind, vs: &[[F; 2]], _: usize) -> bool {
+        f.area_2d(vs) < 0.
+    }
+}
+
 /// Perform honeycomb subdivision, splitting mesh faces and vertices.
-pub fn honeycomb_subdivision<const N: usize>(
+pub fn honeycomb<const N: usize>(
     vs: &[[F; N]],
     fs: &[FaceKind],
+    honeycomb_check: impl HoneycombCheck<N>,
     eps: F,
 ) -> (Vec<[F; N]>, Vec<FaceKind>) {
     let mut out_verts = vec![];
@@ -259,6 +281,7 @@ pub fn honeycomb_subdivision<const N: usize>(
     }
 
     use crate::adjacency::{Winding, vertex_face_adj};
+
     let adj = vertex_face_adj(vs.len(), fs);
     let mut winding = Winding::new();
     for vi in 0..vs.len() {
@@ -271,7 +294,11 @@ pub fn honeycomb_subdivision<const N: usize>(
             }
             new_face.push(new_vert_corr[&[vi, w]]);
         }
-        out_faces.push(FaceKind::from(new_face));
+        let mut new_face = FaceKind::from(new_face);
+        if honeycomb_check.flip_winding(&new_face, &out_verts, vi) {
+            new_face.as_mut_slice().reverse();
+        }
+        out_faces.push(new_face);
     }
 
     (out_verts, out_faces)

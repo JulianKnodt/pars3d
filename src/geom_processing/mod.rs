@@ -114,7 +114,7 @@ pub fn vertex_normals(
     vs: &[[F; 3]],
     dst: &mut Vec<[F; 3]>,
     kind: VertexNormalWeightingKind,
-) -> bool {
+) {
     dst.resize(vs.len(), [0.; 3]);
     dst.fill([0.; 3]);
     for f in fs {
@@ -134,12 +134,11 @@ pub fn vertex_normals(
     for n in dst {
         *n = normalize(*n);
     }
-    true
 }
 
 impl Mesh {
     /// Computes vertex normals into mesh.n for its faces and vertices
-    pub fn vertex_normals(&mut self, kind: VertexNormalWeightingKind) -> bool {
+    pub fn vertex_normals(&mut self, kind: VertexNormalWeightingKind) {
         vertex_normals(&self.f, &self.v, &mut self.n, kind)
     }
 

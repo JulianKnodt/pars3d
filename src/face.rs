@@ -475,6 +475,28 @@ impl FaceKind {
             }
         }
     }
+
+    pub fn area_2d(&self, vs: &[[F; 2]]) -> F {
+        match self {
+            &FaceKind::Tri(t) => super::tri_area_2d(t.map(|vi| vs[vi])),
+            &FaceKind::Quad(q) => super::quad_area_2d(q.map(|vi| vs[vi])),
+            FaceKind::Poly(p) => {
+                let mut vis = p.iter().copied();
+                let Some(root) = vis.next() else {
+                    return 0.;
+                };
+                let Some(mut v0) = vis.next() else {
+                    return 0.;
+                };
+                let mut sum = 0.;
+                for v1 in vis {
+                    sum += super::tri_area_2d([root, v0, v1].map(|vi| vs[vi]));
+                    v0 = v1;
+                }
+                sum
+            }
+        }
+    }
     /// Compute the centroid of some set of values for this face.
     #[inline]
     pub fn centroid<const N: usize>(&self, vals: &[[F; N]]) -> [F; N] {
