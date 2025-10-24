@@ -10,6 +10,7 @@ fn main() -> std::io::Result<()> {
       Input("-i", "--input"; "Input mesh") => input : String = String::new(),
       Output("-o", "--output"; "Output subdivided mesh") => output : String = String::new(),
       Eps("--eps"; "Epsilon for subdivision") => eps : F = 0.1,
+      Triangulate("--tri"; "Triangulate input") => triangulate : bool = false => true,
       Stats("--stats"; "Unused") => stats: String = String::new(),
     );
 
@@ -20,6 +21,9 @@ fn main() -> std::io::Result<()> {
     let input = pars3d::load(args.input).expect("Failed to load input");
     let mut input = input.into_flattened_mesh();
     input.geometry_only();
+    if args.triangulate {
+        input.triangulate(0);
+    }
     let mut vn = vec![];
     vertex_normals(&input.f, &input.v, &mut vn, Default::default());
 
