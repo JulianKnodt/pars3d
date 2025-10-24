@@ -246,6 +246,8 @@ impl HoneycombCheck<2> for () {
 }
 
 /// Perform honeycomb subdivision, splitting mesh faces and vertices.
+/// Returns (new vertices, new faces). The output faces have the following structure:
+/// [ for each input face, 1 output face ; for each input vert, 1 output face].
 pub fn honeycomb<const N: usize>(
     vs: &[[F; N]],
     fs: &[FaceKind],
@@ -264,9 +266,11 @@ pub fn honeycomb<const N: usize>(
 
             let v0 = lerp(eps, vs[e0], vs[e1]);
             let v1 = lerp(eps, vs[e1], vs[e0]);
-            new_vert_corr.insert([e0, e1], out_verts.len());
+            let prev = new_vert_corr.insert([e0, e1], out_verts.len());
+            assert_eq!(prev, None);
             out_verts.push(v0);
-            new_vert_corr.insert([e1, e0], out_verts.len());
+            let prev = new_vert_corr.insert([e1, e0], out_verts.len());
+            assert_eq!(prev, None);
             out_verts.push(v1);
         }
     }
@@ -279,6 +283,7 @@ pub fn honeycomb<const N: usize>(
         }
         out_faces.push(FaceKind::from(new_face));
     }
+    assert_eq!(out_faces.len(), fs.len());
 
     use crate::adjacency::{Winding, vertex_face_adj};
 
@@ -292,7 +297,9 @@ pub fn honeycomb<const N: usize>(
                 new_face.push(out_verts.len());
                 out_verts.push(vs[vi]);
             }
-            new_face.push(new_vert_corr[&[vi, w]]);
+            if let Some(&v) = new_vert_corr.get(&[vi, w]) {
+                new_face.push(v);
+            }
         }
         let mut new_face = FaceKind::from(new_face);
         if honeycomb_check.flip_winding(&new_face, &out_verts, vi) {
