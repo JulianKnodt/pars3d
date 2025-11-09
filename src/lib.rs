@@ -53,6 +53,10 @@ pub mod fbx;
 #[cfg(feature = "gltf")]
 pub mod gltf;
 
+/// Load .msh meshes (https://gmsh.info/doc/texinfo/gmsh.html#MSH-file-format)
+#[cfg(feature = "msh")]
+pub mod msh;
+
 /// Use with caution (.wrl files)
 pub mod vrml;
 

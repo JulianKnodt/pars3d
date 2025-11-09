@@ -22,6 +22,8 @@ default = ["gltf", "fbx", "strict_fbx"]
 f64 = []
 gltf = ["dep:gltf", "dep:gltf-json"]
 fbx = []
+msh = []
+
 strict_fbx = []
 extended_attrs = []
 
