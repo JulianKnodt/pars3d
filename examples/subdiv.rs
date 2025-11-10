@@ -11,6 +11,7 @@ fn main() -> std::io::Result<()> {
       Output("-o", "--output"; "Output subdivided mesh") => output : String = String::new(),
       Eps("--eps"; "Epsilon for subdivision") => eps : F = 0.1,
       Triangulate("--tri"; "Triangulate input") => triangulate : bool = false => true,
+      UV("--uv"; "Subdiv UV instead of mesh") => uv : bool = false => true,
       Stats("--stats"; "Unused") => stats: String = String::new(),
     );
 
@@ -20,20 +21,37 @@ fn main() -> std::io::Result<()> {
 
     let input = pars3d::load(args.input).expect("Failed to load input");
     let mut input = input.into_flattened_mesh();
-    input.geometry_only();
+    if !args.uv {
+        input.geometry_only();
+    }
     if args.triangulate {
         input.triangulate(0);
     }
     let mut vn = vec![];
-    vertex_normals(&input.f, &input.v, &mut vn, Default::default());
+    let m = if args.uv {
+        let (new_v, new_f) = subdivision::honeycomb(&input.uv[0], &input.f, (), args.eps);
+        let new_v = new_v
+            .into_iter()
+            .map(|[x, y]| [x, y, 0.])
+            .collect::<Vec<_>>();
+        Mesh::new_geometry(new_v, new_f)
+    } else {
+        vertex_normals(&input.f, &input.v, &mut vn, Default::default());
 
-    let hc = HoneycombCheck3 {
-        vertex_normals: &vn,
+        let hc = HoneycombCheck3 {
+            vertex_normals: &vn,
+        };
+
+        let (new_v, new_f) = subdivision::honeycomb(&input.v, &input.f, hc, args.eps);
+
+        Mesh::new_geometry(new_v, new_f)
     };
 
-    let (new_v, new_f) = subdivision::honeycomb(&input.v, &input.f, hc, args.eps);
-
-    let m = Mesh::new_geometry(new_v, new_f);
+    // Sanity check:
+    let adj = m.vertex_vertex_adj();
+    for vi in 0..m.v.len() {
+        assert!(adj.degree(vi) <= 3);
+    }
 
     pars3d::save(&args.output, &m.into_scene())
 }
