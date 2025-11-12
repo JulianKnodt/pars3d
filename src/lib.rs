@@ -86,6 +86,9 @@ pub mod visualization;
 /// For visualization or for art.
 pub mod tracing;
 
+/// Computes the barycentric coordinate within a tetrahedron
+pub mod tet_bary;
+
 // GEOMETRY PROCESSING ---
 
 /// Animation related structs
@@ -465,6 +468,7 @@ fn diff_of_prod(a: F, b: F, x: F, y: F) -> F {
     dop + err
 }
 
+/// Computes the barycentric coordinate within a triangle in N-dimensions
 #[inline]
 pub fn barycentric_n<const N: usize>(p: [F; N], a: [F; N], b: [F; N], c: [F; N]) -> [F; 3] {
     let v0 = sub(b, a);
