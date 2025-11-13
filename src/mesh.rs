@@ -566,7 +566,7 @@ impl Mesh {
         denormalize_transform(&mut self.vert_colors, scale, trans)
     }
     /// After flattening a scene into a mesh, repopulate the original scene with a modified
-    /// flattened mesh.
+    /// flattened mesh. (Opposite of flattening, unflattening, inflating).
     pub fn repopulate_scene(&self, scene: &mut Scene) {
         assert_eq!(
             self.face_mesh_idx.len(),
