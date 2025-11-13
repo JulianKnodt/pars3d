@@ -4,6 +4,8 @@ fn stp(a: [F; 3], b: [F; 3], c: [F; 3]) -> F {
     dot(a, cross(b, c))
 }
 
+// https://stackoverflow.com/questions/38545520/barycentric-coordinates-of-a-tetrahedron
+
 pub fn bary_tet(a: [F; 3], b: [F; 3], c: [F; 3], d: [F; 3], p: [F; 3]) -> [F; 4] {
     let pa = sub(p, a);
     let pb = sub(p, b);

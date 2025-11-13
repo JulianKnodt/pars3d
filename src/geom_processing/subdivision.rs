@@ -245,6 +245,12 @@ impl HoneycombCheck<2> for () {
     }
 }
 
+impl HoneycombCheck<2> for bool {
+    fn flip_winding(&self, f: &FaceKind, vs: &[[F; 2]], _: usize) -> bool {
+        *self && f.area_2d(vs) < 0.
+    }
+}
+
 /// Perform honeycomb subdivision, splitting mesh faces and vertices.
 /// Returns (new vertices, new faces). The output faces have the following structure:
 /// [ for each input face, 1 output face ; for each input vert, 1 output face].
