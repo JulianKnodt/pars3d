@@ -263,6 +263,17 @@ pub fn save_obj(
             }
             writeln!(geom_dst, "{}", fmt(lv + 1 + prev_v))?;
         }
+
+        for l in m.l.iter() {
+            geom_dst.write_all(b"l ")?;
+            let Some((last_v, line_v)) = l.as_slice().split_last() else {
+                continue;
+            };
+            for &v in line_v {
+                write!(geom_dst, "{} ", v + 1 + prev_v)?;
+            }
+            writeln!(geom_dst, "{}", last_v + 1 + prev_v)?;
+        }
         prev_v += m.v.len();
     }
     Ok(())

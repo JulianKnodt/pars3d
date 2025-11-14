@@ -387,6 +387,12 @@ impl Line {
     pub fn new_from_endpoints(a: usize, b: usize) -> Self {
         Self::Standard(std::cmp::minmax(a, b))
     }
+    pub fn as_slice(&self) -> &[usize] {
+        match self {
+            Self::Standard(l) => l.as_slice(),
+            Self::Poly(p) => p.as_slice(),
+        }
+    }
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
