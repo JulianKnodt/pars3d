@@ -2,7 +2,7 @@ use crate::FaceKind;
 use crate::edge::EdgeKind;
 use crate::{F, add, kmul, lerp};
 use std::cmp::minmax;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
 
 #[derive(Debug, Clone, Copy)]
 pub enum BarycentricRepr {
@@ -317,8 +317,127 @@ pub fn honeycomb<const N: usize>(
     (out_verts, out_faces)
 }
 
-/*
-fn hadamard<const N: usize>(a: [F; N], b: [F; N]) -> [F; N] {
-    std::array::from_fn(|i| a[i] * b[i])
+/// Returns the edges in a tetrahedron along with the triangles that contain them
+pub fn tet_edges_ord([a, b, c, d]: [usize; 4]) -> [([usize; 2], [usize; 3], [usize; 3]); 6] {
+    use std::cmp::minmax;
+    [
+        (minmax(a, b), [a, b, c], [a, b, d]),
+        (minmax(a, c), [a, b, c], [a, c, d]),
+        (minmax(a, d), [a, b, d], [a, c, d]),
+        (minmax(b, c), [a, b, c], [d, b, c]),
+        (minmax(b, d), [a, b, d], [b, c, d]),
+        (minmax(c, d), [a, c, d], [b, c, d]),
+    ]
 }
-*/
+
+/// returns the triangles in a tetrahedron
+pub fn tet_tris([a, b, c, d]: [usize; 4]) -> [[usize; 3]; 4] {
+    [[a, b, c], [a, c, d], [a, b, d], [c, b, d]]
+}
+
+/// Perform honeycomb subdivision, splitting mesh faces and vertices.
+/// Returns (new vertices, new polyhedrons, new edges). The output faces have the following structure:
+/// [ for each input tet, 1 output polyhedron ; for each input vert, 1 output polyhedron].
+/// Polyhedron may not be in the correct winding order, but will contain all the correct
+/// vertices.
+pub fn honeycomb_tet(
+    vs: &[[F; 3]],
+    tets: &[[usize; 4]],
+    eps: F,
+) -> (Vec<[F; 3]>, Vec<Vec<usize>>, Vec<[usize; 2]>) {
+    let mut out_verts = vec![];
+    let mut out_poly = vec![];
+    let mut out_edges = vec![];
+
+    let mut vertex_poly = vec![vec![]; vs.len()];
+    let mut edge_corr = BTreeMap::new();
+    let mut tri_edge_corr = BTreeMap::new();
+    let mut tri_set = BTreeSet::new();
+
+    for &tet in tets {
+        let mut poly = vec![];
+        edge_corr.clear();
+
+        let tet_center = tet.into_iter().map(|v| vs[v]).fold([0.; 3], add);
+        for ([ei0, ei1], t0, t1) in tet_edges_ord(tet) {
+            let eis @ [ei0, ei1] = minmax(ei0, ei1);
+            // add all elements
+            for mut t in [t0, t1] {
+                t.sort_unstable();
+                let tri_center = t.into_iter().map(|v| vs[v]).fold([0.; 3], add);
+                // pull each vertex towards the triangle center, and pull each vertex towards the
+                // tetrahedron's center
+                let [e0, e1] = eis.map(|ei| {
+                    let e = lerp(0.99, tri_center, vs[ei]);
+                    lerp(0.99, tet_center, e)
+                });
+
+                let v0 = lerp(eps, e0, e1);
+                let v1 = lerp(eps, e1, e0);
+
+                let vi0 = out_verts.len();
+                vertex_poly[ei0].push(vi0);
+                out_verts.push(v0);
+                poly.push(vi0);
+
+                let vi1 = out_verts.len();
+                vertex_poly[ei1].push(vi1);
+                out_verts.push(v1);
+                poly.push(vi1);
+
+                out_edges.push(eis);
+                // same tet, different tri
+                match edge_corr.entry(eis) {
+                    Entry::Vacant(v) => {
+                        v.insert([vi0, vi1]);
+                    }
+                    Entry::Occupied(o) => {
+                        let [ovi0, ovi1] = *o.get();
+                        out_edges.push(minmax(vi0, ovi0));
+                        out_edges.push(minmax(vi1, ovi1));
+                    }
+                }
+                // different tet, same tri
+                match tri_edge_corr.entry((t, eis)) {
+                    Entry::Vacant(v) => {
+                        v.insert([vi0, vi1]);
+                    }
+                    Entry::Occupied(o) => {
+                        let [ovi0, ovi1] = *o.get();
+                        out_edges.push(minmax(vi0, ovi0));
+                        out_edges.push(minmax(vi1, ovi1));
+                        o.remove();
+                    }
+                }
+                if !tri_set.insert(t) {
+                    tri_set.remove(&t);
+                }
+            }
+        }
+        out_poly.push(poly);
+    }
+
+    // also clone boundary triangles
+    for tri in tri_set {
+        for [ei0, ei1] in crate::edges(&tri) {
+            let eis @ [ei0, ei1] = minmax(ei0, ei1);
+            let v0 = lerp(eps, vs[ei0], vs[ei1]);
+            let v1 = lerp(eps, vs[ei1], vs[ei0]);
+
+            let [vi0, vi1] = [v0, v1].map(|v| {
+                let vi = out_verts.len();
+                out_verts.push(v);
+                vi
+            });
+            // This should be guaranteed to exist otherwise the triangle should be unmatched
+            let &[ovi0, ovi1] = tri_edge_corr.get(&(tri, eis)).unwrap();
+            out_edges.push(minmax(vi0, ovi0));
+            out_edges.push(minmax(vi1, ovi1));
+        }
+    }
+
+    assert_eq!(out_poly.len(), tets.len());
+    out_poly.append(&mut vertex_poly);
+
+    (out_verts, out_poly, out_edges)
+}

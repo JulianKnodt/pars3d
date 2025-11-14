@@ -19,6 +19,7 @@ union-find = { git = "https://github.com/JulianKnodt/union-find.git", version = 
 
 [features]
 default = ["gltf", "fbx", "strict_fbx"]
+# formats:
 f64 = []
 gltf = ["dep:gltf", "dep:gltf-json"]
 fbx = []
@@ -26,7 +27,7 @@ msh = []
 
 strict_fbx = []
 extended_attrs = []
-
+# deps:
 svg = ["dep:svg"]
 kdtree = ["dep:kdtree"]
 rand = ["dep:rand"]
