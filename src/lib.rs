@@ -214,6 +214,26 @@ pub fn divk<const N: usize>(v: [F; N], k: F) -> [F; N] {
 }
 
 #[inline]
+pub fn kmul_add<const N: usize>(k: F, a: [F; N], b: [F; N]) -> [F; N] {
+    std::array::from_fn(|i| a[i].mul_add(k, b[i]))
+}
+
+/// Kahan sum of multiple vectors
+pub fn kahan<const N: usize>(vs: impl Iterator<Item = [F; N]>) -> [F; N] {
+    let mut sum = [0.; N];
+    let mut c = [0.; N];
+    for v in vs {
+        for i in 0..N {
+            let y = v[i] - c[i];
+            let t = sum[i] + y;
+            c[i] = (t - sum[i]) - y;
+            sum[i] = t;
+        }
+    }
+    sum
+}
+
+#[inline]
 pub fn add<const N: usize>(a: [F; N], b: [F; N]) -> [F; N] {
     std::array::from_fn(|i| a[i] + b[i])
 }
@@ -331,7 +351,8 @@ pub fn length<const N: usize>(v: [F; N]) -> F {
 /// Normalizes a vector, returning a zero vector if it has 0 norm
 #[inline]
 pub fn normalize<const N: usize>(v: [F; N]) -> [F; N] {
-    let sum: F = v.iter().map(|v| v * v).sum();
+    //let sum: F = v.iter().map(|v| v * v).sum();
+    let sum = dot(v, v);
     if sum == 0. {
         return [0.; N];
     }
@@ -341,7 +362,14 @@ pub fn normalize<const N: usize>(v: [F; N]) -> [F; N] {
 
 #[inline]
 pub fn dot<const N: usize>(a: [F; N], b: [F; N]) -> F {
-    (0..N).map(|i| a[i] * b[i]).sum::<F>()
+    // more accurate sum with mul_add
+    let mut acc = 0.;
+    for i in 0..N {
+        // algebraic float?
+        //acc = a[i].mul_add(b[i], acc);
+        acc += a[i] * b[i];
+    }
+    acc
 }
 
 pub(crate) fn append_one([a, b, c]: [F; 3]) -> [F; 4] {
@@ -480,7 +508,7 @@ pub fn barycentric_n<const N: usize>(p: [F; N], a: [F; N], b: [F; N], c: [F; N])
     let d20 = dot(v2, v0);
     let d21 = dot(v2, v1);
     let denom = diff_of_prod(d00, d11, d01, d01);
-    if denom.abs() < 1e-16 {
+    if denom.abs() <= 0.0 {
         return [1., 0., 0.];
     }
     // note that division is kept here to retain accuracy
@@ -567,7 +595,7 @@ pub fn matmul<const N: usize>(ta: [[F; N]; N], tb: [[F; N]; N]) -> [[F; N]; N] {
 }
 
 /// Computes the value `t` such that `s + (s-e)t = nearest point to p on line`
-pub fn nearest_on_line(p: [F; 3], [s, e]: [[F; 3]; 2]) -> F {
+pub fn nearest_on_line<const N: usize>(p: [F; N], [s, e]: [[F; N]; 2]) -> F {
     let dir = sub(e, s);
     let denom = dot(dir, dir);
     if denom.abs() < 1e-10 {
@@ -578,7 +606,7 @@ pub fn nearest_on_line(p: [F; 3], [s, e]: [[F; 3]; 2]) -> F {
 }
 
 /// Computes the nearest point on the line for a point p
-pub fn nearest_pt_on_line(p: [F; 3], [s, e]: [[F; 3]; 2]) -> [F; 3] {
+pub fn nearest_pt_on_line<const N: usize>(p: [F; N], [s, e]: [[F; N]; 2]) -> [F; N] {
     let t = nearest_on_line(p, [s, e]).clamp(0., 1.);
     add(s, kmul(t, sub(e, s)))
 }
