@@ -289,6 +289,18 @@ impl Scene {
     pub fn num_faces(&self) -> usize {
         self.meshes.iter().map(|m| m.f.len()).sum::<usize>()
     }
+    /// Number of edges in this scene (allocates).
+    pub fn num_edges(&self) -> usize {
+        let mut edges: HashSet<[usize; 2]> = HashSet::new();
+        for m in self.meshes.iter() {
+            for f in &m.f {
+                for e in f.edges_ord() {
+                    edges.insert(e);
+                }
+            }
+        }
+        edges.len()
+    }
     /// Number of triangles in this scene
     pub fn num_tris(&self) -> usize {
         self.meshes.iter().map(Mesh::num_tris).sum::<usize>()

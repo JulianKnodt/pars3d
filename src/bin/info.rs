@@ -36,6 +36,7 @@ fn main() -> std::io::Result<()> {
     println!("#Meshes = {}", scene.meshes.len());
     println!("#Nodes = {}", scene.nodes.len());
     println!("#V = {}", scene.num_vertices());
+    println!("#E = {}", scene.num_edges());
     println!("#F = {}", scene.num_faces());
     println!("- Geometry Info:");
     let mut mesh = scene.clone().into_flattened_mesh();

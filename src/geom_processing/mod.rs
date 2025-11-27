@@ -62,6 +62,17 @@ pub fn edge_kinds(fs: &[FaceKind]) -> BTreeMap<[usize; 2], EdgeKind> {
     edges
 }
 
+pub fn boundary_faces(fs: &[FaceKind]) -> impl Iterator<Item = usize> + '_ {
+    edge_kinds(fs).into_iter().filter_map(|(_, v)| match v {
+        EdgeKind::Boundary(f) => Some(f),
+        EdgeKind::Manifold([a, b]) => {
+            assert_ne!(a, b);
+            None
+        }
+        _ => None,
+    })
+}
+
 pub fn boundary_edges(fs: &[FaceKind]) -> impl Iterator<Item = [usize; 2]> + '_ {
     edge_kinds(fs)
         .into_iter()
