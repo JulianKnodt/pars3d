@@ -477,9 +477,12 @@ impl FaceKind {
     }
 
     pub fn area_2d(&self, vs: &[[F; 2]]) -> F {
+        self.area_2d_with(|vi| vs[vi])
+    }
+    pub fn area_2d_with(&self, vs: impl Fn(usize) -> [F; 2]) -> F {
         match self {
-            &FaceKind::Tri(t) => super::tri_area_2d(t.map(|vi| vs[vi])),
-            &FaceKind::Quad(q) => super::quad_area_2d(q.map(|vi| vs[vi])),
+            &FaceKind::Tri(t) => super::tri_area_2d(t.map(|vi| vs(vi))),
+            &FaceKind::Quad(q) => super::quad_area_2d(q.map(|vi| vs(vi))),
             FaceKind::Poly(p) => {
                 let mut vis = p.iter().copied();
                 let Some(root) = vis.next() else {
@@ -490,7 +493,7 @@ impl FaceKind {
                 };
                 let mut sum = 0.;
                 for v1 in vis {
-                    sum += super::tri_area_2d([root, v0, v1].map(|vi| vs[vi]));
+                    sum += super::tri_area_2d([root, v0, v1].map(|vi| vs(vi)));
                     v0 = v1;
                 }
                 sum
