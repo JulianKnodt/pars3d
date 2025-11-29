@@ -219,10 +219,10 @@ pub fn kmul_add<const N: usize>(k: F, a: [F; N], b: [F; N]) -> [F; N] {
 }
 
 /// Kahan sum of multiple vectors
-pub fn kahan<const N: usize>(vs: impl Iterator<Item = [F; N]>) -> [F; N] {
+pub fn kahan<const N: usize>(vs: impl IntoIterator<Item = [F; N]>) -> [F; N] {
     let mut sum = [0.; N];
     let mut c = [0.; N];
-    for v in vs {
+    for v in vs.into_iter() {
         for i in 0..N {
             let y = v[i] - c[i];
             let t = sum[i] + y;
