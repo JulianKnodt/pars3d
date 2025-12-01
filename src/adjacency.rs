@@ -33,6 +33,26 @@ pub fn vertex_vertex_adj(nv: usize, f: &[FaceKind]) -> Adj<()> {
     from_nbr_vec(&mut nbrs)
 }
 
+pub fn face_face_adj(f: &[FaceKind]) -> Adj<()> {
+    let edge_adjs = super::geom_processing::edge_kinds(f);
+    let mut f_nbrs = vec![vec![]; f.len()];
+
+    for (fi, f) in f.iter().enumerate() {
+        for e in f.edges_ord() {
+            f_nbrs[fi].extend(
+                edge_adjs[&e]
+                    .as_slice()
+                    .iter()
+                    .copied()
+                    .filter(|&ofi| ofi != fi)
+                    .map(|v| v as u32),
+            );
+        }
+    }
+
+    from_nbr_vec(&mut f_nbrs)
+}
+
 pub fn vertex_face_adj(nv: usize, f: &[FaceKind]) -> Adj<()> {
     let mut nbrs = vec![vec![]; nv];
     for (fi, f) in f.iter().enumerate() {
@@ -99,22 +119,7 @@ impl Mesh {
         vertex_face_adj(self.v.len(), &self.f)
     }
     pub fn face_face_adj(&self) -> Adj<()> {
-        let edge_adjs = self.edge_kinds();
-        let mut f_nbrs = vec![vec![]; self.f.len()];
-
-        for (fi, f) in self.f.iter().enumerate() {
-            for e in f.edges_ord() {
-                f_nbrs[fi].extend(
-                    edge_adjs[&e]
-                        .as_slice()
-                        .iter()
-                        .copied()
-                        .filter(|&ofi| ofi != fi)
-                        .map(|v| v as u32),
-                );
-            }
-        }
-        from_nbr_vec(&mut f_nbrs)
+        face_face_adj(&self.f)
     }
     pub fn face_face_pos_adj(&self) -> Adj<()> {
         let edge_adjs = self.edge_pos_kinds();
