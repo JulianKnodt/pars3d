@@ -12,6 +12,7 @@
 .DS_Store
 
 tmp/
+data/
 
 *.dot
 
