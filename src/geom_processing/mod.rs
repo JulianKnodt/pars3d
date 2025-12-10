@@ -47,9 +47,11 @@ pub fn barycentric_areas(fs: &[FaceKind], vs: &[[F; 3]], dst: &mut Vec<F>) {
 }
 
 /// For a given set of faces, computes an adjacency map between them.
-pub fn edge_kinds(fs: &[FaceKind]) -> BTreeMap<[usize; 2], EdgeKind> {
+pub fn edge_kinds<'a>(
+    fs: impl IntoIterator<Item = &'a FaceKind>,
+) -> BTreeMap<[usize; 2], EdgeKind> {
     let mut edges: BTreeMap<[usize; 2], EdgeKind> = BTreeMap::new();
-    for (fi, f) in fs.iter().enumerate() {
+    for (fi, f) in fs.into_iter().enumerate() {
         for e in f.edges_ord() {
             edges
                 .entry(e)
@@ -73,7 +75,9 @@ pub fn boundary_faces(fs: &[FaceKind]) -> impl Iterator<Item = usize> + '_ {
     })
 }
 
-pub fn boundary_edges(fs: &[FaceKind]) -> impl Iterator<Item = [usize; 2]> + '_ {
+pub fn boundary_edges<'a, 'b>(
+    fs: impl IntoIterator<Item = &'a FaceKind>,
+) -> impl Iterator<Item = [usize; 2]> + 'b {
     edge_kinds(fs)
         .into_iter()
         .filter_map(|(k, v)| v.is_boundary().then_some(k))
@@ -87,7 +91,7 @@ pub fn boundary_vertices(fs: &[FaceKind]) -> impl Iterator<Item = usize> + '_ {
 /// another triangle.
 pub fn delete_non_manifold_duplicates(fs: &mut Vec<FaceKind>) -> usize {
     let mut to_del = vec![];
-    let ek = edge_kinds(fs);
+    let ek = edge_kinds(fs.iter());
     for (fi, f) in fs.iter().enumerate() {
         if to_del.contains(&fi) {
             continue;
@@ -523,6 +527,13 @@ impl Mesh {
     /// Non-unique iterator over boundary edges
     pub fn boundary_edges(&self) -> impl Iterator<Item = [usize; 2]> + '_ {
         boundary_edges(&self.f)
+    }
+    /// For a subset of face indices of the input mesh, compute their boundary.
+    pub fn boundary_edges_of_subset(
+        &self,
+        face_idxs: impl IntoIterator<Item = usize>,
+    ) -> impl Iterator<Item = [usize; 2]> + '_ {
+        boundary_edges(face_idxs.into_iter().map(|vi| &self.f[vi]))
     }
 
     /// Boundary vertices of this mesh

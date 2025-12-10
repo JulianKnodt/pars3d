@@ -471,10 +471,14 @@ impl<D> Adj<D> {
     // TODO this should return another struct which also contains the vertices enclosed within
     // each boundary loop.
     /// Connectivity between boundary vertices (vert -> [prev, next])
-    /// Also returns the number of boundary loops present in this mesh.
-    pub fn boundary_loops(&self, m: &Mesh) -> (usize, BTreeMap<usize, [usize; 2]>) {
+    /// A mesh must be passed again to determine where faces are.
+    /// Returns (number of boundary loops present in this mesh, map from bd vert to adjacent verts).
+    pub fn boundary_loops<'a>(
+        &self,
+        f: impl IntoIterator<Item = &'a FaceKind>,
+    ) -> (usize, BTreeMap<usize, [usize; 2]>) {
         let mut out: BTreeMap<usize, [usize; 2]> = BTreeMap::new();
-        for [e0, e1] in m.boundary_edges() {
+        for [e0, e1] in crate::geom_processing::boundary_edges(f) {
             let slot = out
                 .entry(e0)
                 .or_insert([usize::MAX; 2])
