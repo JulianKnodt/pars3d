@@ -305,7 +305,7 @@ pub fn sign(x: F) -> Sign {
     }
 }
 
-pub(crate) fn tri_area_2d([a, b, c]: [[F; 2]; 3]) -> F {
+pub fn tri_area_2d([a, b, c]: [[F; 2]; 3]) -> F {
     cross_2d(sub(b, a), sub(c, a)) / 2.
 }
 
