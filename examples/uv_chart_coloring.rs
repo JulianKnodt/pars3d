@@ -60,11 +60,17 @@ fn main() -> std::io::Result<()> {
             }
         }
 
+        const EMPTY: &'static [usize] = &[];
         // Apply greedy coloring, then set coloring per vertex.
         let coloring = pars3d::visualization::greedy_face_coloring(
             |vi| comps[vi] as usize,
             m.v.len(),
-            |a| adjs.get(&a).map_or(&[], Vec::as_slice),
+            |a| {
+                adjs.get(&a)
+                    .map_or(EMPTY, Vec::as_slice)
+                    .into_iter()
+                    .copied()
+            },
             &pars3d::coloring::HIGH_CONTRAST,
         );
 

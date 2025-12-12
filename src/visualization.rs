@@ -163,16 +163,19 @@ pub fn arrows(
 /// Face group should be O(1). Outputs a color for each face, which can be applied with
 /// Mesh::with_face_coloring. `palette` can be arbitrary, but one example is
 /// pars3d::coloring::HIGH_CONTRAST.
-pub fn greedy_face_coloring<'a>(
+pub fn greedy_face_coloring<'a, T>(
     // Fn(Face) -> Group#
     face_group: impl Fn(usize) -> usize,
     // #Faces
     num_fs: usize,
     // The set of neighbors for a given group.
-    group_adj: impl Fn(usize) -> &'a [usize],
+    group_adj: impl Fn(usize) -> T,
     // Palette to use for coloring
     palette: &[[u8; 3]],
-) -> Vec<[F; 3]> {
+) -> Vec<[F; 3]>
+where
+    T: IntoIterator<Item = usize> + Clone + 'a,
+{
     const fn to_rgbf([r, g, b]: [u8; 3]) -> [F; 3] {
         [r as F / 255., g as F / 255., b as F / 255.]
     }
@@ -197,8 +200,8 @@ pub fn greedy_face_coloring<'a>(
         let nbrs = group_adj(g);
         let color = (0..)
             .find(|&v| {
-                nbrs.iter()
-                    .copied()
+                nbrs.clone()
+                    .into_iter()
                     .filter(|nbr| uniq_unord[nbr] < uniq_unord[&g])
                     .all(|nbr| coloring[uniq_unord[&nbr]] != v)
             })
@@ -228,7 +231,7 @@ pub fn greedy_face_coloring<'a>(
 
 impl super::mesh::Mesh {
     /// Constructs a new mesh with a given face coloring.
-    /// Does not retain any other information from the original mesh.
+    /// Retains only the UV[0] information from the original mesh.
     pub fn with_face_coloring(&self, fc: &[[F; 3]]) -> Self {
         assert_eq!(
             fc.len(),
@@ -239,6 +242,7 @@ impl super::mesh::Mesh {
         let mut new_v = vec![];
         let mut new_fs = vec![];
         let mut new_vc = vec![];
+        let mut new_uv = vec![];
         let mut created_pairs = HashMap::new();
 
         fn to_key(v: [F; 3], c: [F; 3]) -> [super::U; 6] {
@@ -263,6 +267,7 @@ impl super::mesh::Mesh {
                         let new_pos = new_v.len();
                         new_v.push(self.v[v]);
                         new_vc.push(color);
+                        new_uv.push(self.uv[0][v]);
                         empty.insert(new_pos);
                         new_f.insert(new_pos);
                     }
@@ -276,6 +281,7 @@ impl super::mesh::Mesh {
             v: new_v,
             f: new_fs,
             vert_colors: new_vc,
+            uv: [new_uv, vec![], vec![], vec![]],
 
             ..Default::default()
         }
