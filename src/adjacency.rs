@@ -5,11 +5,11 @@ use std::collections::{BTreeMap, BTreeSet};
 /// If the mesh is modified, this structure will no longer be valid.
 /// Can also be used to store associated data.
 #[derive(Debug, Clone)]
-pub struct Adj<D = ()> {
+pub struct Adj<D = (), I = u32> {
     /// Index and # of nbrs in adjacency vector
-    idx_count: Vec<(u32, u16)>,
+    idx_count: Vec<(I, u16)>,
     /// Flattened 2D vector from vertex to its neighbors
-    adj: Vec<u32>,
+    adj: Vec<I>,
     /// Associated data with each edge
     data: Vec<D>,
 }
@@ -51,6 +51,28 @@ pub fn face_face_adj(f: &[FaceKind]) -> Adj<()> {
     }
 
     from_nbr_vec(&mut f_nbrs)
+}
+
+/// Constructs the adjacency between edges
+pub fn edge_edge_adj(nv: usize, es: &[[usize; 2]]) -> Adj<()> {
+    let mut v_nbrs = vec![vec![]; nv];
+    for (ei, &[ei0, ei1]) in es.iter().enumerate() {
+        v_nbrs[ei0].push(ei);
+        v_nbrs[ei1].push(ei);
+    }
+
+    let mut e_nbrs = vec![vec![]; es.len()];
+    for eis in v_nbrs {
+        for &ei0 in &eis {
+            for &ei1 in &eis {
+                if ei0 == ei1 {
+                    continue;
+                }
+                e_nbrs[ei0].push(ei1 as u32);
+            }
+        }
+    }
+    from_nbr_vec(&mut e_nbrs)
 }
 
 pub fn vertex_face_adj(nv: usize, f: &[FaceKind]) -> Adj<()> {
@@ -471,7 +493,7 @@ impl<D> Adj<D> {
     // TODO this should return another struct which also contains the vertices enclosed within
     // each boundary loop.
     /// Connectivity between boundary vertices (vert -> [prev, next])
-    /// A mesh must be passed again to determine where faces are.
+    /// for a given set of faces.
     /// Returns (number of boundary loops present in this mesh, map from bd vert to adjacent verts).
     pub fn boundary_loops<'a>(
         &self,
@@ -495,10 +517,10 @@ impl<D> Adj<D> {
             *slot = e0;
         }
 
-        assert!(
-            out.values()
-                .all(|&[v0, v1]| v0 != usize::MAX && v1 != usize::MAX)
-        );
+        let all_filled = out
+            .values()
+            .all(|&[v0, v1]| v0 != usize::MAX && v1 != usize::MAX);
+        assert!(all_filled);
 
         // Fix up the loop order
         let mut num_loops = 0;
