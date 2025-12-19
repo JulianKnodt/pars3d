@@ -68,7 +68,12 @@ pub fn edge_edge_adj(nv: usize, es: &[[usize; 2]]) -> Adj<()> {
                 if ei0 == ei1 {
                     continue;
                 }
-                e_nbrs[ei0].push(ei1 as u32);
+                if !e_nbrs[ei0].contains(&(ei1 as u32)) {
+                    e_nbrs[ei0].push(ei1 as u32);
+                }
+                if !e_nbrs[ei1].contains(&(ei0 as u32)) {
+                    e_nbrs[ei1].push(ei0 as u32);
+                }
             }
         }
     }
@@ -541,6 +546,82 @@ impl<D> Adj<D> {
         }
 
         (num_loops, out)
+    }
+
+    pub fn boundary_loops_with_extra<'a>(
+        &self,
+        f: impl IntoIterator<Item = &'a FaceKind>,
+        // extra edges which should be considered part of the boundary, but do not have any
+        // boundary faces. Should be considered when connecting planar graphs with holes
+        extra_boundary: impl IntoIterator<Item = [usize; 2]>,
+    ) -> Vec<Vec<usize>> {
+        let (_, bd_loops) = self.boundary_loops(f);
+
+        let mut extra_slots: BTreeMap<usize, [usize; 2]> = BTreeMap::new();
+        for [e0, e1] in extra_boundary.into_iter() {
+            let slot = extra_slots
+                .entry(e0)
+                .or_insert([usize::MAX; 2])
+                .iter_mut()
+                .find(|v| **v == usize::MAX)
+                .expect("Multiple extra boundary edges meet");
+            *slot = e1;
+            let slot = extra_slots
+                .entry(e1)
+                .or_insert([usize::MAX; 2])
+                .iter_mut()
+                .find(|v| **v == usize::MAX)
+                .expect("Multiple extra boundary edges meet");
+            *slot = e0;
+        }
+
+        let mut out = vec![];
+        let mut not_visited = bd_loops
+            .keys()
+            .copied()
+            .filter(|v| !extra_slots.contains_key(&v))
+            .collect::<BTreeSet<_>>();
+
+        while let Some(first) = not_visited.pop_first() {
+            let mut curr_loop = vec![first];
+
+            let mut curr: usize = bd_loops[&first][1];
+            while curr != first {
+                not_visited.remove(&curr);
+
+                curr_loop.push(curr);
+                if extra_slots.contains_key(&curr) {
+                    // zip along the boundary
+                    let mut e_curr = curr;
+                    let [mut e_n, usize::MAX] = extra_slots[&curr] else {
+                        todo!("Should be unreachable");
+                    };
+
+                    loop {
+                        curr_loop.push(e_n);
+                        let e_nn = match extra_slots[&e_n] {
+                            [e_prev, usize::MAX] => {
+                                assert_eq!(e_prev, e_curr);
+                                break;
+                            }
+                            [e_prev, o] | [o, e_prev] if e_prev == e_curr => o,
+                            _ => todo!("Should be unreachable"),
+                        };
+                        e_curr = e_n;
+                        e_n = e_nn;
+                    }
+                    curr = bd_loops[&e_curr][1];
+                    not_visited.remove(&e_curr);
+                    continue;
+                }
+
+                curr = bd_loops[&curr][1];
+            }
+
+            out.push(curr_loop);
+        }
+
+        out
     }
 
     /// For this adjacency, returns a labelling of each element's component, along

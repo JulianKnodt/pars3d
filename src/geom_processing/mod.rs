@@ -3,6 +3,7 @@ use super::edge::EdgeKind;
 use super::{F, U, add, cross, dot, kmul, length, normalize, sub, tri_area, tri_area_2d};
 use super::{FaceKind, Mesh, Scene, face::Barycentric};
 use std::collections::BTreeMap;
+use std::collections::btree_map::Entry;
 
 /// Curvature related functions
 pub mod curvature;
@@ -47,6 +48,7 @@ pub fn barycentric_areas(fs: &[FaceKind], vs: &[[F; 3]], dst: &mut Vec<F>) {
 }
 
 /// For a given set of faces, computes an adjacency map between them.
+/// The output map will always have std::cmp::minmax of each edge.
 pub fn edge_kinds<'a>(
     fs: impl IntoIterator<Item = &'a FaceKind>,
 ) -> BTreeMap<[usize; 2], EdgeKind> {
@@ -64,6 +66,36 @@ pub fn edge_kinds<'a>(
     edges
 }
 
+/// Returns whether a 2D loop is counterclockwise.
+/// If the loop is empty, returns true.
+pub fn is_ccw_loop(lp: &BTreeMap<usize, [usize; 2]>, vals: &[[F; 2]]) -> bool {
+    let Some((&start, &[_, mut curr])) = lp.first_key_value() else {
+        return true;
+    };
+    let mut prev = start;
+    const ORIGIN: [F; 2] = [0.; 2];
+    let mut area = tri_area_2d([vals[prev], vals[curr], ORIGIN]);
+    while curr != start {
+        prev = curr;
+        curr = lp[&prev][1];
+        area += tri_area_2d([vals[prev], vals[curr], ORIGIN]);
+    }
+    area < 0.
+}
+
+#[test]
+fn test_ccw_loop() {
+    let vs = [[1., 0.], [0., 1.], [-1., 0.], [0., -1.]];
+    let vs = vs.map(|v| add(v, [-5., 0.]));
+    let mut lp = BTreeMap::new();
+    lp.insert(0, [1, 3]);
+    lp.insert(1, [2, 0]);
+    lp.insert(2, [3, 1]);
+    lp.insert(3, [0, 2]);
+
+    assert!(is_ccw_loop(&lp, &vs));
+}
+
 pub fn boundary_faces(fs: &[FaceKind]) -> impl Iterator<Item = usize> + '_ {
     edge_kinds(fs).into_iter().filter_map(|(_, v)| match v {
         EdgeKind::Boundary(f) => Some(f),
@@ -75,12 +107,31 @@ pub fn boundary_faces(fs: &[FaceKind]) -> impl Iterator<Item = usize> + '_ {
     })
 }
 
+/// Computes the boundary edges for a set of faces.
+/// Maintains each boundary edge's original order.
 pub fn boundary_edges<'a, 'b>(
     fs: impl IntoIterator<Item = &'a FaceKind>,
 ) -> impl Iterator<Item = [usize; 2]> + 'b {
-    edge_kinds(fs)
-        .into_iter()
-        .filter_map(|(k, v)| v.is_boundary().then_some(k))
+    let mut edges: BTreeMap<[usize; 2], bool> = BTreeMap::new();
+    for f in fs.into_iter() {
+        for e in f.edges() {
+            let swapped = [e[1], e[0]];
+            match edges.entry(swapped) {
+                Entry::Occupied(mut o) => {
+                    o.insert(false);
+                    continue;
+                }
+                _ => {}
+            }
+            edges
+                .entry(e)
+                .and_modify(|ek| {
+                    *ek = false;
+                })
+                .or_insert(true);
+        }
+    }
+    edges.into_iter().filter_map(|(k, v)| v.then_some(k))
 }
 
 pub fn boundary_vertices(fs: &[FaceKind]) -> impl Iterator<Item = usize> + '_ {
