@@ -97,6 +97,23 @@ pub fn vertex_face_adj(nv: usize, f: &[FaceKind]) -> Adj<()> {
     from_nbr_vec(&mut nbrs)
 }
 
+pub fn from_edges(edges: impl IntoIterator<Item = [usize; 2]>) -> Adj<()> {
+    let mut nbrs = vec![];
+    for [e0, e1] in edges {
+        if e0.max(e1) >= nbrs.len() {
+            nbrs.resize_with(e0.max(e1) + 1, Vec::new);
+        }
+        if !nbrs[e0].contains(&(e1 as u32)) {
+            nbrs[e0].push(e1 as u32);
+        }
+        if !nbrs[e1].contains(&(e0 as u32)) {
+            nbrs[e1].push(e0 as u32);
+        }
+    }
+
+    from_nbr_vec(&mut nbrs)
+}
+
 fn from_nbr_vec(nbrs: &mut Vec<Vec<u32>>) -> Adj<()> {
     let mut idx_count = vec![];
     let mut adj = vec![];
