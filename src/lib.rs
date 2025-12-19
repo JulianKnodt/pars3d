@@ -266,7 +266,7 @@ pub fn cross([x, y, z]: [F; 3], [a, b, c]: [F; 3]) -> [F; 3] {
     //[y * c - z * b, z * a - x * c, x * b - y * a]
 }
 
-pub(crate) fn cross_2d([x, y]: [F; 2], [a, b]: [F; 2]) -> F {
+pub fn cross_2d([x, y]: [F; 2], [a, b]: [F; 2]) -> F {
     // x * b - y * a
     diff_of_prod(x, b, y, a)
 }
