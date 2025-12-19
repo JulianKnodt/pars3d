@@ -54,6 +54,20 @@ impl<T> EdgeKind<T> {
     }
 }
 
+impl<T: Eq> EdgeKind<T> {
+    pub fn shares_any(&self, o: &Self) -> bool {
+        for i in self.as_slice() {
+            for j in o.as_slice() {
+                if i == j {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+}
+
 impl<T> EdgeKind<(usize, T)> {
     /// Insert a new element into this edge kind, if a condition is met for all existing faces.
     pub fn insert_if_new(&mut self, fi: usize, new: impl Fn() -> T) -> bool {
