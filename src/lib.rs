@@ -276,6 +276,12 @@ pub fn orient([a, b, p]: [[F; 2]; 3]) -> Sign {
     sign(cross_2d(sub(a, p), sub(b, p)))
 }
 
+pub(crate) fn signed_angle_2d([p, c, n]: [[F; 2]; 3]) -> F {
+    let e0 = normalize(sub(n, c));
+    let e1 = normalize(sub(c, p));
+    F::atan2(cross_2d(e0, e1), dot(e0, e1))
+}
+
 #[derive(Debug, PartialEq, Eq, Ord, PartialOrd, Copy, Clone)]
 pub enum Sign {
     Pos,

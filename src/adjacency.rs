@@ -1,4 +1,4 @@
-use super::{F, FaceKind, Mesh, dist, dot, normalize, sub};
+use super::{F, FaceKind, Mesh, dist, dot, normalize, signed_angle_2d, sub};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Structure for maintaining adjacencies of a mesh with fixed topology.
@@ -12,6 +12,12 @@ pub struct Adj<D = (), I = u32> {
     adj: Vec<I>,
     /// Associated data with each edge
     data: Vec<D>,
+}
+
+impl<D, I> Adj<D, I> {
+    pub fn parts(&self) -> (&[(I, u16)], &[I]) {
+        (&self.idx_count, &self.adj)
+    }
 }
 
 pub fn vertex_vertex_adj(nv: usize, f: &[FaceKind]) -> Adj<()> {
@@ -97,12 +103,9 @@ pub fn vertex_face_adj(nv: usize, f: &[FaceKind]) -> Adj<()> {
     from_nbr_vec(&mut nbrs)
 }
 
-pub fn from_edges(edges: impl IntoIterator<Item = [usize; 2]>) -> Adj<()> {
-    let mut nbrs = vec![];
+pub fn from_edges(nv: usize, edges: impl IntoIterator<Item = [usize; 2]>) -> Adj<()> {
+    let mut nbrs = vec![vec![]; nv];
     for [e0, e1] in edges {
-        if e0.max(e1) >= nbrs.len() {
-            nbrs.resize_with(e0.max(e1) + 1, Vec::new);
-        }
         if !nbrs[e0].contains(&(e1 as u32)) {
             nbrs[e0].push(e1 as u32);
         }
@@ -403,6 +406,9 @@ impl<D> Adj<D> {
     pub fn all_adj_data(&self) -> impl Iterator<Item = (usize, &[u32], &[D])> + '_ {
         (0..self.idx_count.len()).map(|vi| (vi, self.adj(vi), self.data(vi)))
     }
+    pub fn all_adjs(&self) -> impl Iterator<Item = (usize, &[u32])> + '_ {
+        (0..self.idx_count.len()).map(|vi| (vi, self.adj(vi)))
+    }
 
     /// Given an incoming edge to this vertex, return the edge that is closest to being
     /// opposite. Returns none if vertex does not share any faces
@@ -633,6 +639,55 @@ impl<D> Adj<D> {
                 }
 
                 curr = bd_loops[&curr][1];
+            }
+
+            out.push(curr_loop);
+        }
+
+        out
+    }
+
+    /// Loops between boundary vertices in order for a given set of faces.
+    /// Will trace dividing edges if present, following the dividing edge with the lowest angle.
+    /// Returns (number of boundary loops present in this mesh, and order around boundary loops)
+    // TODO how to not omit faces which are entirely made of boundary edges or dividing edges
+    pub fn boundary_loops_with_dividing_edges<'a>(
+        &self,
+        f: impl IntoIterator<Item = &'a FaceKind>,
+        embedding: &[[F; 2]],
+    ) -> Vec<Vec<usize>> {
+        let (_loops, bd_loops) = self.boundary_loops(f);
+
+        let mut out = vec![];
+        let mut not_visited = bd_loops.keys().copied().collect::<BTreeSet<_>>();
+
+        while let Some(first) = not_visited.pop_first() {
+            let mut curr_loop = vec![];
+            let mut curr = first;
+
+            loop {
+                // could have already been removed
+                not_visited.remove(&curr);
+                curr_loop.push(curr);
+
+                let [p, n] = bd_loops[&curr];
+
+                let a = self
+                    .adj(curr)
+                    .iter()
+                    .map(|&adj| adj as usize)
+                    .filter(|&a| bd_loops.contains_key(&a) && a != p && a != n)
+                    .map(|a| {
+                        let ang = signed_angle_2d([p, curr, a].map(|e| embedding[e]));
+                        (a, ang)
+                    })
+                    .filter(|&(_, ang)| ang >= 0.)
+                    .min_by(|a, b| a.1.total_cmp(&b.1));
+                curr = if let Some((a, _)) = a { a } else { n };
+
+                if curr == first {
+                    break;
+                }
             }
 
             out.push(curr_loop);
