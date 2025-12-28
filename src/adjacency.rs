@@ -117,7 +117,7 @@ pub fn from_edges(nv: usize, edges: impl IntoIterator<Item = [usize; 2]>) -> Adj
     from_nbr_vec(&mut nbrs)
 }
 
-fn from_nbr_vec(nbrs: &mut Vec<Vec<u32>>) -> Adj<()> {
+pub(crate) fn from_nbr_vec(nbrs: &mut Vec<Vec<u32>>) -> Adj<()> {
     let mut idx_count = vec![];
     let mut adj = vec![];
     for fi in 0..nbrs.len() {
@@ -383,6 +383,17 @@ impl<D> Adj<D> {
         let cnt = cnt as usize;
 
         (&self.adj[idx..idx + cnt], &mut self.data[idx..idx + cnt])
+    }
+
+    pub fn data_mut(&mut self, v: usize) -> &mut [D] {
+        let (idx, cnt) = self.idx_count[v];
+        if cnt == 0 {
+            return &mut [];
+        }
+        let idx = idx as usize;
+        let cnt = cnt as usize;
+
+        &mut self.data[idx..idx + cnt]
     }
 
     /// Returns all pairs of edges (both e0->e1 and e1->e0)
