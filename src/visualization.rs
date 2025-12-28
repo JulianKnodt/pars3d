@@ -120,7 +120,12 @@ pub fn face_segmentation_wireframes<'a>(
             }
         }
     }
-    colored_wireframe(edges.into_iter(), |vi| vertices[vi], |_| [0.; 3], width)
+    colored_wireframe(
+        edges.into_iter(),
+        |vi| vertices[vi],
+        |_| Some([0.; 3]),
+        width,
+    )
 }
 
 // for each position, constructs a set of arrows based on a set of directions with a given
@@ -157,6 +162,34 @@ pub fn arrows(
         faces.append(&mut fs);
     }
     (verts, colors, faces)
+}
+
+use super::adjacency::{self, Adj};
+/// Given a labeling of each face to a group, constructs an adj between groups.
+/// Allocates.
+pub fn face_group_adjacency(
+    face_group: impl Fn(usize) -> usize,
+    faces: &[super::FaceKind],
+    num_groups: usize,
+) -> Adj<()> {
+    let ff_adj = adjacency::face_face_adj(faces);
+
+    let mut group_adjs = vec![vec![]; num_groups];
+    for ([f0, f1], ()) in ff_adj.all_pairs() {
+        let g0 = face_group(f0);
+        let g1 = face_group(f1);
+        if g0 != g1 {
+            if !group_adjs[g0].contains(&(g1 as u32)) {
+                group_adjs[g0].push(g1 as u32);
+            }
+
+            if !group_adjs[g1].contains(&(g0 as u32)) {
+                group_adjs[g1].push(g0 as u32);
+            }
+        }
+    }
+
+    adjacency::from_nbr_vec(&mut group_adjs)
 }
 
 /// Uses a fixed set of high contrast colors to color each face group.
@@ -363,7 +396,7 @@ pub fn opt_colored_wireframe(
     colored_wireframe(
         edges,
         vs,
-        |e| edge_value(e).map(magma).unwrap_or(default_color),
+        |e| Some(edge_value(e).map(magma).unwrap_or(default_color)),
         width,
     )
 }
@@ -372,7 +405,7 @@ pub fn opt_colored_wireframe(
 pub fn colored_wireframe(
     edges: impl Iterator<Item = [usize; 2]>,
     vs: impl Fn(usize) -> [F; 3],
-    edge_value: impl Fn([usize; 2]) -> [F; 3],
+    edge_value: impl Fn([usize; 2]) -> Option<[F; 3]>,
     width: F,
 ) -> (Vec<[F; 3]>, Vec<[F; 3]>, Vec<[usize; 4]>) {
     let mut new_vs = vec![];
@@ -380,7 +413,9 @@ pub fn colored_wireframe(
     let mut new_fs = vec![];
 
     for [e0, e1] in edges {
-        let color = edge_value([e0, e1]);
+        let Some(color) = edge_value([e0, e1]) else {
+            continue;
+        };
         let e0 = vs(e0);
         let e1 = vs(e1);
         let e_dir = normalize(sub(e1, e0));

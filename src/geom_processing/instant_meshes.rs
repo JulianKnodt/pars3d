@@ -304,7 +304,7 @@ pub fn instant_mesh(
         let wf = crate::visualization::colored_wireframe(
             nbr_edges.iter().copied(),
             |vi| pos_field[vi],
-            |[_, _]| [1., 0., 0.],
+            |[_, _]| Some([1., 0., 0.]),
             0.001,
         );
         let mut out_tmp = crate::visualization::wireframe_to_mesh(wf);
