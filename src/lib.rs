@@ -278,8 +278,17 @@ pub fn orient([a, b, p]: [[F; 2]; 3]) -> Sign {
 
 pub(crate) fn signed_angle_2d([p, c, n]: [[F; 2]; 3]) -> F {
     let e0 = normalize(sub(n, c));
-    let e1 = normalize(sub(c, p));
+    let e1 = normalize(sub(p, c));
     F::atan2(cross_2d(e0, e1), dot(e0, e1))
+}
+
+#[test]
+fn test_signed_angle_2d() {
+    let a = signed_angle_2d([[-1., 0.], [0.; 2], [1., 0.]]);
+    assert!((a - std::f64::consts::PI as F).abs() < 1e-5);
+
+    let a = signed_angle_2d([[-1., 0.], [0.; 2], [0., 1.]]);
+    assert!((a - std::f64::consts::FRAC_PI_2 as F).abs() < 1e-5);
 }
 
 #[derive(Debug, PartialEq, Eq, Ord, PartialOrd, Copy, Clone)]

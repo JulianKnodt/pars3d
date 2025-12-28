@@ -15,8 +15,8 @@ pub struct Adj<D = (), I = u32> {
 }
 
 impl<D, I> Adj<D, I> {
-    pub fn parts(&self) -> (&[(I, u16)], &[I]) {
-        (&self.idx_count, &self.adj)
+    pub fn parts(&self) -> (&[(I, u16)], &[I], &[D]) {
+        (&self.idx_count, &self.adj, &self.data)
     }
 }
 
@@ -672,6 +672,7 @@ impl<D> Adj<D> {
         let mut out = vec![];
         let mut not_visited = bd_loops.keys().copied().collect::<BTreeSet<_>>();
 
+        // TODO here should not take a vertex that will later be cut by a dividing edge
         while let Some(first) = not_visited.pop_first() {
             let mut curr_loop = vec![];
             let mut curr = first;
@@ -679,21 +680,24 @@ impl<D> Adj<D> {
             loop {
                 // could have already been removed
                 not_visited.remove(&curr);
-                curr_loop.push(curr);
-
                 let [p, n] = bd_loops[&curr];
+                let prev = curr_loop.last().copied().unwrap_or(p);
+                assert_ne!(prev, curr);
+
+                curr_loop.push(curr);
 
                 let a = self
                     .adj(curr)
                     .iter()
                     .map(|&adj| adj as usize)
-                    .filter(|&a| bd_loops.contains_key(&a) && a != p && a != n)
+                    .filter(|&a| bd_loops.contains_key(&a) && a != p)
                     .map(|a| {
-                        let ang = signed_angle_2d([p, curr, a].map(|e| embedding[e]));
+                        let ang = signed_angle_2d([prev, curr, a].map(|e| embedding[e]));
                         (a, ang)
                     })
-                    .filter(|&(_, ang)| ang >= 0.)
+                    .filter(|&(_, ang)| ang <= 0.)
                     .min_by(|a, b| a.1.total_cmp(&b.1));
+                //println!("{curr} {a:?}");
                 curr = if let Some((a, _)) = a { a } else { n };
 
                 if curr == first {

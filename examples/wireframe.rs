@@ -31,7 +31,7 @@ fn main() -> std::io::Result<()> {
     let wf = pars3d::visualization::colored_wireframe(
         edges.iter().copied(),
         |vi| m.v[vi],
-        |[_, _]| [0.; 3],
+        |[_, _]| Some([0.; 3]),
         args.width,
     );
 
