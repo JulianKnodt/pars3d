@@ -21,6 +21,15 @@ pub fn line_isect([a0, a1]: [[F; 2]; 2], [b0, b1]: [[F; 2]; 2]) -> Option<(F, F,
     Some((t, u, add(a0, kmul(t, a_dir))))
 }
 
+pub fn line_dir_isect([a0, a_dir]: [[F; 2]; 2], [b0, b_dir]: [[F; 2]; 2]) -> Option<[F; 2]> {
+    let denom = cross_2d(a_dir, b_dir);
+    if denom == 0. {
+        return None;
+    }
+    let t = cross_2d(sub(b0, a0), b_dir) / denom;
+    Some(add(a0, kmul(t, a_dir)))
+}
+
 // given two lines, compute their intersection
 pub fn line_segment_isect(a: [[F; 2]; 2], b: [[F; 2]; 2]) -> Option<[F; 2]> {
     // they could also lie directly on the line, but that's annoying to check
