@@ -661,7 +661,6 @@ impl<D> Adj<D> {
     /// Loops between boundary vertices in order for a given set of faces.
     /// Will trace dividing edges if present, following the dividing edge with the lowest angle.
     /// Returns (number of boundary loops present in this mesh, and order around boundary loops)
-    // TODO how to not omit faces which are entirely made of boundary edges or dividing edges
     pub fn boundary_loops_with_dividing_edges<'a>(
         &self,
         f: impl IntoIterator<Item = &'a FaceKind>,
@@ -697,9 +696,8 @@ impl<D> Adj<D> {
                     })
                     .filter(|&(_, ang)| ang <= 0.)
                     .min_by(|a, b| a.1.total_cmp(&b.1));
-                //println!("{curr} {a:?}");
-                curr = if let Some((a, _)) = a { a } else { n };
 
+                curr = if let Some((a, _)) = a { a } else { n };
                 if curr == first {
                     break;
                 }
