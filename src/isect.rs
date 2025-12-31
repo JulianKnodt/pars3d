@@ -31,8 +31,10 @@ pub fn line_dir_isect([a0, a_dir]: [[F; 2]; 2], [b0, b_dir]: [[F; 2]; 2]) -> Opt
 }
 
 /// Checks if point is on a line segment.
-pub fn point_on_line_segment([s, e]: [[F; 2]; 2], p: [F; 2]) -> bool {
-    (dist(s, p) + dist(e, p) - dist(s, e)).abs() < F::EPSILON
+/// `eps` is a threshold for when a point is close enough to a line.
+/// Reasonable values are `5e-6` for f32, and `1e-12` for f64.
+pub fn point_on_line_segment([s, e]: [[F; 2]; 2], p: [F; 2], eps: F) -> bool {
+    (dist(s, p) + dist(e, p) - dist(s, e)).abs() <= eps
 }
 
 // given two lines, compute their intersection
@@ -40,9 +42,18 @@ pub fn line_segment_isect(a: [[F; 2]; 2], b: [[F; 2]; 2]) -> Option<[F; 2]> {
     // they could also lie directly on the line, but that's annoying to check
     let (t, u, isect) = line_isect(a, b)?;
     let valid = (0.0..=1.0).contains(&t) && (0.0..=1.0).contains(&u);
-    let pls = point_on_line_segment;
-    let valid = valid && !pls(a, b[0]) && !pls(a, b[1]) && !pls(b, a[0]) && !pls(b, a[1]);
     valid.then_some(isect)
+}
+
+/// Checks if any endpoint of two line segments intersect with the other.
+pub fn line_segment_ends_isect(l0: [[F; 2]; 2], l1: [[F; 2]; 2], eps: F) -> Option<[F; 2]> {
+    for (l, p) in [(l0, l1[0]), (l0, l1[1]), (l1, l0[0]), (l1, l0[1])] {
+        if point_on_line_segment(l, p, eps) {
+            return Some(p);
+        }
+    }
+
+    None
 }
 
 #[test]
@@ -54,6 +65,34 @@ fn test_line_segment_isect() {
 
     let isect = line_segment_isect([[-1., 0.], [1., 0.]], [[0.5, 100.], [-0.5, -100.]]);
     assert_eq!(Some([0., 0.]), isect);
+}
+
+#[test]
+fn test_par_line_seg_isect() {
+    let l0 = [[0., 0.], [10., 0.]];
+    let l1 = [[3., 0.], [4., 0.]];
+
+    assert!(line_segment_ends_isect(l0, l1, 0.).is_some());
+    assert!(line_segment_isect(l0, l1).is_none());
+
+    let l0 = [[0.; 2], [100000.; 2]];
+    let l1 = [[3.; 2], [4.; 2]];
+
+    assert!(line_segment_ends_isect(l0, l1, 0.).is_some());
+    assert!(line_segment_isect(l0, l1).is_none());
+
+    let l0 = [[(13.283 as F).sin(), (231.01 as F).cos()], [10., -3.]];
+    let n = 100;
+    for t in 0..n {
+        let t = t as F / n as F;
+        let p = crate::lerp(t, l0[0], l0[1]);
+        // 1e-10 seems fine for f64, 1e-12 for f32
+        #[cfg(feature = "f64")]
+        let eps = 1e-13;
+        #[cfg(not(feature = "f64"))]
+        let eps = 5e-6;
+        assert!(point_on_line_segment(l0, p, eps));
+    }
 }
 
 /// Given the equation of a plane (dot(P,N) + d), where d = (dot(Point on Plane, N))
