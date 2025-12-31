@@ -694,8 +694,8 @@ impl<D> Adj<D> {
                         let ang = signed_angle_2d([prev, curr, a].map(|e| embedding[e]));
                         (a, ang)
                     })
-                    .filter(|&(_, ang)| ang <= 0.)
-                    .min_by(|a, b| a.1.total_cmp(&b.1));
+                    .filter(|&(_, ang)| ang < 0.)
+                    .max_by(|a, b| a.1.total_cmp(&b.1));
 
                 curr = if let Some((a, _)) = a { a } else { n };
                 if curr == first {
