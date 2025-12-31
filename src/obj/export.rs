@@ -213,7 +213,7 @@ pub fn save_obj(
         } else {
             writeln!(geom_dst, "g {}", m.name)?;
         }
-        let fmt = |v| match (v >= m.n.len(), v >= m.uv[0].len()) {
+        let fmt = |v| match (v > m.n.len(), v > m.uv[0].len()) {
             (true, true) => format!("{v}"),
             (true, false) => format!("{v}/{v}"),
             (false, true) => format!("{v}//{v}"),
