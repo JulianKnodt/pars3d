@@ -523,12 +523,13 @@ pub fn wireframe_to_mesh(
     }
 }
 
+/// lazily returns a non-parallel vector
 fn non_parallel([x, y, z]: [F; 3]) -> [F; 3] {
-    if (x - y).abs() > 1e-3 {
+    if (x.abs() - y.abs()).abs() > 1e-3 {
         [y, x, z]
-    } else if (x - z).abs() > 1e-3 {
+    } else if (x.abs() - z.abs()).abs() > 1e-3 {
         [z, y, x]
-    } else if (y - z).abs() > 1e-3 {
+    } else if (y.abs() - z.abs()).abs() > 1e-3 {
         [x, z, y]
     } else {
         [-x, y, z]
