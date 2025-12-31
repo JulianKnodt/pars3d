@@ -30,11 +30,18 @@ pub fn line_dir_isect([a0, a_dir]: [[F; 2]; 2], [b0, b_dir]: [[F; 2]; 2]) -> Opt
     Some(add(a0, kmul(t, a_dir)))
 }
 
+/// Checks if point is on a line segment.
+pub fn point_on_line_segment([s, e]: [[F; 2]; 2], p: [F; 2]) -> bool {
+    (dist(s, p) + dist(e, p) - dist(s, e)).abs() < F::EPSILON
+}
+
 // given two lines, compute their intersection
 pub fn line_segment_isect(a: [[F; 2]; 2], b: [[F; 2]; 2]) -> Option<[F; 2]> {
     // they could also lie directly on the line, but that's annoying to check
     let (t, u, isect) = line_isect(a, b)?;
     let valid = (0.0..=1.0).contains(&t) && (0.0..=1.0).contains(&u);
+    let pls = point_on_line_segment;
+    let valid = valid && !pls(a, b[0]) && !pls(a, b[1]) && !pls(b, a[0]) && !pls(b, a[1]);
     valid.then_some(isect)
 }
 
