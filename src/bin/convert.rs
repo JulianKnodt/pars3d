@@ -1,10 +1,12 @@
-use pars3d::{load, save, parse_args};
+use pars3d::{load, parse_args, save};
 
 fn main() -> std::io::Result<()> {
     let args = parse_args!(
       "Import and export a given mesh.",
-      Input("-i", "--input"; "Input mesh"; |arg: &str| !arg.is_empty()) => input : String = String::new(),
-      Output("-o", "--output"; "Output mesh"; |arg: &str| !arg.is_empty()) => output : String = String::new(),
+      Input("-i", "--input"; "Input mesh"; |arg: &str| !arg.is_empty())
+        => input : String = String::new(),
+      Output("-o", "--output"; "Output mesh"; |arg: &str| !arg.is_empty())
+        => output : String = String::new(),
       Triangulate("--triangulate"; "Triangulate the input mesh")
         => triangulate : bool = false => true,
     );

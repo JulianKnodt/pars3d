@@ -32,7 +32,7 @@ fbx::export::export_fbx(fbx_scene, std::io::BufWriter::new(out)).expect("Failed 
 - .obj
 - .glb (with `feature = "gltf"`, binary only)
 - .fbx (experimental export, binary only)
-- .ply (ascii only, vertex colors, normals, UV)
+- .ply (ascii + binary, vertex colors, normals, UV, ![NEW](https://web.archive.org/web/20091027143217if_/http://geocities.com/dent30cmu/icon/new.gif) Gaussian Splats)
 
 
 ##### Secondary Support

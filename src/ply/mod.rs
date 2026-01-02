@@ -1,4 +1,5 @@
-use super::mesh::VertexAttrs;
+use super::mesh::{SphHarmonicCoeff, VertexAttrs};
+
 use super::{F, FaceKind};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Error, ErrorKind, Read, Write};
@@ -10,20 +11,20 @@ pub mod to_mesh;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Ply {
     /// Vertex positions
-    v: Vec<[F; 3]>,
+    pub v: Vec<[F; 3]>,
     /// Vertex colors
-    vc: Vec<[F; 3]>,
+    pub vc: Vec<[F; 3]>,
 
     /// Vertex Normals
-    n: Vec<[F; 3]>,
+    pub n: Vec<[F; 3]>,
 
     /// UV coordinates (called st in PLYs for historical reasons)
-    uv: Vec<[F; 2]>,
+    pub uv: Vec<[F; 2]>,
 
     /// Faces for this mesh
-    f: Vec<FaceKind>,
+    pub f: Vec<FaceKind>,
 
-    vertex_attrs: VertexAttrs,
+    pub vertex_attrs: VertexAttrs,
 }
 
 #[derive(PartialEq)]
@@ -74,6 +75,17 @@ enum Field {
     RotW,
 
     FRest(u8),
+}
+
+/// PLY Format
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum FormatKind {
+    /// Ascii (Human Readable)
+    Ascii,
+    /// Binary Little Endian
+    BinLil,
+    /// Binary Big Endian
+    BinBig,
 }
 
 impl Ply {
@@ -133,13 +145,12 @@ impl Ply {
         let height = &mut vertex_attrs.height;
         let scales = &mut vertex_attrs.scale;
         let rots = &mut vertex_attrs.rot;
+        let sphs = &mut vertex_attrs.sph_harmonic_coeff;
 
         let mut f = vec![];
 
         let mut num_v = 0;
         let mut num_f = 0;
-
-        let mut max_f_rest = 0;
 
         let mut vertex_bytes = 0;
 
@@ -147,13 +158,6 @@ impl Ply {
             ($s: expr) => {
                 Err(Error::new(ErrorKind::Other, $s))
             };
-        }
-
-        #[derive(Debug, PartialEq, Eq)]
-        enum FormatKind {
-            Ascii,
-            BinLil,
-            BinBig,
         }
 
         let mut format = FormatKind::Ascii;
@@ -301,9 +305,7 @@ impl Ply {
                             }
                         }
                         Some(k) if k.starts_with("f_rest_") => {
-                            let n = k["f_rest_".len()..].parse().unwrap();
-                            max_f_rest = max_f_rest.max(n as usize);
-                            Field::FRest(n)
+                            Field::FRest(k["f_rest_".len()..].parse().unwrap())
                         }
                         Some("opacity") => Field::Opacity,
 
@@ -364,10 +366,9 @@ impl Ply {
                     let mut h = 0.;
                     let mut opacity = 0.;
 
-                    let mut f_rest = vec![0.; max_f_rest + 1];
-
                     let mut scale = [0.; 3];
                     let mut rot = [0.; 4];
+                    let mut sph = [SphHarmonicCoeff::default(); 3];
 
                     let mut offset = 0;
                     match format {
@@ -417,7 +418,18 @@ impl Ply {
                                     Field::Alpha => todo!(),
 
                                     Field::Opacity => opacity = get!(f32, F),
-                                    Field::FRest(n) => f_rest[*n as usize] = get!(f32, F),
+                                    Field::FRest(n) => {
+                                        let n = *n as usize;
+                                        // maybe this is incorrect (but it's the most simple)
+                                        let color = n / 15;
+                                        let chan = n % 15;
+                                        /*
+                                        let color = n % 3;
+                                        let chan = n / 3;
+                                        assert!(chan < 15);
+                                        */
+                                        *sph[color].get_mut(chan).unwrap() = get!(f32, F);
+                                    }
 
                                     Field::ScaleX => scale[0] = get!(f32, F),
                                     Field::ScaleY => scale[1] = get!(f32, F),
@@ -484,7 +496,7 @@ impl Ply {
                     cond_push!(has_opacity, opacitys, opacity);
                     cond_push!(has_scale, scales, scale);
                     cond_push!(has_rot, rots, rot);
-                    // TODO handle f_rest
+                    cond_push!(has_f_rest, sphs, sph);
 
                     match (num_v, num_f) {
                         (0, 0) => Done,
@@ -537,92 +549,140 @@ impl Ply {
     }
 
     /// Write this Ply file to a mesh.
-    pub fn write(&self, mut out: impl Write) -> std::io::Result<()> {
+    pub fn write(&self, mut out: impl Write, fmt: FormatKind) -> std::io::Result<()> {
         let has_vc = !self.vc.is_empty();
         let has_n = !self.n.is_empty();
         let has_uv = !self.uv.is_empty();
-        let has_h = !self.vertex_attrs.height.is_empty();
+        let va = &self.vertex_attrs;
+
+        let has_h = !va.height.is_empty();
+        // gaussian splat attributes
+        let has_opacity = !va.opacity.is_empty();
+        let has_scale = !va.scale.is_empty();
+        let has_rot = !va.rot.is_empty();
+        let has_sph = !va.sph_harmonic_coeff.is_empty();
 
         writeln!(out, "ply")?;
-        writeln!(out, "format ascii 1.0")?;
+        match fmt {
+            FormatKind::Ascii => writeln!(out, "format ascii 1.0")?,
+            FormatKind::BinBig => writeln!(out, "format binary_big_endian 1.0")?,
+            FormatKind::BinLil => writeln!(out, "format binary_little_endian 1.0")?,
+        }
         writeln!(out, "element vertex {}", self.v.len())?;
         writeln!(out, "property float x")?;
         writeln!(out, "property float y")?;
         writeln!(out, "property float z")?;
 
-        if has_n {
-            assert_eq!(
-                self.v.len(),
-                self.n.len(),
-                "Mismatch between #vertices and #normals"
-            );
-            for p in ["nx", "ny", "nz"] {
-                writeln!(out, "property float {p}")?;
-            }
-        }
-        if has_uv {
-            assert_eq!(
-                self.uv.len(),
-                self.v.len(),
-                "Mismatch between #uv and #vertices",
-            );
-            for p in ["s", "t"] {
-                writeln!(out, "property float {p}")?;
-            }
+        macro_rules! opt_property {
+            ($cond: expr, $src: expr, $name: literal, $ty_name: expr, $exprs: expr) => {{
+                if $cond {
+                    assert_eq!(
+                        self.v.len(),
+                        $src.len(),
+                        "Mismatch between #vertices and #{}",
+                        $name
+                    );
+                    for p in $exprs {
+                        writeln!(out, "property {} {p}", $ty_name)?;
+                    }
+                }
+            }};
         }
 
-        if has_vc {
-            assert_eq!(
-                self.v.len(),
-                self.vc.len(),
-                "Mismatch between #vertices and #vertex colors"
-            );
-            for p in ["red", "green", "blue"] {
-                writeln!(out, "property uchar {p}")?;
-            }
+        opt_property!(has_n, self.n, "normals", "float", ["nx", "ny", "nz"]);
+        opt_property!(has_uv, self.uv, "uv", "float", ["s", "t"]);
+        if has_sph {
+            let attrs = ["f_dc_0", "f_dc_1", "f_dc_2"];
+            opt_property!(has_vc, self.vc, "vertex colors", "float", attrs);
+        } else {
+            let attrs = ["red", "green", "blue"];
+            opt_property!(has_vc, self.vc, "vertex colors", "uchar", attrs);
         }
 
-        if has_h {
-            assert_eq!(
-                self.v.len(),
-                self.vertex_attrs.height.len(),
-                "Mismatch between #vertices and #height"
-            );
-            writeln!(out, "property float height")?;
-        }
+        let attrs = (0..45).map(|i| format!("f_rest_{i}"));
+        opt_property!(has_sph, va.sph_harmonic_coeff, "sphs", "float", attrs);
 
-        writeln!(out, "element face {}", self.f.len())?;
-        writeln!(out, "property list uchar int vertex_indices")?;
+        opt_property!(has_h, va.height, "height", "float", ["height"]);
+        opt_property!(has_opacity, va.opacity, "opacity", "float", ["opacity"]);
+        let attrs = ["scale_0", "scale_1", "scale_2"];
+        opt_property!(has_scale, va.scale, "scale", "float", attrs);
+        let attrs = ["rot_0", "rot_1", "rot_2", "rot_3"];
+        opt_property!(has_rot, va.rot, "rot", "float", attrs);
+
+        if !(self.f.is_empty() && has_sph) {
+            writeln!(out, "element face {}", self.f.len())?;
+            writeln!(out, "property list uchar int vertex_indices")?;
+        }
         writeln!(out, "end_header")?;
 
+        macro_rules! write_out {
+            (OPT: $data: expr) => {{
+                if let Some(d) = $data {
+                    write_out!(d);
+                }
+            }};
+            ($data: expr) => {{
+                for v in $data {
+                    match fmt {
+                        FormatKind::Ascii => write!(out, " {v}")?,
+                        FormatKind::BinLil => {
+                            out.write(&v.to_le_bytes())?;
+                        }
+                        FormatKind::BinBig => {
+                            out.write(&v.to_be_bytes())?;
+                        }
+                    }
+                }
+            }};
+            ($data: expr, NO_LEADING_SPACE) => {{
+                let mut d = $data.into_iter();
+                if let Some(v) = d.next() {
+                    match fmt {
+                        FormatKind::Ascii => write!(out, "{v}")?,
+                        FormatKind::BinLil => {
+                            out.write(&v.to_le_bytes())?;
+                        }
+                        FormatKind::BinBig => {
+                            out.write(&v.to_be_bytes())?;
+                        }
+                    }
+                }
+                write_out!(d);
+            }};
+        }
         for vi in 0..self.v.len() {
-            let [x, y, z] = self.v[vi];
-            write!(out, "{x} {y} {z}")?;
-            if let Some([nx, ny, nz]) = self.n.get(vi) {
-                write!(out, " {nx} {ny} {nz}")?;
-            }
-            if let Some([u, v]) = self.uv.get(vi) {
-                write!(out, " {u} {v}")?;
-            }
+            write_out!(self.v[vi], NO_LEADING_SPACE);
+            write_out!(OPT: self.n.get(vi));
+            write_out!(OPT: self.uv.get(vi));
             if let Some(rgb) = self.vc.get(vi) {
-                let [r, g, b] = rgb.map(|v| (v.clamp(0., 1.) * u8::MAX as F) as u8);
-                write!(out, " {r} {g} {b}")?;
+                if has_sph {
+                    write_out!(rgb);
+                } else {
+                    let rgb = rgb.map(|v| (v.clamp(0., 1.) * u8::MAX as F) as u8);
+                    write_out!(rgb);
+                }
             }
-            if let Some(h) = self.vertex_attrs.height.get(vi) {
-                write!(out, " {h}")?;
+            if let Some(sphs) = va.sph_harmonic_coeff.get(vi) {
+                let coeffs = sphs
+                    .iter()
+                    .flat_map(|sph| (0..15).map(|i| sph.get(i).unwrap()));
+                write_out!(coeffs);
             }
-            writeln!(out)?;
+            write_out!(OPT: va.height.get(vi).map(|h| [h]));
+            write_out!(OPT: va.opacity.get(vi).map(|o| [o]));
+            write_out!(OPT: va.scale.get(vi));
+            write_out!(OPT: va.rot.get(vi));
+            if let FormatKind::Ascii = fmt {
+                writeln!(out)?;
+            }
         }
 
         for f in &self.f {
-            write!(out, "{} ", f.len())?;
-            let Some((last, rest)) = f.as_slice().split_last() else {
-                continue;
-            };
-            for vi in rest {
-                write!(out, "{vi} ")?;
+            write_out!([f.len() as u8], NO_LEADING_SPACE);
+            write_out!(f.as_slice().into_iter().map(|&i| i as i32));
+            if let FormatKind::Ascii = fmt {
+                writeln!(out)?;
             }
-            writeln!(out, "{last}")?;
         }
 
         Ok(())

@@ -356,12 +356,49 @@ impl Scene {
                     out.joint_weights.extend(m.joint_weights.iter().copied());
                 }
             }
+
+            out.vertex_attrs.extend(&m.vertex_attrs);
         }
         if !out.joint_idxs.is_empty() {
             assert_eq!(out.joint_idxs.len(), out.joint_weights.len());
             assert_eq!(out.joint_idxs.len(), out.v.len());
         }
         out
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Default)]
+pub(crate) struct SphHarmonicCoeff {
+    order1: [F; 3],
+    order2: [F; 5],
+    order3: [F; 7],
+}
+
+impl SphHarmonicCoeff {
+    pub fn get_mut(&mut self, i: usize) -> Option<&mut F> {
+        let v = if i < 3 {
+            &mut self.order1[i]
+        } else if i < 8 {
+            &mut self.order2[i - 3]
+        } else if i < 15 {
+            &mut self.order3[i - 8]
+        } else {
+            return None;
+        };
+        Some(v)
+    }
+
+    pub fn get(&self, i: usize) -> Option<&F> {
+        let v = if i < 3 {
+            &self.order1[i]
+        } else if i < 8 {
+            &self.order2[i - 3]
+        } else if i < 15 {
+            &self.order3[i - 8]
+        } else {
+            return None;
+        };
+        Some(v)
     }
 }
 
@@ -374,13 +411,27 @@ pub struct VertexAttrs {
     pub(crate) opacity: Vec<F>,
     pub(crate) scale: Vec<[F; 3]>,
     pub(crate) rot: Vec<[F; 4]>,
+    pub(crate) sph_harmonic_coeff: Vec<[SphHarmonicCoeff; 3]>,
 }
+
 impl VertexAttrs {
     /// Truncates all associated attributes
     pub fn truncate(&mut self, l: usize) {
         self.height.truncate(l);
         self.tangent.truncate(l);
         self.bitangent.truncate(l);
+    }
+
+    pub fn extend(&mut self, o: &Self) {
+        self.height.extend(o.height.iter().copied());
+        self.tangent.extend(o.tangent.iter().copied());
+        self.bitangent.extend(o.bitangent.iter().copied());
+
+        self.opacity.extend(o.opacity.iter().copied());
+        self.scale.extend(o.scale.iter().copied());
+        self.rot.extend(o.rot.iter().copied());
+        self.sph_harmonic_coeff
+            .extend(o.sph_harmonic_coeff.iter().copied());
     }
 }
 
