@@ -368,7 +368,7 @@ impl Scene {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Default)]
-pub(crate) struct SphHarmonicCoeff {
+pub struct SphHarmonicCoeff {
     order1: [F; 3],
     order2: [F; 5],
     order3: [F; 7],
@@ -408,10 +408,10 @@ pub struct VertexAttrs {
     pub tangent: Vec<[F; 3]>,
     pub bitangent: Vec<[F; 3]>,
 
-    pub(crate) opacity: Vec<F>,
-    pub(crate) scale: Vec<[F; 3]>,
-    pub(crate) rot: Vec<[F; 4]>,
-    pub(crate) sph_harmonic_coeff: Vec<[SphHarmonicCoeff; 3]>,
+    pub opacity: Vec<F>,
+    pub scale: Vec<[F; 3]>,
+    pub rot: Vec<[F; 4]>,
+    pub sph_harmonic_coeff: Vec<[SphHarmonicCoeff; 3]>,
 }
 
 impl VertexAttrs {
@@ -693,6 +693,24 @@ impl Mesh {
                         assert_eq!(mesh.v.len(), mesh.vert_colors.len());
                     }
 
+                    macro_rules! opt_va_push {
+                        ($k: ident) => {{
+                            if let Some(&v) = self.vertex_attrs.$k.get(flat_vi) {
+                                mesh.vertex_attrs.$k.push(v);
+                                assert_eq!(mesh.v.len(), mesh.vertex_attrs.$k.len());
+                            }
+                        }};
+                    }
+
+                    opt_va_push!(height);
+                    opt_va_push!(tangent);
+                    opt_va_push!(bitangent);
+
+                    opt_va_push!(opacity);
+                    opt_va_push!(scale);
+                    opt_va_push!(rot);
+                    opt_va_push!(sph_harmonic_coeff);
+
                     vi
                 };
                 *vertex_map[mi].entry(flat_vi).or_insert_with(new_vert_ins)
@@ -755,7 +773,7 @@ impl Mesh {
     ) -> Vec<[F; N]> {
         let mut new = vec![[0.; N]; self.v.len()];
         let mut ws = vec![0; self.v.len()];
-        for (vi, v) in og_v.into_iter().enumerate() {
+        for (vi, v) in og_v.iter().enumerate() {
             let new_idx = new_vert_map[&v.map(F::to_bits)];
             let old_val = og_attribs[vi];
             new[new_idx] = add(new[new_idx], old_val);

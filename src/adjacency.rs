@@ -117,7 +117,7 @@ pub fn from_edges(nv: usize, edges: impl IntoIterator<Item = [usize; 2]>) -> Adj
     from_nbr_vec(&mut nbrs)
 }
 
-pub(crate) fn from_nbr_vec(nbrs: &mut Vec<Vec<u32>>) -> Adj<()> {
+pub(crate) fn from_nbr_vec(nbrs: &mut [Vec<u32>]) -> Adj<()> {
     let mut idx_count = vec![];
     let mut adj = vec![];
     for fi in 0..nbrs.len() {
@@ -613,7 +613,7 @@ impl<D> Adj<D> {
         let mut not_visited = bd_loops
             .keys()
             .copied()
-            .filter(|v| !extra_slots.contains_key(&v))
+            .filter(|v| !extra_slots.contains_key(v))
             .collect::<BTreeSet<_>>();
 
         while let Some(first) = not_visited.pop_first() {

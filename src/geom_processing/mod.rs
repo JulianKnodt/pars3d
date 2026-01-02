@@ -116,13 +116,10 @@ pub fn boundary_edges<'a, 'b>(
     for f in fs.into_iter() {
         for e in f.edges() {
             let swapped = [e[1], e[0]];
-            match edges.entry(swapped) {
-                Entry::Occupied(mut o) => {
-                    o.insert(false);
-                    continue;
-                }
-                _ => {}
-            }
+            if let Entry::Occupied(mut o) = edges.entry(swapped) {
+                o.insert(false);
+                continue;
+            };
             edges
                 .entry(e)
                 .and_modify(|ek| {

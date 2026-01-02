@@ -39,7 +39,7 @@ pub fn polygon_kernel(vs: &[[F; 2]], out: &mut Vec<[F; 2]>) {
                 out_buf.push(isect);
             }
 
-            ki = ki + 1;
+            ki += 1;
         }
         std::mem::swap(out, &mut out_buf);
         out_buf.clear();

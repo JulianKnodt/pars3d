@@ -186,6 +186,7 @@ pub fn save(v: impl AsRef<Path>, scene: &mesh::Scene) -> std::io::Result<()> {
             let f = std::fs::File::create(v)?;
             let buf = std::io::BufWriter::new(f);
             let p: ply::Ply = scene.into_flattened_mesh().into();
+            //p.write(buf, ply::FormatKind::Ascii) // for debugging.
             let fmt = if p.vertex_attrs.sph_harmonic_coeff.is_empty() {
                 ply::FormatKind::Ascii
             } else {
