@@ -370,6 +370,10 @@ pub struct VertexAttrs {
     pub height: Vec<F>,
     pub tangent: Vec<[F; 3]>,
     pub bitangent: Vec<[F; 3]>,
+
+    pub(crate) opacity: Vec<F>,
+    pub(crate) scale: Vec<[F; 3]>,
+    pub(crate) rot: Vec<[F; 4]>,
 }
 impl VertexAttrs {
     /// Truncates all associated attributes

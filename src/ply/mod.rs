@@ -12,7 +12,7 @@ pub struct Ply {
     /// Vertex positions
     v: Vec<[F; 3]>,
     /// Vertex colors
-    vc: Vec<[u8; 3]>,
+    vc: Vec<[F; 3]>,
 
     /// Vertex Normals
     n: Vec<[F; 3]>,
@@ -45,7 +45,7 @@ enum Type {
     Float,
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum Field {
     X,
     Y,
@@ -62,6 +62,18 @@ enum Field {
     Height,
     // Allow for storing arbitrary values
     //Arbitrary(String),
+    Opacity,
+
+    ScaleX,
+    ScaleY,
+    ScaleZ,
+
+    RotX,
+    RotY,
+    RotZ,
+    RotW,
+
+    FRest(u8),
 }
 
 impl Ply {
@@ -76,6 +88,10 @@ impl Ply {
         assert!(vc.is_empty() || v.len() == vc.len());
         assert!(n.is_empty() || n.len() == v.len());
         assert!(uv.is_empty() || uv.len() == v.len());
+        let vc = vc
+            .into_iter()
+            .map(|v| v.map(|v| v as F / u8::MAX as F))
+            .collect::<Vec<_>>();
         Self {
             v,
             vc,
@@ -93,7 +109,7 @@ impl Ply {
     pub fn read(r: impl Read) -> io::Result<Self> {
         Self::buf_read(BufReader::new(r))
     }
-    pub fn buf_read(r: impl BufRead) -> io::Result<Self> {
+    pub fn buf_read(mut r: impl BufRead) -> io::Result<Self> {
         let mut state = ReadExpect::Header;
         let mut prop_set = vec![];
         let mut fields = vec![];
@@ -102,46 +118,95 @@ impl Ply {
         let mut has_normal = false;
         let mut has_uv = false;
         let mut has_height = false;
+        let mut has_opacity = false;
+        let mut has_scale = false;
+        let mut has_rot = false;
+        let mut has_f_rest = false;
 
         let mut v = vec![];
-        let mut vc = vec![];
+        let mut vc: Vec<[F; 3]> = vec![];
         let mut n = vec![];
         let mut uv: Vec<[F; 2]> = vec![];
         let mut vertex_attrs = VertexAttrs::default();
+
+        let opacitys = &mut vertex_attrs.opacity;
         let height = &mut vertex_attrs.height;
+        let scales = &mut vertex_attrs.scale;
+        let rots = &mut vertex_attrs.rot;
+
         let mut f = vec![];
 
         let mut num_v = 0;
         let mut num_f = 0;
+
+        let mut max_f_rest = 0;
+
+        let mut vertex_bytes = 0;
+
         macro_rules! parse_err {
             ($s: expr) => {
                 Err(Error::new(ErrorKind::Other, $s))
             };
         }
 
-        for l in r.lines() {
-            let l = l?;
-            if l.trim().starts_with("comment") {
+        #[derive(Debug, PartialEq, Eq)]
+        enum FormatKind {
+            Ascii,
+            BinLil,
+            BinBig,
+        }
+
+        let mut format = FormatKind::Ascii;
+
+        let mut buf = vec![];
+        loop {
+            buf.clear();
+            match format {
+                FormatKind::Ascii => {
+                    if r.read_until(b'\n', &mut buf)? == 0 {
+                        break;
+                    }
+                }
+                FormatKind::BinLil | FormatKind::BinBig => match state {
+                    ReadExpect::Done => break,
+                    ReadExpect::Vertices => {
+                        buf.resize(vertex_bytes, 0);
+                        r.read_exact(&mut buf)?;
+                    }
+                    ReadExpect::Faces => todo!(),
+                    _ => {
+                        if r.read_until(b'\n', &mut buf)? == 0 {
+                            break;
+                        }
+                    }
+                },
+            }
+            let l = buf
+                .strip_suffix(b"\n")
+                .and_then(|b| std::str::from_utf8(&b).ok());
+            if l.is_some_and(|l| l.trim().starts_with("comment")) {
                 continue;
             }
             use ReadExpect::*;
             state = match state {
                 Header => {
-                    if l != "ply" {
-                        return parse_err!("Expected ply as 1st line.");
+                    if l != Some("ply") {
+                        return parse_err!(format!("Expected ply as 1st line, got {l:?}"));
                     } else {
                         Format
                     }
                 }
                 Format => {
-                    if l != "format ascii 1.0" {
-                        return parse_err!("Unsupported ply format (only ascii supported)");
-                    } else {
-                        VertexCount
-                    }
+                    format = match l.expect("Format should be ascii") {
+                        "format ascii 1.0" => FormatKind::Ascii,
+                        "format binary_little_endian 1.0" => FormatKind::BinLil,
+                        "format binary_big_endian 1.0" => FormatKind::BinBig,
+                        _ => return parse_err!(format!("Unsupported ply format (got {l:?})")),
+                    };
+                    VertexCount
                 }
                 VertexCount => {
-                    let mut tokens = l.split_whitespace();
+                    let mut tokens = l.unwrap().split_whitespace();
                     if tokens.next() != Some("element") {
                         return parse_err!("Missing 'element'");
                     }
@@ -159,7 +224,18 @@ impl Ply {
 
                     VertexProperty
                 }
-                VertexProperty if l.starts_with("element") => {
+                VertexProperty if l == Some("end_header") => {
+                    // in theory could match on the beginning of each vertex but lazy
+                    match (num_v, num_f) {
+                        (0, 0) => Done,
+                        (0, _) => Faces,
+                        _ => Vertices,
+                    }
+                }
+                VertexProperty
+                    if let Some(l) = l
+                        && l.starts_with("element") =>
+                {
                     let mut tokens = l.split_whitespace();
 
                     if tokens.next() != Some("element") {
@@ -180,15 +256,19 @@ impl Ply {
                     PropertyList
                 }
                 VertexProperty => {
-                    let mut tokens = l.split_whitespace();
+                    let mut tokens = l.unwrap().split_whitespace();
                     if tokens.next() != Some("property") {
-                        return parse_err!("Missing 'property'");
+                        return parse_err!(format!("Missing 'property', got {:?} instead", l));
                     }
                     let prop = match tokens.next() {
                         None => return parse_err!("Missing type of property"),
                         Some("uchar") => Type::UChar,
                         Some("float") => Type::Float,
                         Some(_) => return parse_err!("Unknown property kind"),
+                    };
+                    vertex_bytes += match prop {
+                        Type::UChar => 1,
+                        Type::Float => 4,
                     };
                     prop_set.push(prop);
 
@@ -211,18 +291,47 @@ impl Ply {
                         Some("alpha") => Field::Alpha,
                         Some("height") => Field::Height,
 
-                        Some(_) => return parse_err!("Unknown property name"),
+                        // Gaussian splatting parameters
+                        Some(k) if k.starts_with("f_dc_") => {
+                            match k["f_dc_".len()..].parse().unwrap() {
+                                0 => Field::Red,
+                                1 => Field::Green,
+                                2 => Field::Blue,
+                                _ => return parse_err!(format!("Unknown property {k}")),
+                            }
+                        }
+                        Some(k) if k.starts_with("f_rest_") => {
+                            let n = k["f_rest_".len()..].parse().unwrap();
+                            max_f_rest = max_f_rest.max(n as usize);
+                            Field::FRest(n)
+                        }
+                        Some("opacity") => Field::Opacity,
+
+                        Some("scale_0") => Field::ScaleX,
+                        Some("scale_1") => Field::ScaleY,
+                        Some("scale_2") => Field::ScaleZ,
+
+                        Some("rot_0") => Field::RotX,
+                        Some("rot_1") => Field::RotY,
+                        Some("rot_2") => Field::RotZ,
+                        Some("rot_3") => Field::RotW,
+
+                        Some(k) => return parse_err!(format!("Unknown property name {k}")),
                     };
                     fields.push(field);
-                    has_color =
-                        has_color || matches!(field, Field::Red | Field::Green | Field::Blue);
-                    has_normal = has_normal || matches!(field, Field::NX | Field::NY | Field::NZ);
-                    has_uv = has_uv || matches!(field, Field::S | Field::T);
-                    has_height = has_height || matches!(field, Field::Height);
+                    use Field::*;
+                    has_color = has_color || matches!(field, Red | Green | Blue);
+                    has_normal = has_normal || matches!(field, NX | NY | NZ);
+                    has_uv = has_uv || matches!(field, S | T);
+                    has_height = has_height || matches!(field, Height);
+                    has_opacity = has_opacity || matches!(field, Opacity);
+                    has_scale = has_scale || matches!(field, ScaleX | ScaleY | ScaleZ);
+                    has_rot = has_rot || matches!(field, RotX | RotY | RotZ | RotW);
+                    has_f_rest = has_f_rest || matches!(field, FRest(_));
                     VertexProperty
                 }
                 PropertyList => {
-                    let mut it = l.split_whitespace();
+                    let mut it = l.unwrap().split_whitespace();
                     let got = [it.next(), it.next(), it.next(), it.next()];
                     let should_match = [Some("property"), Some("list"), Some("uchar"), Some("int")];
                     if got != should_match {
@@ -235,8 +344,8 @@ impl Ply {
                     EndHeader
                 }
                 EndHeader => {
-                    if l != "end_header" {
-                        return parse_err!("Unknown end of header");
+                    if l != Some("end_header") {
+                        return parse_err!("Unknown end of header {l:?}");
                     }
                     // in theory could match on the beginning of each vertex but lazy
                     match (num_v, num_f) {
@@ -249,48 +358,133 @@ impl Ply {
                     num_v -= 1;
 
                     let mut xyz = [0.; 3];
-                    let mut rgb = [0; 3];
+                    let mut rgb = [0.; 3];
                     let mut nrm = [0.; 3];
                     let mut uv_ = [0.; 2];
                     let mut h = 0.;
+                    let mut opacity = 0.;
 
-                    for (fi, v) in l.split_whitespace().enumerate() {
-                        macro_rules! get {
-                            ($t: ty) => {{ v.parse::<$t>().unwrap() }};
+                    let mut f_rest = vec![0.; max_f_rest + 1];
+
+                    let mut scale = [0.; 3];
+                    let mut rot = [0.; 4];
+
+                    let mut offset = 0;
+                    match format {
+                        FormatKind::BinLil | FormatKind::BinBig => {
+                            macro_rules! get {
+                                ($raw_t: ty, $t: ty) => {{
+                                    use std::array::from_fn;
+                                    let v = match format {
+                                        FormatKind::Ascii => unreachable!(),
+                                        FormatKind::BinLil => {
+                                            <$raw_t>::from_le_bytes(from_fn(|i| buf[i + offset]))
+                                        }
+                                        FormatKind::BinBig => {
+                                            <$raw_t>::from_be_bytes(from_fn(|i| buf[i + offset]))
+                                        }
+                                    };
+                                    offset += std::mem::size_of::<$raw_t>();
+                                    v as $t
+                                }};
+                            }
+
+                            for (i, field) in fields.iter().enumerate() {
+                                macro_rules! cond_parse {
+                                    () => {{
+                                        match prop_set[i] {
+                                            Type::UChar => get!(u8, u8) as F / u8::MAX as F,
+                                            Type::Float => get!(f32, F),
+                                        }
+                                    }};
+                                }
+                                match field {
+                                    Field::X => xyz[0] = get!(f32, F),
+                                    Field::Y => xyz[1] = get!(f32, F),
+                                    Field::Z => xyz[2] = get!(f32, F),
+
+                                    Field::NX => nrm[0] = get!(f32, F),
+                                    Field::NY => nrm[1] = get!(f32, F),
+                                    Field::NZ => nrm[2] = get!(f32, F),
+
+                                    Field::S => uv_[0] = get!(f32, F),
+                                    Field::T => uv_[1] = get!(f32, F),
+
+                                    Field::Red => rgb[0] = cond_parse!(),
+                                    Field::Green => rgb[1] = cond_parse!(),
+                                    Field::Blue => rgb[2] = cond_parse!(),
+                                    Field::Height => h = get!(f32, F),
+                                    Field::Alpha => todo!(),
+
+                                    Field::Opacity => opacity = get!(f32, F),
+                                    Field::FRest(n) => f_rest[*n as usize] = get!(f32, F),
+
+                                    Field::ScaleX => scale[0] = get!(f32, F),
+                                    Field::ScaleY => scale[1] = get!(f32, F),
+                                    Field::ScaleZ => scale[2] = get!(f32, F),
+
+                                    Field::RotX => rot[0] = get!(f32, F),
+                                    Field::RotY => rot[1] = get!(f32, F),
+                                    Field::RotZ => rot[2] = get!(f32, F),
+                                    Field::RotW => rot[3] = get!(f32, F),
+                                }
+                            }
                         }
-                        match fields[fi] {
-                            Field::X => xyz[0] = get!(F),
-                            Field::Y => xyz[1] = get!(F),
-                            Field::Z => xyz[2] = get!(F),
+                        FormatKind::Ascii => {
+                            for (fi, v) in l.unwrap().split_whitespace().enumerate() {
+                                macro_rules! get {
+                                    ($t: ty) => {{ v.parse::<$t>().unwrap() }};
+                                }
+                                macro_rules! cond_parse {
+                                    () => {{
+                                        match prop_set[fi] {
+                                            Type::UChar => get!(u8) as F / u8::MAX as F,
+                                            Type::Float => get!(F),
+                                        }
+                                    }};
+                                }
+                                match fields[fi] {
+                                    Field::X => xyz[0] = get!(F),
+                                    Field::Y => xyz[1] = get!(F),
+                                    Field::Z => xyz[2] = get!(F),
 
-                            Field::NX => nrm[0] = get!(F),
-                            Field::NY => nrm[1] = get!(F),
-                            Field::NZ => nrm[2] = get!(F),
+                                    Field::NX => nrm[0] = get!(F),
+                                    Field::NY => nrm[1] = get!(F),
+                                    Field::NZ => nrm[2] = get!(F),
 
-                            Field::S => uv_[0] = get!(F),
-                            Field::T => uv_[1] = get!(F),
+                                    Field::S => uv_[0] = get!(F),
+                                    Field::T => uv_[1] = get!(F),
 
-                            Field::Red => rgb[0] = get!(u8),
-                            Field::Green => rgb[1] = get!(u8),
-                            Field::Blue => rgb[2] = get!(u8),
-                            Field::Height => h = get!(F),
-                            Field::Alpha => continue,
+                                    Field::Red => rgb[0] = cond_parse!(),
+                                    Field::Green => rgb[1] = cond_parse!(),
+                                    Field::Blue => rgb[2] = cond_parse!(),
+                                    Field::Height => h = get!(F),
+                                    Field::Alpha => continue,
+
+                                    Field::Opacity => opacity = get!(F),
+                                    f => todo!("{f:?}"),
+                                }
+                            }
                         }
                     }
 
                     v.push(xyz);
-                    if has_color {
-                        vc.push(rgb);
+                    macro_rules! cond_push {
+                        ($cond: expr, $dest: ident, $val: ident) => {{
+                            if $cond {
+                                $dest.push($val);
+                            }
+                        }};
                     }
-                    if has_normal {
-                        n.push(nrm);
-                    }
-                    if has_uv {
-                        uv.push(uv_);
-                    }
-                    if has_height {
-                        height.push(h);
-                    }
+
+                    cond_push!(has_color, vc, rgb);
+                    cond_push!(has_normal, n, nrm);
+                    cond_push!(has_uv, uv, uv_);
+                    cond_push!(has_height, height, h);
+                    cond_push!(has_opacity, opacitys, opacity);
+                    cond_push!(has_scale, scales, scale);
+                    cond_push!(has_rot, rots, rot);
+                    // TODO handle f_rest
 
                     match (num_v, num_f) {
                         (0, 0) => Done,
@@ -299,10 +493,11 @@ impl Ply {
                     }
                 }
                 Faces => {
+                    assert_eq!(format, FormatKind::Ascii, "TODO implement faces in binary");
                     num_f -= 1;
 
                     use std::array::from_fn;
-                    let mut f_tokens = l.split_whitespace();
+                    let mut f_tokens = l.unwrap().split_whitespace();
                     let nf = f_tokens.next().unwrap().parse::<usize>().unwrap();
                     let face = match nf {
                         0 | 1 | 2 => continue,
@@ -323,8 +518,10 @@ impl Ply {
                     if num_f == 0 { Done } else { Faces }
                 }
                 Done => {
-                    eprintln!("Unexpected extra lines in PLY {l}");
-                    Done
+                    if let Some(l) = l {
+                        eprintln!("Unexpected extra lines in PLY {l:?}");
+                    }
+                    break;
                 }
             }
         }
@@ -407,7 +604,8 @@ impl Ply {
             if let Some([u, v]) = self.uv.get(vi) {
                 write!(out, " {u} {v}")?;
             }
-            if let Some([r, g, b]) = self.vc.get(vi) {
+            if let Some(rgb) = self.vc.get(vi) {
+                let [r, g, b] = rgb.map(|v| (v.clamp(0., 1.) * u8::MAX as F) as u8);
                 write!(out, " {r} {g} {b}")?;
             }
             if let Some(h) = self.vertex_attrs.height.get(vi) {

@@ -1,5 +1,4 @@
 use super::Ply;
-use crate::F;
 use crate::mesh::Mesh;
 
 impl From<Ply> for Mesh {
@@ -12,15 +11,11 @@ impl From<Ply> for Mesh {
             vc,
             vertex_attrs,
         } = ply;
-        let vert_colors = vc
-            .into_iter()
-            .map(|rgb| rgb.map(|v| v as F / 255.))
-            .collect::<Vec<_>>();
         Mesh {
             v,
             f,
             n,
-            vert_colors,
+            vert_colors: vc,
 
             uv: [uv, vec![], vec![], vec![]],
             face_mesh_idx: vec![],
@@ -46,10 +41,7 @@ impl From<Mesh> for Ply {
             vertex_attrs,
             ..
         } = mesh;
-        let vc = vc
-            .into_iter()
-            .map(|c| c.map(|v| (v.clamp(0., 1.) * 255.) as u8))
-            .collect::<Vec<_>>();
+
         Ply {
             v,
             f,

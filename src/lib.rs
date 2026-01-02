@@ -8,6 +8,7 @@
 #![feature(ascii_char_variants)]
 #![feature(assert_matches)]
 #![feature(iter_map_windows)]
+#![feature(if_let_guard)]
 
 #[cfg(not(feature = "f64"))]
 pub type U = u32;

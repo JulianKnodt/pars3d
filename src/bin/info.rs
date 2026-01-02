@@ -1,35 +1,19 @@
 use pars3d::load;
+use pars3d::parse_args;
+
 use std::io::Write;
 
 fn main() -> std::io::Result<()> {
-    macro_rules! help {
-        () => {{
-            eprintln!("Usage: <bin> src [OPTIONAL dst_json]");
-            return Ok(());
-        }};
-    }
-    let mut src = None;
-    let mut dst_json = None;
-    for v in std::env::args().skip(1) {
-        if src.is_none() {
-            src = Some(v);
-        } else if dst_json.is_none() {
-            dst_json = Some(v)
-        } else {
-            help!();
-        };
-    }
-    let Some(src) = src else {
+    let args = parse_args!(
+      "Utility for getting information on a mesh",
+      Input("-i", "--input"; "Input Mesh") => input : String = String::new(),
+      Dest("-s", "--stats"; "Stat file") => stats : String = String::new(),
+    );
+
+    if args.input.is_empty() {
         help!();
     };
-    if src.starts_with("-")
-        || dst_json
-            .as_ref()
-            .map(|v| v.starts_with("-"))
-            .unwrap_or(false)
-    {
-        help!();
-    }
+    let src = args.input;
     println!("[INFO]: Info about {src}:");
 
     let scene = load(&src).expect("Failed to load input scene");
@@ -38,6 +22,10 @@ fn main() -> std::io::Result<()> {
     println!("#V = {}", scene.num_vertices());
     println!("#E = {}", scene.num_edges());
     println!("#F = {}", scene.num_faces());
+
+    if scene.num_faces() == 0 {
+        return Ok(());
+    }
     println!("- Geometry Info:");
     let mut mesh = scene.clone().into_flattened_mesh();
     mesh.geometry_only();
@@ -46,10 +34,12 @@ fn main() -> std::io::Result<()> {
         sum_of_all_chord_lens += len;
     });
     println!("#Chords = {num_chords}");
-    println!(
-        "Avg Chord Len = {}",
-        sum_of_all_chord_lens as f64 / num_chords as f64
-    );
+    if num_chords != 0 {
+        println!(
+            "Avg Chord Len = {}",
+            sum_of_all_chord_lens as f64 / num_chords as f64
+        );
+    }
 
     for m in &scene.meshes {
         let (_, bd_e, nm_e) = m.num_edge_kinds();
@@ -68,7 +58,8 @@ fn main() -> std::io::Result<()> {
         }
     }
 
-    let Some(dst_json) = dst_json else {
+    let dst_json = args.stats;
+    if dst_json.is_empty() {
         return Ok(());
     };
     if std::fs::exists(&dst_json)? {
