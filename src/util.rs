@@ -192,7 +192,7 @@ fn test_append_json() {
 macro_rules! parse_args {
   (
     $desc: expr,
-  $( $StateName: ident ( $($flags: expr),+ ; $help: expr) => $field: ident : $t: ty = $def: expr $( => $auto:expr )?, )+) => {{
+  $( $StateName: ident ( $($flags: expr),+ ; $help: expr $(; $check: expr)?) => $field: ident : $t: ty = $def: expr $( => $auto:expr )?, )+) => {{
     #[derive(Debug)]
     struct Args {
       $(pub $field: $t,)+
@@ -231,6 +231,13 @@ macro_rules! parse_args {
           msg.push_str($help);
           msg.push_str(&format!(" = `{}`", $def));
           $( msg.push_str(&format!(" [No Value => {}]", $auto)); )?
+          $(
+            let mut raw = stringify!($check);
+            if raw.get(0..1) == Some("|") && let Some(snd) = raw[1..].find('|') {
+              raw = &raw[snd+2..];
+            }
+            msg.push_str(&format!(" [Must satisfy: {}]", raw.trim()));
+          )?
           eprintln!("{msg}");
         )+
         return Ok(());
@@ -270,6 +277,27 @@ macro_rules! parse_args {
         })+
         State::Empty => help!("No positional arguments supported"),
       }
+    }
+    let mut any_failed = false;
+
+    $(
+      #[allow(unused)]
+      let failed = false;
+      $( let failed = !$check(&args.$field); )?
+
+      if failed {
+        let mut msg = String::from("");
+        $(
+          msg.push_str($flags);
+          msg.push_str("/");
+        )+
+        eprintln!("[ERROR]: `{}` is invalid for {}.", args.$field, msg.trim_end_matches("/"));
+      }
+      any_failed = failed || any_failed;
+    )+
+
+    if any_failed {
+      help!();
     }
 
     if state != State::Empty {

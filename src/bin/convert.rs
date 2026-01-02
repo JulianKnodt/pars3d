@@ -1,58 +1,19 @@
-use pars3d::{load, save};
+use pars3d::{load, save, parse_args};
 
-fn main() {
-    let mut src = None;
-    let mut dst = None;
-    let mut triangulate = false;
-    let mut option_list: [(_, Option<&str>, &mut bool, &str); _] = [(
-        "--triangulate",
-        None,
-        &mut triangulate,
-        "Triangulate output mesh",
-    )];
-    macro_rules! help {
-        () => {{
-            eprintln!("[HELP]: \nImport and export a given mesh.");
-            eprintln!("Basic Usage: <bin> src dst");
-            for (l, s, _, help) in option_list {
-                if let Some(s) = s {
-                    eprintln!("\t {s}, {l} : {help}");
-                } else {
-                    eprintln!("\t {l} : {help}");
-                }
-            }
-            return;
-        }};
-    }
-    for v in std::env::args().skip(1) {
-        if let Some(opt) = option_list
-            .iter_mut()
-            .find(|opt| opt.0 == v || opt.1.is_some_and(|short| short == v))
-        {
-            *opt.2 = true;
-            continue;
-        }
-        if matches!(v.as_str(), "-h" | "--help") {
-            help!();
-        }
-
-        if src.is_none() {
-            src = Some(v);
-        } else if dst.is_none() {
-            dst = Some(v)
-        } else {
-            help!();
-        };
-    }
-    let Some(src) = src else {
-        help!();
-    };
-    let Some(dst) = dst else {
-        help!();
-    };
+fn main() -> std::io::Result<()> {
+    let args = parse_args!(
+      "Import and export a given mesh.",
+      Input("-i", "--input"; "Input mesh"; |arg: &str| !arg.is_empty()) => input : String = String::new(),
+      Output("-o", "--output"; "Output mesh"; |arg: &str| !arg.is_empty()) => output : String = String::new(),
+      Triangulate("--triangulate"; "Triangulate the input mesh")
+        => triangulate : bool = false => true,
+    );
+    let src = args.input;
+    let dst = args.output;
     if src.starts_with("-") || dst.starts_with("-") {
         help!();
     }
+    let triangulate = args.triangulate;
     println!("[INFO]: {src} -> {dst}");
 
     let mut scene = load(&src).expect("Failed to load scene");
@@ -61,5 +22,5 @@ fn main() {
             m.triangulate(0);
         }
     }
-    save(dst, &scene).expect("Failed to save scene");
+    save(dst, &scene)
 }
