@@ -24,8 +24,8 @@ pub mod collapsible;
 /// Compute the kernel of a general polygon.
 pub mod polygon_kernel;
 
-/// 2D delaunay triangulation.
-// pub mod delaunay;
+/// Simple Delaunay triangulation.
+pub mod delaunay;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum VertexNormalWeightingKind {

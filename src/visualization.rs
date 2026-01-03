@@ -570,7 +570,7 @@ fn test_edge_vis() {
     let ply = Ply::new(vs, vc, vec![], vec![], fs);
     use std::fs::File;
     let f = File::create("edge_vis.ply").unwrap();
-    ply.write(f).unwrap();
+    ply.write(f, Default::default()).unwrap();
 }
 
 #[ignore]
@@ -598,7 +598,7 @@ fn test_raw_edge_vis() {
     let ply = Ply::new(vs, vc, vec![], vec![], fs);
     use std::fs::File;
     let f = File::create("raw_edge_vis.ply").unwrap();
-    ply.write(f).unwrap();
+    ply.write(f, Default::default()).unwrap();
 }
 
 pub fn frustum_to_quad_mesh(

@@ -78,9 +78,10 @@ enum Field {
 }
 
 /// PLY Format
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Default)]
 pub enum FormatKind {
     /// Ascii (Human Readable)
+    #[default]
     Ascii,
     /// Binary Little Endian
     BinLil,
@@ -704,7 +705,7 @@ fn test_ply_write() {
             vec![],
             vec![FaceKind::Tri([0, 1, 2])],
         );
-        ply.write(f).unwrap();
+        ply.write(f, Default::default()).unwrap();
     }
     remove_file(name).expect("Failed to delete file");
 }

@@ -9,6 +9,7 @@
 #![feature(assert_matches)]
 #![feature(iter_map_windows)]
 #![feature(if_let_guard)]
+#![feature(btree_set_entry)]
 
 #[cfg(not(feature = "f64"))]
 pub type U = u32;
@@ -737,4 +738,21 @@ fn test_octahedron_contains() {
     ];
     let oct_contains = octahedron_contains(pts, [0.; 3], 0.);
     assert!(oct_contains);
+}
+
+pub(crate) fn inverse([[a, b, c], [d, e, f], [g, h, i]]: [[F; 3]; 3]) -> [[F; 3]; 3] {
+    let x = e * i - h * f;
+    let y = f * g - d * i;
+    let z = d * h - g * e;
+    let det = a * x + b * y + c * z;
+    [
+        [x, c * h - b * i, b * f - c * e],
+        [y, a * i - c * g, d * c - a * f],
+        [z, g * b - a * h, a * e - d * b],
+    ]
+    .map(|r| r.map(|v| v / det))
+}
+
+pub(crate) fn matvecmul3(rs: [[F; 3]; 3], v: [F; 3]) -> [F; 3] {
+    rs.map(|r| dot(r, v))
 }
