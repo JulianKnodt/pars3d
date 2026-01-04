@@ -171,8 +171,10 @@ where
     }
 
     for mat in doc.materials() {
-        let mut new_mat = GLTFMaterial::default();
-        new_mat.name = mat.name().map(String::from).unwrap_or_else(String::new);
+        let mut new_mat = GLTFMaterial {
+            name: mat.name().map(String::from).unwrap_or_else(String::new),
+            ..Default::default()
+        };
         let prev_pbr_mr = mat.pbr_metallic_roughness();
         new_mat.pbr_metallic_roughness = PbrMetallicRoughness {
             base_color_factor: prev_pbr_mr.base_color_factor().map(|v| v as F),

@@ -188,7 +188,7 @@ impl Ply {
             }
             let l = buf
                 .strip_suffix(b"\n")
-                .and_then(|b| std::str::from_utf8(&b).ok());
+                .and_then(|b| std::str::from_utf8(b).ok());
             if l.is_some_and(|l| l.trim().starts_with("comment")) {
                 continue;
             }
@@ -627,10 +627,10 @@ impl Ply {
                     match fmt {
                         FormatKind::Ascii => write!(out, " {v}")?,
                         FormatKind::BinLil => {
-                            out.write(&v.to_le_bytes())?;
+                            out.write_all(&v.to_le_bytes())?;
                         }
                         FormatKind::BinBig => {
-                            out.write(&v.to_be_bytes())?;
+                            out.write_all(&v.to_be_bytes())?;
                         }
                     }
                 }
@@ -641,10 +641,10 @@ impl Ply {
                     match fmt {
                         FormatKind::Ascii => write!(out, "{v}")?,
                         FormatKind::BinLil => {
-                            out.write(&v.to_le_bytes())?;
+                            out.write_all(&v.to_le_bytes())?;
                         }
                         FormatKind::BinBig => {
-                            out.write(&v.to_be_bytes())?;
+                            out.write_all(&v.to_be_bytes())?;
                         }
                     }
                 }
@@ -680,7 +680,7 @@ impl Ply {
 
         for f in &self.f {
             write_out!([f.len() as u8], NO_LEADING_SPACE);
-            write_out!(f.as_slice().into_iter().map(|&i| i as i32));
+            write_out!(f.as_slice().iter().map(|&i| i as i32));
             if let FormatKind::Ascii = fmt {
                 writeln!(out)?;
             }

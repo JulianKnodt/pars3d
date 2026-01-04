@@ -196,7 +196,7 @@ pub fn bowyer_watson_3d(ps: &[[F; 3]], dst: &mut Vec<[usize; 4]>) {
         }
 
         if crate::signed_tet_vol(s.map(|vi| ps[vi])) < 0. {
-            s.swap(0,1);
+            s.swap(0, 1);
             debug_assert!(crate::signed_tet_vol(s.map(|vi| ps[vi])) > 0.);
         }
 

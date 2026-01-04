@@ -375,6 +375,18 @@ pub struct SphHarmonicCoeff {
 }
 
 impl SphHarmonicCoeff {
+    pub fn flat_iter(&self) -> impl Iterator<Item = F> + '_ {
+        self.order1
+            .into_iter()
+            .chain(self.order2.into_iter())
+            .chain(self.order3.into_iter())
+    }
+    pub fn flat_iter_mut(&mut self) -> impl Iterator<Item = &mut F> + '_ {
+        self.order1
+            .iter_mut()
+            .chain(self.order2.iter_mut())
+            .chain(self.order3.iter_mut())
+    }
     pub fn get_mut(&mut self, i: usize) -> Option<&mut F> {
         let v = if i < 3 {
             &mut self.order1[i]

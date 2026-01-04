@@ -210,9 +210,10 @@ impl Default for MTL {
 
 impl MTL {
     pub fn is_empty(&self) -> bool {
-        let mut tmp = Self::default();
-        tmp.mtllib_idx = self.mtllib_idx;
-        self == &tmp
+        self == &Self {
+            mtllib_idx: self.mtllib_idx,
+            ..Default::default()
+        }
     }
     /*
     pub fn diffuse_image(&self) -> DynamicImage {
@@ -351,8 +352,10 @@ pub fn parse(p: impl AsRef<Path>, split_by_object: bool, split_by_group: bool) -
     let p = p.as_ref();
     let f = File::open(p)?;
     let buf_read = BufReader::new(f);
-    let mut obj = Obj::default();
-    obj.input_file = p.to_str().unwrap().into();
+    let mut obj = Obj {
+        input_file: p.to_str().unwrap().into(),
+        ..Default::default()
+    };
     let mut curr_obj = ObjObject::default();
     let mut curr_mtl = None;
     let mut smoothing_start_face = 0;

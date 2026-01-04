@@ -274,14 +274,6 @@ impl<D> Adj<D> {
         }
     }
 
-    /// Given a specific vertex index, compute the polygonal kernel of the one-ring UV
-    /// neighborhood. The kernel is defined as the set of points from which the entire shape is
-    /// visible.
-    /*
-    pub fn kernel(&self, uv: &[[F;2]], vi: usize, out: &mut Vec<[F;2]>) {
-    }
-    */
-
     /// Returns the degree of a given vertex
     pub fn degree(&self, v: usize) -> usize {
         self.idx_count[v].1 as usize
