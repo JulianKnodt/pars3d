@@ -5,7 +5,7 @@ use std::array::from_fn;
 use std::collections::BTreeSet;
 
 /// Delaunay triangulation of 2D points
-pub fn bowyer_watson_2d(ps: &[[F; 2]]) -> impl Iterator<Item = [usize; 3]> {
+pub fn bowyer_watson_2d(ps: &[[F; 2]]) -> Vec<[usize; 3]> {
     const N: usize = 2;
     let mut min = [F::INFINITY; 2];
     let mut max = [F::NEG_INFINITY; 2];
@@ -14,9 +14,12 @@ pub fn bowyer_watson_2d(ps: &[[F; 2]]) -> impl Iterator<Item = [usize; 3]> {
         for j in (i + 1)..ps.len() {
             for k in (j + 1)..ps.len() {
                 let (c, r) = circumcircle_2d([i, j, k].map(|vi| ps[vi]));
-                for i in 0..2 {
-                    min[i] = min[i].min(c[i] - r);
-                    max[i] = max[i].max(c[i] + r);
+                for v in c {
+                    if !v.is_finite() {
+                        continue;
+                    }
+                    min[i] = min[i].min(v - r);
+                    max[i] = max[i].max(v + r);
                 }
             }
         }
@@ -35,8 +38,7 @@ pub fn bowyer_watson_2d(ps: &[[F; 2]]) -> impl Iterator<Item = [usize; 3]> {
 
     let markers: [usize; N + 1] = from_fn(|i| usize::MAX - i);
 
-    let mut simps = BTreeSet::new();
-    simps.insert(markers);
+    let mut simps = vec![markers];
 
     let get_v = |i: usize| {
         let t = usize::MAX - i;
@@ -44,21 +46,26 @@ pub fn bowyer_watson_2d(ps: &[[F; 2]]) -> impl Iterator<Item = [usize; 3]> {
     };
 
     // TODO bad tris can be omitted by swapping to the end and keeping a count
-    let mut bad_tris = vec![];
     let mut polys: BTreeSet<[usize; 2]> = BTreeSet::new();
+
     for (pi, p) in ps.iter().enumerate() {
-        bad_tris.clear();
-        for &s in simps.iter() {
-            let tri = s.map(get_v);
+        let mut bad_tris = 0;
+        let mut si = 0;
+        while si < simps.len() - bad_tris {
+            let tri = simps[si].map(get_v);
             let cc = circumcircle_2d(tri);
             if circle_contains(cc, *p) {
-                bad_tris.push(s);
+                let last = simps.len() - 1 - bad_tris;
+                simps.swap(si, last);
+                bad_tris += 1;
+            } else {
+                si += 1;
             }
         }
 
         polys.clear();
-        for bt in bad_tris.drain(..) {
-            for [e0, e1] in edges(&bt) {
+        for bt in &simps[simps.len() - bad_tris..] {
+            for [e0, e1] in edges(bt) {
                 use std::collections::btree_set::Entry;
                 match polys.entry(std::cmp::minmax(e0, e1)) {
                     Entry::Occupied(o) => {
@@ -67,24 +74,45 @@ pub fn bowyer_watson_2d(ps: &[[F; 2]]) -> impl Iterator<Item = [usize; 3]> {
                     Entry::Vacant(v) => v.insert(),
                 }
             }
-            let ok = simps.remove(&bt);
-            assert!(ok);
         }
 
+        simps.truncate(simps.len() - bad_tris);
+
         for &[e0, e1] in polys.iter() {
-            simps.insert([e0, e1, pi]);
+            simps.push([e0, e1, pi]);
         }
     }
 
-    // clear super-simplex
-    simps.retain(|s| s.iter().all(|&v| v < usize::MAX - N));
+    let mut i = 0;
+    while i < simps.len() {
+        let s = &mut simps[i];
+        if !s.iter().all(|&v| v < usize::MAX - N) {
+            simps.swap_remove(i);
+            continue;
+        }
 
-    simps.into_iter().map(|mut s| {
         if tri_area_2d(s.map(|vi| ps[vi])) < 0. {
             s.reverse();
         }
-        s
-    })
+
+        i += 1;
+    }
+
+    simps
+
+    /*
+    simps
+        .into_iter()
+        // clear super-simplex
+        .filter(|&v| v.iter().all(|&v| v < usize::MAX - N))
+        // correct order
+        .map(|mut s| {
+            if tri_area_2d(s.map(|vi| ps[vi])) < 0. {
+                s.reverse();
+            }
+            s
+        })
+    */
 }
 
 pub fn bowyer_watson_3d(ps: &[[F; 3]]) -> impl Iterator<Item = [usize; 4]> {
@@ -97,9 +125,12 @@ pub fn bowyer_watson_3d(ps: &[[F; 3]]) -> impl Iterator<Item = [usize; 4]> {
             for k in (j + 1)..ps.len() {
                 for l in (k + 1)..ps.len() {
                     let (c, r) = circumsphere_tet([i, j, k, l].map(|vi| ps[vi]));
-                    for i in 0..N {
-                        min[i] = min[i].min(c[i] - r);
-                        max[i] = max[i].max(c[i] + r);
+                    for v in c {
+                        if !v.is_finite() {
+                            continue;
+                        }
+                        min[i] = min[i].min(v - r);
+                        max[i] = max[i].max(v + r);
                     }
                 }
             }
@@ -177,14 +208,22 @@ pub fn bowyer_watson_3d(ps: &[[F; 3]]) -> impl Iterator<Item = [usize; 4]> {
 
 #[test]
 fn test_bowyer_watson_2d() {
-    let ps = [[0.; 2], [1., 0.], [1., 1.], [0., 1.], [0.5; 2]];
+    //let ps = [[0.; 2], [1., 0.], [1., 1.], [0., 1.], [0.5; 2]];
+
+    let mut ps = vec![];
+    const N: usize = 20;
+    for i in 0..N {
+        let t = i as F / N as F;
+        ps.push([(t * 13333.1923).sin(), (t * 2193.239 + 0.798025).cos()]);
+    }
+
     let s = bowyer_watson_2d(&ps);
     let p = crate::ply::Ply::new(
         ps.iter().map(|&[x, y]| [x, y, 0.]).collect(),
         vec![],
         vec![],
         vec![],
-        s.map(crate::FaceKind::Tri).collect(),
+        s.into_iter().map(crate::FaceKind::Tri).collect(),
     );
     let f = std::fs::File::create("bowyer_watson_2d.ply").unwrap();
     p.write(f, Default::default()).unwrap();
@@ -263,7 +302,8 @@ fn circumdelta([a, b, c]: [[F; 2]; 3]) -> [F; 2] {
 
     let ba2 = dot(ba, ba);
     let ca2 = dot(ca, ca);
-    let d = 0.5 / cross_2d(ba, ca);
+    let denom = cross_2d(ba, ca);
+    let d = 0.5 / denom;
 
     let x = ca[1] * ba2 - ba[1] * ca2;
     let y = ba[0] * ca2 - ca[0] * ba2;
