@@ -14,7 +14,7 @@ pub fn bowyer_watson_2d(ps: &[[F; 2]]) -> Vec<[usize; 3]> {
         for j in (i + 1)..ps.len() {
             for k in (j + 1)..ps.len() {
                 let (c, r) = circumcircle_2d([i, j, k].map(|vi| ps[vi]));
-                for v in c {
+                for (i, v) in c.into_iter().enumerate() {
                     if !v.is_finite() {
                         continue;
                     }
@@ -99,23 +99,9 @@ pub fn bowyer_watson_2d(ps: &[[F; 2]]) -> Vec<[usize; 3]> {
     }
 
     simps
-
-    /*
-    simps
-        .into_iter()
-        // clear super-simplex
-        .filter(|&v| v.iter().all(|&v| v < usize::MAX - N))
-        // correct order
-        .map(|mut s| {
-            if tri_area_2d(s.map(|vi| ps[vi])) < 0. {
-                s.reverse();
-            }
-            s
-        })
-    */
 }
 
-pub fn bowyer_watson_3d(ps: &[[F; 3]]) -> impl Iterator<Item = [usize; 4]> {
+pub fn bowyer_watson_3d(ps: &[[F; 3]], dst: &mut Vec<[usize; 4]>) {
     const N: usize = 3;
     let mut min = [F::INFINITY; 3];
     let mut max = [F::NEG_INFINITY; 3];
@@ -125,7 +111,7 @@ pub fn bowyer_watson_3d(ps: &[[F; 3]]) -> impl Iterator<Item = [usize; 4]> {
             for k in (j + 1)..ps.len() {
                 for l in (k + 1)..ps.len() {
                     let (c, r) = circumsphere_tet([i, j, k, l].map(|vi| ps[vi]));
-                    for v in c {
+                    for (i, v) in c.into_iter().enumerate() {
                         if !v.is_finite() {
                             continue;
                         }
@@ -154,28 +140,33 @@ pub fn bowyer_watson_3d(ps: &[[F; 3]]) -> impl Iterator<Item = [usize; 4]> {
 
     let tet_tris = |[a, b, c, d]: [usize; 4]| [[a, b, c], [a, b, d], [a, c, d], [b, c, d]];
 
-    let mut simps: BTreeSet<[usize; N + 1]> = BTreeSet::new();
-    simps.insert(markers);
+    let simps = dst;
+    simps.clear();
+    simps.push(markers);
 
     let get_v = |i: usize| {
         let t = usize::MAX - i;
         if t < N + 1 { super_simplex[t] } else { ps[i] }
     };
 
-    let mut bad_tets = vec![];
     let mut polys: BTreeSet<[usize; 3]> = BTreeSet::new();
     for (pi, p) in ps.iter().enumerate() {
-        bad_tets.clear();
-        for &s in simps.iter() {
-            let tet = s.map(get_v);
+        let mut bad_tets = 0;
+        let mut si = 0;
+        while si < simps.len() - bad_tets {
+            let tet = simps[si].map(get_v);
             let cc = circumsphere_tet(tet);
             if circle_contains(cc, *p) {
-                bad_tets.push(s);
+                let last = simps.len() - 1 - bad_tets;
+                simps.swap(si, last);
+                bad_tets += 1;
+            } else {
+                si += 1;
             }
         }
 
         polys.clear();
-        for bt in bad_tets.drain(..) {
+        for &bt in &simps[simps.len() - bad_tets..] {
             for mut tri in tet_tris(bt) {
                 tri.sort_unstable();
                 use std::collections::btree_set::Entry;
@@ -186,24 +177,31 @@ pub fn bowyer_watson_3d(ps: &[[F; 3]]) -> impl Iterator<Item = [usize; 4]> {
                     Entry::Vacant(v) => v.insert(),
                 }
             }
-            let ok = simps.remove(&bt);
-            assert!(ok);
         }
 
+        simps.truncate(simps.len() - bad_tets);
+
         for &[v0, v1, v2] in polys.iter() {
-            simps.insert([v0, v1, v2, pi]);
+            simps.push([v0, v1, v2, pi]);
         }
     }
 
     // clear super-simplex
-    simps.retain(|s| s.iter().all(|&v| v < usize::MAX - N));
-
-    simps.into_iter().map(|mut s| {
-        if crate::signed_tet_vol(s.map(|vi| ps[vi])) < 0. {
-            s.reverse();
+    let mut i = 0;
+    while i < simps.len() {
+        let s = &mut simps[i];
+        if !s.iter().all(|&v| v < usize::MAX - N) {
+            simps.swap_remove(i);
+            continue;
         }
-        s
-    })
+
+        if crate::signed_tet_vol(s.map(|vi| ps[vi])) < 0. {
+            s.swap(0,1);
+            debug_assert!(crate::signed_tet_vol(s.map(|vi| ps[vi])) > 0.);
+        }
+
+        i += 1;
+    }
 }
 
 #[test]
@@ -241,13 +239,15 @@ fn test_bowyer_watson_3d() {
             (t * 19.44 + 0.58).cos(),
         ]);
     }
-    let s = bowyer_watson_3d(&ps);
+    let mut s = vec![];
+    bowyer_watson_3d(&ps, &mut s);
     let p = crate::ply::Ply::new(
         ps.clone(),
         vec![],
         vec![],
         vec![],
-        s.flat_map(|[a, b, c, d]| [[a, b, c], [a, c, d], [a, b, d], [b, c, d]])
+        s.into_iter()
+            .flat_map(|[a, b, c, d]| [[a, b, c], [a, c, d], [a, b, d], [b, c, d]])
             .map(crate::FaceKind::Tri)
             .collect(),
     );
