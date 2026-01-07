@@ -101,22 +101,79 @@ pub fn bowyer_watson_2d(ps: &[[F; 2]]) -> Vec<[usize; 3]> {
     simps
 }
 
-pub fn bowyer_watson_3d(ps: &[[F; 3]], dst: &mut Vec<[usize; 4]>) {
+#[derive(Default, Copy, Clone, Debug)]
+pub enum SuperSimplexStrategy {
+    /// Use AABB (most approximate)
+    AABB,
+    /// Use max edge len + each vertex
+    MaxEdge,
+    /// Compute circumradius for each tetrahedron and bound with circumcenter
+    #[default]
+    Exact,
+}
+
+#[derive(Default, Debug, Clone, Copy)]
+pub struct BowyerWatsonSettings {
+    pub super_simplex_strat: SuperSimplexStrategy,
+    pub do_not_check_flips: bool,
+}
+
+pub fn bowyer_watson_3d(
+    ps: &[[F; 3]],
+    dst: &mut Vec<[usize; 4]>,
+    poly_buf: &mut Vec<[usize; 3]>,
+    settings: BowyerWatsonSettings,
+) {
     const N: usize = 3;
     let mut min = [F::INFINITY; 3];
     let mut max = [F::NEG_INFINITY; 3];
-    // Cubic cost (TODO optimize?) it is easily parallelizable though
-    for i in 0..ps.len() {
-        for j in (i + 1)..ps.len() {
-            for k in (j + 1)..ps.len() {
-                for l in (k + 1)..ps.len() {
-                    let (c, r) = circumsphere_tet([i, j, k, l].map(|vi| ps[vi]));
-                    for (i, v) in c.into_iter().enumerate() {
-                        if !v.is_finite() {
-                            continue;
+    match settings.super_simplex_strat {
+        SuperSimplexStrategy::AABB => {
+            for p in ps {
+                for (i, &v) in p.into_iter().enumerate() {
+                    if !v.is_finite() {
+                        continue;
+                    }
+                    min[i] = min[i].min(v);
+                    max[i] = max[i].max(v);
+                }
+            }
+        }
+        SuperSimplexStrategy::MaxEdge => {
+            let max_edge_len = (0..ps.len())
+                .flat_map(|i| ((i + 1)..ps.len()).map(move |j| dist(ps[i], ps[j])))
+                .max_by(F::total_cmp)
+                .unwrap_or(0.);
+            let l = max_edge_len;
+
+            let reg_vol = l * l * l / (6. * std::f64::consts::SQRT_2 as F);
+
+            let bd = reg_vol.max(l);
+            for p in ps {
+                for (i, v) in p.into_iter().enumerate() {
+                    if !v.is_finite() {
+                        continue;
+                    }
+                    min[i] = min[i].min(v - bd);
+                    max[i] = max[i].max(v + bd);
+                }
+            }
+        }
+        SuperSimplexStrategy::Exact => {
+            // Quartic cost (TODO optimize?) it is easily parallelizable though
+            for i in 0..ps.len() {
+                for j in (i + 1)..ps.len() {
+                    for k in (j + 1)..ps.len() {
+                        for l in (k + 1)..ps.len() {
+                            let (c, r) = circumsphere_tet([i, j, k, l].map(|vi| ps[vi]));
+                            for (i, v) in c.into_iter().enumerate() {
+                                if !v.is_finite() {
+                                    continue;
+                                }
+                                min[i] = min[i].min(v - r);
+                                max[i] = max[i].max(v + r);
+                            }
                         }
-                        min[i] = min[i].min(v - r);
-                        max[i] = max[i].max(v + r);
                     }
                 }
             }
@@ -149,7 +206,6 @@ pub fn bowyer_watson_3d(ps: &[[F; 3]], dst: &mut Vec<[usize; 4]>) {
         if t < N + 1 { super_simplex[t] } else { ps[i] }
     };
 
-    let mut polys: BTreeSet<[usize; 3]> = BTreeSet::new();
     for (pi, p) in ps.iter().enumerate() {
         let mut bad_tets = 0;
         let mut si = 0;
@@ -165,26 +221,27 @@ pub fn bowyer_watson_3d(ps: &[[F; 3]], dst: &mut Vec<[usize; 4]>) {
             }
         }
 
-        polys.clear();
+        poly_buf.clear();
         for &bt in &simps[simps.len() - bad_tets..] {
-            for mut tri in tet_tris(bt) {
-                tri.sort_unstable();
-                use std::collections::btree_set::Entry;
-                match polys.entry(tri) {
-                    Entry::Occupied(o) => {
-                        o.remove();
-                    }
-                    Entry::Vacant(v) => v.insert(),
+            for tri in tet_tris(bt) {
+                if let Some(p) = poly_buf.iter().position(|&t| t == tri) {
+                    poly_buf.swap_remove(p);
+                } else {
+                    poly_buf.push(tri);
                 }
             }
         }
 
         simps.truncate(simps.len() - bad_tets);
 
-        for &[v0, v1, v2] in polys.iter() {
-            simps.push([v0, v1, v2, pi]);
+        for &[v0, v1, v2] in poly_buf.iter() {
+            let mut tet = [v0, v1, v2, pi];
+            tet.sort_unstable();
+            simps.push(tet);
         }
     }
+
+    let check_flips = !settings.do_not_check_flips;
 
     // clear super-simplex
     let mut i = 0;
@@ -195,7 +252,7 @@ pub fn bowyer_watson_3d(ps: &[[F; 3]], dst: &mut Vec<[usize; 4]>) {
             continue;
         }
 
-        if crate::signed_tet_vol(s.map(|vi| ps[vi])) < 0. {
+        if check_flips && crate::signed_tet_vol(s.map(|vi| ps[vi])) < 0. {
             s.swap(0, 1);
             debug_assert!(crate::signed_tet_vol(s.map(|vi| ps[vi])) > 0.);
         }
@@ -240,7 +297,8 @@ fn test_bowyer_watson_3d() {
         ]);
     }
     let mut s = vec![];
-    bowyer_watson_3d(&ps, &mut s);
+    let mut buf = vec![];
+    bowyer_watson_3d(&ps, &mut s, &mut buf, Default::default());
     let p = crate::ply::Ply::new(
         ps.clone(),
         vec![],
