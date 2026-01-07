@@ -23,6 +23,9 @@ fn main() -> std::io::Result<()> {
     println!("#E = {}", scene.num_edges());
     println!("#F = {}", scene.num_faces());
 
+    let aabb = scene.aabb();
+    println!("AABB = {aabb:?}");
+
     if scene.num_faces() == 0 {
         return Ok(());
     }

@@ -420,7 +420,9 @@ pub struct VertexAttrs {
     pub tangent: Vec<[F; 3]>,
     pub bitangent: Vec<[F; 3]>,
 
+    /// pre-sigmoid (not in the 0-1 range)
     pub opacity: Vec<F>,
+    /// log-scale
     pub scale: Vec<[F; 3]>,
     pub rot: Vec<[F; 4]>,
     pub sph_harmonic_coeff: Vec<[SphHarmonicCoeff; 3]>,

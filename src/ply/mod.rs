@@ -617,70 +617,71 @@ impl Ply {
         writeln!(out, "end_header")?;
 
         macro_rules! write_out {
-            (OPT: $data: expr) => {{
+            (OPT: $dty: ty, $data: expr) => {{
                 if let Some(d) = $data {
-                    write_out!(d);
+                    write_out!($dty, d);
                 }
             }};
-            ($data: expr) => {{
+            ($dty: ty, $data: expr) => {{
                 for v in $data {
                     match fmt {
                         FormatKind::Ascii => write!(out, " {v}")?,
                         FormatKind::BinLil => {
-                            out.write_all(&v.to_le_bytes())?;
+                            out.write_all(&(v as $dty).to_le_bytes())?;
                         }
                         FormatKind::BinBig => {
-                            out.write_all(&v.to_be_bytes())?;
+                            out.write_all(&(v as $dty).to_be_bytes())?;
                         }
                     }
                 }
             }};
-            ($data: expr, NO_LEADING_SPACE) => {{
+            ($dty: ty, $data: expr, NO_LEADING_SPACE) => {{
                 let mut d = $data.into_iter();
                 if let Some(v) = d.next() {
                     match fmt {
                         FormatKind::Ascii => write!(out, "{v}")?,
                         FormatKind::BinLil => {
-                            out.write_all(&v.to_le_bytes())?;
+                            out.write_all(&(v as $dty).to_le_bytes())?;
                         }
                         FormatKind::BinBig => {
-                            out.write_all(&v.to_be_bytes())?;
+                            out.write_all(&(v as $dty).to_be_bytes())?;
                         }
                     }
                 }
-                write_out!(d);
+                write_out!($dty, d);
             }};
         }
+
         for vi in 0..self.v.len() {
-            write_out!(self.v[vi], NO_LEADING_SPACE);
-            write_out!(OPT: self.n.get(vi));
-            write_out!(OPT: self.uv.get(vi));
-            if let Some(rgb) = self.vc.get(vi) {
+            write_out!(f32, self.v[vi], NO_LEADING_SPACE);
+            write_out!(OPT: f32, self.n.get(vi).copied());
+            write_out!(OPT: f32, self.uv.get(vi).copied());
+            if let Some(rgb) = self.vc.get(vi).copied() {
                 if has_sph {
-                    write_out!(rgb);
+                    write_out!(f32, rgb);
                 } else {
                     let rgb = rgb.map(|v| (v.clamp(0., 1.) * u8::MAX as F) as u8);
-                    write_out!(rgb);
+                    write_out!(u8, rgb);
                 }
             }
             if let Some(sphs) = va.sph_harmonic_coeff.get(vi) {
                 let coeffs = sphs
                     .iter()
-                    .flat_map(|sph| (0..15).map(|i| sph.get(i).unwrap()));
-                write_out!(coeffs);
+                    .flat_map(|sph| (0..15).map(|i| *sph.get(i).unwrap()));
+                write_out!(f32, coeffs);
             }
-            write_out!(OPT: va.height.get(vi).map(|h| [h]));
-            write_out!(OPT: va.opacity.get(vi).map(|o| [o]));
-            write_out!(OPT: va.scale.get(vi));
-            write_out!(OPT: va.rot.get(vi));
+            write_out!(OPT: f32, va.height.get(vi).map(|&h| [h]));
+            write_out!(OPT: f32, va.opacity.get(vi).map(|&o| [o]));
+            write_out!(OPT: f32, va.scale.get(vi).copied());
+            write_out!(OPT: f32, va.rot.get(vi).copied());
             if let FormatKind::Ascii = fmt {
                 writeln!(out)?;
             }
         }
 
         for f in &self.f {
-            write_out!([f.len() as u8], NO_LEADING_SPACE);
-            write_out!(f.as_slice().iter().map(|&i| i as i32));
+            write_out!(u8, [f.len() as u8], NO_LEADING_SPACE);
+            write_out!(i32, f.as_slice().iter().map(|&i| i as i32));
             if let FormatKind::Ascii = fmt {
                 writeln!(out)?;
             }
