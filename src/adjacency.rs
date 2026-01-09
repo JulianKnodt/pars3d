@@ -1,4 +1,4 @@
-use super::{F, FaceKind, Mesh, dist, dot, normalize, signed_angle_2d, sub};
+use super::{F, FaceKind, Mesh, dist, dot, normalize, sub};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Structure for maintaining adjacencies of a mesh with fixed topology.
@@ -572,6 +572,33 @@ impl<D> Adj<D> {
         }
 
         (num_loops, out)
+    }
+
+    pub fn boundary_loops_vec<'a>(
+        &self,
+        f: impl IntoIterator<Item = &'a FaceKind>,
+    ) -> Vec<Vec<usize>> {
+        let (_, mut bd_loops) = self.boundary_loops(f);
+
+        let mut out = vec![];
+        while let Some((first, [_, n])) = bd_loops.pop_first() {
+            let mut curr_loop = vec![first];
+
+            let mut curr: usize = n;
+            while curr != first {
+                let Some([_, next]) = bd_loops.remove(&curr) else {
+                    todo!();
+                };
+
+                curr_loop.push(curr);
+
+                curr = next;
+            }
+
+            out.push(curr_loop);
+        }
+
+        out
     }
 
     pub fn boundary_loops_with_extra<'a>(

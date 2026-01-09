@@ -210,6 +210,7 @@ pub fn split_dividing_edges(
 
     let eks = edge_kinds(fs.iter());
     let mut count = 0;
+    let mut adj_f = vec![];
     for (&[ei0, ei1], ek) in eks.iter() {
         let &EdgeKind::Manifold([fi0, _f1]) = ek else {
             continue;
@@ -217,18 +218,45 @@ pub fn split_dividing_edges(
         if !(bd_verts.contains(&ei0) && bd_verts.contains(&ei1)) {
             continue;
         }
-        // clone e0 and e1, and change
-        let [new_ei0, new_ei1] = [ei0, ei1].map(&mut clone_vert);
-        fs[fi0].remap(|prev| {
-            if prev == ei0 {
-                new_ei0
-            } else if prev == ei1 {
-                new_ei1
-            } else {
-                prev
-            }
-        });
+        assert!(bd_verts.contains(&ei0));
+        assert!(bd_verts.contains(&ei1));
+
         count += 1;
+        // clone e0 and e1, and change adjacent faces
+        let [new_ei0, new_ei1] = [ei0, ei1].map(&mut clone_vert);
+
+        adj_f.push(fi0);
+        while let Some(nf) = adj_f.pop() {
+            let nfs = fs[nf].as_slice();
+            if !(nfs.contains(&ei0) || nfs.contains(&ei1)) {
+                continue;
+            }
+
+            // add adjacent faces as well
+            for e in fs[nf].edges_ord() {
+                if e == [ei0, ei1] {
+                    continue;
+                }
+                assert_ne!(ei1, ei0);
+                adj_f.extend(
+                    eks[&e]
+                        .as_slice()
+                        .into_iter()
+                        .copied()
+                        .filter(|&fi| fi != nf),
+                );
+            }
+
+            fs[nf].remap(|prev| {
+                if prev == ei0 {
+                    new_ei0
+                } else if prev == ei1 {
+                    new_ei1
+                } else {
+                    prev
+                }
+            });
+        }
     }
     count
 }
