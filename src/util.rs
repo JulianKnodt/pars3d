@@ -275,7 +275,7 @@ macro_rules! parse_args {
           };
           state = State::Empty;
         })+
-        State::Empty => help!("No positional arguments supported"),
+        State::Empty => help!("No positional arguments supported, got {v}"),
       }
     }
     let mut any_failed = false;
