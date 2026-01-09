@@ -199,6 +199,40 @@ pub fn vertex_normals(
     }
 }
 
+/// Splits a mesh into separate components so that none of them have dividing edges.
+/// `clone_vert` should take an existing vertex and make another copy of it with a different
+/// index.
+pub fn split_dividing_edges(
+    fs: &mut Vec<FaceKind>,
+    mut clone_vert: impl FnMut(usize) -> usize,
+) -> usize {
+    let bd_verts = boundary_vertices(&fs).collect::<Vec<_>>();
+
+    let eks = edge_kinds(fs.iter());
+    let mut count = 0;
+    for (&[ei0, ei1], ek) in eks.iter() {
+        let &EdgeKind::Manifold([fi0, _f1]) = ek else {
+            continue;
+        };
+        if !(bd_verts.contains(&ei0) && bd_verts.contains(&ei1)) {
+            continue;
+        }
+        // clone e0 and e1, and change
+        let [new_ei0, new_ei1] = [ei0, ei1].map(&mut clone_vert);
+        fs[fi0].remap(|prev| {
+            if prev == ei0 {
+                new_ei0
+            } else if prev == ei1 {
+                new_ei1
+            } else {
+                prev
+            }
+        });
+        count += 1;
+    }
+    count
+}
+
 impl Mesh {
     /// Computes vertex normals into mesh.n for its faces and vertices
     pub fn vertex_normals(&mut self, kind: VertexNormalWeightingKind) {

@@ -650,6 +650,7 @@ impl<D> Adj<D> {
         out
     }
 
+    /*
     /// Loops between boundary vertices in order for a given set of faces.
     /// Will trace dividing edges if present, following the dividing edge with the lowest angle.
     /// Returns (number of boundary loops present in this mesh, and order around boundary loops)
@@ -688,6 +689,7 @@ impl<D> Adj<D> {
                     })
                     .filter(|&(_, ang)| ang < 0.)
                     .max_by(|a, b| a.1.total_cmp(&b.1));
+                //.min_by(|a, b| a.1.total_cmp(&b.1));
 
                 curr = if let Some((a, _)) = a { a } else { n };
                 if curr == first {
@@ -700,6 +702,7 @@ impl<D> Adj<D> {
 
         out
     }
+    */
 
     /// For this adjacency, returns a labelling of each element's component, along
     /// with the total number of components present.
