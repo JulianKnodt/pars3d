@@ -46,6 +46,24 @@ pub fn polygon_kernel(vs: &[[F; 2]], out: &mut Vec<[F; 2]>) {
     }
 }
 
+/// Computes the kernel for a given quadrilateral.
+/// assumes that vs are in counterclockwise order
+pub fn quad_kernel(vs: [[F; 2]; 4]) -> [[F; 2]; 4] {
+    use crate::{cross_2d, sub};
+    use std::array::from_fn;
+    from_fn(|i| {
+        let [v, v_n, v_nn, v_nnn] = from_fn(|j| vs[(i + j) % 4]);
+        let isect = if cross_2d(sub(v_nn, v_n), sub(v, v_n)) < 0. {
+            line_isect([v_nnn, v_nn], [v, v_n])
+        } else if cross_2d(sub(v_nnn, v_nn), sub(v, v_nn)) < 0. {
+            line_isect([v_n, v_nn], [v_nnn, v])
+        } else {
+            return v;
+        };
+        isect.unwrap().2
+    })
+}
+
 #[test]
 fn test_quad_polygon_kernel() {
     let verts = &[
@@ -57,6 +75,26 @@ fn test_quad_polygon_kernel() {
     let mut out = vec![];
     polygon_kernel(verts, &mut out);
     assert_eq!(out.len(), 4);
+}
+
+#[test]
+fn test_quad_quad_kernel() {
+    let verts = [
+        [1., 0.], //
+        [-3., 1.],
+        [-1., 0.],
+        [-3., -1.],
+    ];
+    let out = quad_kernel(verts);
+
+    let mut out_poly = vec![];
+    polygon_kernel(&verts, &mut out_poly);
+    // cw vs ccw (probably should make it consistent
+    out_poly.swap(1, 3);
+    assert_eq!(out_poly.len(), out.len());
+    for i in 0..4 {
+      assert!(crate::dist(out[i], out_poly[i]) < 1e-6, "{:?} {:?}", out[i], out_poly[i]);
+    }
 }
 
 #[test]

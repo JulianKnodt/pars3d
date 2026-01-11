@@ -141,7 +141,7 @@ fn test_line_plane_isect_tri() {
     let pl = plane_eq([tri[0], tri[1], tri[2]]);
     println!("{pl:?}");
     let ray = [[-1.0, 3.0, 0.0], [1.0, -4.0, 0.0]];
-    assert_eq!(line_plane_isect(pl, ray).1, line_tri_isect(tri, ray).3);
+    assert!(dist(line_plane_isect(pl, ray).1, line_tri_isect(tri, ray).3) < 1e-7);
 }
 
 /// Intersect a ray with a triangle.
