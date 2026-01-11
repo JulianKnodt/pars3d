@@ -208,10 +208,16 @@ pub fn split_dividing_edges(
 ) -> usize {
     let bd_verts = boundary_vertices(&fs).collect::<Vec<_>>();
 
-    let eks = edge_kinds(fs.iter());
+    let mut eks = edge_kinds(fs.iter());
     let mut count = 0;
     let mut adj_f = vec![];
-    for (&[ei0, ei1], ek) in eks.iter() {
+    let mut edges_to_visit = eks
+        .keys()
+        .filter(|[ei0, ei1]| bd_verts.contains(ei1) && bd_verts.contains(ei0))
+        .copied()
+        .collect::<Vec<_>>();
+    while let Some([ei0, ei1]) = edges_to_visit.pop() {
+        let ek = &eks[&[ei0, ei1]];
         let &EdgeKind::Manifold([fi0, _f1]) = ek else {
             continue;
         };
@@ -238,13 +244,16 @@ pub fn split_dividing_edges(
                     continue;
                 }
                 assert_ne!(ei1, ei0);
-                adj_f.extend(
-                    eks[&e]
-                        .as_slice()
-                        .into_iter()
-                        .copied()
-                        .filter(|&fi| fi != nf),
-                );
+                let adjs = &eks[&e];
+                adj_f.extend(adjs.as_slice().into_iter().copied().filter(|&fi| fi != nf));
+            }
+
+            for e in fs[nf].edges_ord() {
+                // remove old edges
+                let Some(ek) = eks.get_mut(&e) else {
+                    unreachable!();
+                };
+                ek.remove(nf);
             }
 
             fs[nf].remap(|prev| {
@@ -256,6 +265,11 @@ pub fn split_dividing_edges(
                     prev
                 }
             });
+
+            for e in fs[nf].edges_ord() {
+                // insert new edges
+                eks.entry(e).or_insert_with(EdgeKind::empty).insert(nf);
+            }
         }
     }
     count

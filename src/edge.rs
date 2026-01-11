@@ -132,6 +132,28 @@ impl EdgeKind {
         *self = new;
         true
     }
+    pub fn remove(&mut self, v: usize) -> bool {
+        match self {
+            EdgeKind::Boundary(f) if *f == v => {
+                *self = EdgeKind::empty();
+            }
+            EdgeKind::Manifold([f0, f1] | [f1, f0]) if *f0 == v => {
+                *self = EdgeKind::Boundary(*f1);
+            }
+            EdgeKind::NonManifold(vs) if vs.contains(&v) => {
+                let Some(i) = vs.iter().position(|&ov| ov == v) else {
+                    unreachable!();
+                };
+                vs.swap_remove(i);
+                assert_ne!(vs.len(), 1);
+                if let &[f0, f1] = vs.as_slice() {
+                    *self = EdgeKind::Manifold([f0, f1]);
+                }
+            }
+            _ => return false,
+        }
+        true
+    }
     /// Returns the element other than `i` if self is `Manifold`, otherwise returns `None`.
     /// If `i` is not in the `Manifold` edge then returns `None`.
     #[inline]
