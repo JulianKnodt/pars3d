@@ -93,8 +93,20 @@ fn test_quad_quad_kernel() {
     out_poly.swap(1, 3);
     assert_eq!(out_poly.len(), out.len());
     for i in 0..4 {
-      assert!(crate::dist(out[i], out_poly[i]) < 1e-6, "{:?} {:?}", out[i], out_poly[i]);
+        assert!(
+            crate::dist(out[i], out_poly[i]) < 1e-6,
+            "{:?} {:?}",
+            out[i],
+            out_poly[i]
+        );
     }
+}
+
+#[test]
+fn test_degen_quad_kernel() {
+    let verts = [[1., 0.], [1. + 1e-8, 0.], [0., 1.], [0., -1.]];
+    let out = quad_kernel(verts);
+    assert_eq!(out, [[1., 0.], [1., 0.], [0., 1.], [0., -1.],]);
 }
 
 #[test]
