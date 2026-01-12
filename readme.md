@@ -1,6 +1,6 @@
 # pars3d
 
-![VRML](https://web.archive.org/web/20000929035521/http://www.geocities.com:80/SiliconValley/4944/VRML.gif)
+![shapes](assets/shapes.gif)
 
 A 3D parsing library with minimal dependencies.
 
