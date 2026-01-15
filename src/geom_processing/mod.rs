@@ -256,14 +256,10 @@ pub fn split_dividing_edges(
                 ek.remove(nf);
             }
 
-            fs[nf].remap(|prev| {
-                if prev == ei0 {
-                    new_ei0
-                } else if prev == ei1 {
-                    new_ei1
-                } else {
-                    prev
-                }
+            fs[nf].remap(|prev| match prev {
+                v if v == ei0 => new_ei0,
+                v if v == ei1 => new_ei1,
+                v => v,
             });
 
             for e in fs[nf].edges_ord() {
@@ -273,6 +269,56 @@ pub fn split_dividing_edges(
         }
     }
     count
+}
+
+/// Given a set of faces, modifies them such that the connected path specified by path is a new
+/// boundary. The first and last vertices of `path` should be boundary vertices.
+pub fn cut_between_boundaries(fs: &mut Vec<FaceKind>, path: &[usize], clone_vert: impl FnMut(usize) -> usize) {
+    let mut eks = edge_kinds(fs.iter());
+    let new_path = path.iter().copied().map(clone_vert).collect::<Vec<_>>();
+    let mut to_visit = vec![];
+
+    for [e0, e1] in path.array_windows::<2>().copied() {
+        let e = std::cmp::minmax(e0, e1);
+        let adjs = eks[&e]
+            .as_slice()
+            .iter()
+            .copied()
+            .filter(|&f| fs[f].edges().any(|e| e == [e0, e1]));
+
+        to_visit.extend(adjs);
+    }
+
+    while let Some(nf) = to_visit.pop() {
+        let any_from_path = fs[nf].as_slice().iter().any(|&vi| path.contains(&vi));
+        if !any_from_path {
+            continue;
+        }
+        for [e0, e1] in fs[nf].edges_ord() {
+            if path.contains(&e0) && path.contains(&e1) {
+                continue;
+            }
+            let adjs = &eks[&[e0, e1]];
+            to_visit.extend(adjs.as_slice().into_iter().copied().filter(|&fi| fi != nf));
+        }
+        for e in fs[nf].edges_ord() {
+            // remove old edges
+            let Some(ek) = eks.get_mut(&e) else {
+                unreachable!();
+            };
+            ek.remove(nf);
+        }
+        fs[nf].remap(|vi| {
+            let Some(pi) = path.iter().position(|&pv| pv == vi) else {
+                return vi;
+            };
+            new_path[pi]
+        });
+        for e in fs[nf].edges_ord() {
+            // insert new edges
+            eks.entry(e).or_insert_with(EdgeKind::empty).insert(nf);
+        }
+    }
 }
 
 impl Mesh {
