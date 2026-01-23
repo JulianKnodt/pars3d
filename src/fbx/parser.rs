@@ -12,7 +12,7 @@ use std::io::{self, BufRead, Seek, SeekFrom, Write};
 use std::mem::size_of;
 use std::path::Path;
 
-use std::assert_matches::assert_matches;
+use std::assert_matches;
 
 /// Magic binary length.
 pub(crate) const MAGIC_LEN: usize = 23;

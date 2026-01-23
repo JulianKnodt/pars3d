@@ -1,5 +1,4 @@
 #![feature(str_split_whitespace_remainder)]
-#![feature(array_windows)]
 #![feature(array_try_map)]
 #![feature(iter_array_chunks)]
 #![feature(cmp_minmax)]

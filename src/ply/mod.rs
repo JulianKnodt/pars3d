@@ -342,7 +342,7 @@ impl Ply {
                             "Unknown face property list, got {got:?}, expected {should_match:?}"
                         ));
                     }
-                    use std::assert_matches::assert_matches;
+                    use std::assert_matches;
                     assert_matches!(it.next(), Some("vertex_index") | Some("vertex_indices"));
                     EndHeader
                 }

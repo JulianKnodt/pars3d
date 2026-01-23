@@ -273,7 +273,11 @@ pub fn split_dividing_edges(
 
 /// Given a set of faces, modifies them such that the connected path specified by path is a new
 /// boundary. The first and last vertices of `path` should be boundary vertices.
-pub fn cut_between_boundaries(fs: &mut Vec<FaceKind>, path: &[usize], clone_vert: impl FnMut(usize) -> usize) {
+pub fn cut_between_boundaries(
+    fs: &mut Vec<FaceKind>,
+    path: &[usize],
+    clone_vert: impl FnMut(usize) -> usize,
+) {
     let mut eks = edge_kinds(fs.iter());
     let new_path = path.iter().copied().map(clone_vert).collect::<Vec<_>>();
     let mut to_visit = vec![];
