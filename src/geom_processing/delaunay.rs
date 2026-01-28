@@ -134,8 +134,8 @@ pub fn bowyer_watson_3d(
                     if !v.is_finite() {
                         continue;
                     }
-                    min[i] = min[i].min(v);
-                    max[i] = max[i].max(v);
+                    min[i] = min[i].min(v - 1e-6);
+                    max[i] = max[i].max(v + 1e-6);
                 }
             }
         }
