@@ -434,6 +434,11 @@ impl VertexAttrs {
         self.height.truncate(l);
         self.tangent.truncate(l);
         self.bitangent.truncate(l);
+
+        self.opacity.truncate(l);
+        self.scale.truncate(l);
+        self.rot.truncate(l);
+        self.sph_harmonic_coeff.truncate(l);
     }
 
     pub fn extend(&mut self, o: &Self) {
