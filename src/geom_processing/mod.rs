@@ -5,6 +5,8 @@ use super::{FaceKind, Mesh, Scene, face::Barycentric};
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 
+use std::cmp::minmax;
+
 /// Curvature related functions
 pub mod curvature;
 
@@ -48,7 +50,7 @@ pub fn barycentric_areas(fs: &[FaceKind], vs: &[[F; 3]], dst: &mut Vec<F>) {
 }
 
 /// For a given set of faces, computes an adjacency map between them.
-/// The output map will always have std::cmp::minmax of each edge.
+/// The output map will always have minmax of each edge.
 pub fn edge_kinds<'a>(
     fs: impl IntoIterator<Item = &'a FaceKind>,
 ) -> BTreeMap<[usize; 2], EdgeKind> {
@@ -273,17 +275,18 @@ pub fn split_dividing_edges(
 
 /// Given a set of faces, modifies them such that the connected path specified by path is a new
 /// boundary. The first and last vertices of `path` should be boundary vertices.
+/// Returns the vertices on the new boundary.
 pub fn cut_between_boundaries(
     fs: &mut Vec<FaceKind>,
     path: &[usize],
     clone_vert: impl FnMut(usize) -> usize,
-) {
+) -> Vec<usize> {
     let mut eks = edge_kinds(fs.iter());
     let new_path = path.iter().copied().map(clone_vert).collect::<Vec<_>>();
     let mut to_visit = vec![];
 
     for [e0, e1] in path.array_windows::<2>().copied() {
-        let e = std::cmp::minmax(e0, e1);
+        let e = minmax(e0, e1);
         let adjs = eks[&e]
             .as_slice()
             .iter()
@@ -323,6 +326,8 @@ pub fn cut_between_boundaries(
             eks.entry(e).or_insert_with(EdgeKind::empty).insert(nf);
         }
     }
+
+    new_path
 }
 
 impl Mesh {
@@ -676,7 +681,7 @@ impl Mesh {
         for f in &self.f {
             for e in f.edges_ord() {
                 let [e0, e1] = e.map(|vi| self.v[vi].map(F::to_bits));
-                let cnt = edges.entry(std::cmp::minmax(e0, e1)).or_default();
+                let cnt = edges.entry(minmax(e0, e1)).or_default();
                 *cnt += 1u32;
             }
         }
@@ -727,7 +732,7 @@ impl Mesh {
             for e in f.edges_ord() {
                 let [e0, e1] = e.map(|v| self.v[v].map(F::to_bits));
                 edges
-                    .entry(std::cmp::minmax(e0, e1))
+                    .entry(minmax(e0, e1))
                     .and_modify(|ek| {
                         ek.insert(fi);
                     })
