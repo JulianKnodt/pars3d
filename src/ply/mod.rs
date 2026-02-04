@@ -46,7 +46,7 @@ enum Type {
     Float,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum Field {
     X,
     Y,
@@ -75,6 +75,8 @@ enum Field {
     RotW,
 
     FRest(u8),
+
+    Unknown(String),
 }
 
 /// PLY Format
@@ -247,7 +249,7 @@ impl Ply {
                         return parse_err!("Missing 'element'");
                     }
                     if tokens.next() != Some("face") {
-                        return parse_err!("Missing 'face'");
+                        return parse_err!("Missing 'face' in element descriptor");
                     }
                     let Some(fc) = tokens.next() else {
                         return parse_err!("Missing face count");
@@ -319,9 +321,11 @@ impl Ply {
                         Some("rot_2") => Field::RotZ,
                         Some("rot_3") => Field::RotW,
 
-                        Some(k) => return parse_err!(format!("Unknown property name {k}")),
+                        Some(k) => {
+                            eprintln!("Unknown property name {k}");
+                            Field::Unknown(String::from(k))
+                        }
                     };
-                    fields.push(field);
                     use Field::*;
                     has_color = has_color || matches!(field, Red | Green | Blue);
                     has_normal = has_normal || matches!(field, NX | NY | NZ);
@@ -331,6 +335,8 @@ impl Ply {
                     has_scale = has_scale || matches!(field, ScaleX | ScaleY | ScaleZ);
                     has_rot = has_rot || matches!(field, RotX | RotY | RotZ | RotW);
                     has_f_rest = has_f_rest || matches!(field, FRest(_));
+
+                    fields.push(field);
                     VertexProperty
                 }
                 PropertyList => {
@@ -440,6 +446,10 @@ impl Ply {
                                     Field::RotY => rot[1] = get!(f32, F),
                                     Field::RotZ => rot[2] = get!(f32, F),
                                     Field::RotW => rot[3] = get!(f32, F),
+                                    Field::Unknown(_) => {
+                                        cond_parse!();
+                                        continue;
+                                    }
                                 }
                             }
                         }
@@ -456,7 +466,7 @@ impl Ply {
                                         }
                                     }};
                                 }
-                                match fields[fi] {
+                                match &fields[fi] {
                                     Field::X => xyz[0] = get!(F),
                                     Field::Y => xyz[1] = get!(F),
                                     Field::Z => xyz[2] = get!(F),
@@ -475,6 +485,7 @@ impl Ply {
                                     Field::Alpha => continue,
 
                                     Field::Opacity => opacity = get!(F),
+                                    Field::Unknown(_) => continue,
                                     f => todo!("{f:?}"),
                                 }
                             }

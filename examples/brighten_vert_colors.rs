@@ -14,11 +14,11 @@ fn main() -> std::io::Result<()> {
     for m in input.meshes.iter_mut() {
         for vc in m.vert_colors.iter_mut() {
             if args.sigmoid {
-              *vc = vc.map(sigmoid);
+                *vc = vc.map(sigmoid);
             }
             *vc = vc.map(|c| c.powf(args.gamma));
             if args.sigmoid {
-              *vc = vc.map(inv_sigmoid);
+                *vc = vc.map(inv_sigmoid);
             }
         }
     }
@@ -27,9 +27,9 @@ fn main() -> std::io::Result<()> {
 }
 
 fn sigmoid(x: F) -> F {
-  1. / (1. + (-x).exp())
+    1. / (1. + (-x).exp())
 }
 
 fn inv_sigmoid(y: F) -> F {
-  y.ln() - (1. - y).ln()
+    y.ln() - (1. - y).ln()
 }
