@@ -48,11 +48,13 @@ pub fn axis_angle_rot(k: [F; 3], v: [F; 3], angle: F) -> [F; 3] {
 
 #[inline]
 pub fn quat_from_to(s: [F; 3], t: [F; 3]) -> [F; 4] {
-    let ns = normalize(s);
-    let d = dot(ns, normalize(t));
+    let s = normalize(s);
+    let t = normalize(t);
+    let d = dot(s, t);
+    const EPS: F = 1e-12;
     // opposite directions
-    if d < -1. + 1e-5 {
-        let [ox, oy, oz] = normalize(orthogonal(ns));
+    if d < -1. + EPS {
+        let [ox, oy, oz] = normalize(orthogonal(s));
         return [ox, oy, oz, 0.];
     }
 
@@ -70,16 +72,15 @@ pub fn quat_from_axis_angle(axis: [F; 3], angle: F) -> [F; 4] {
 /// Computes rotation from the standard xyz basis to this basis, where fwd and up are orthogonal
 /// and normalized.
 pub fn quat_from_standard(fwd: [F; 3], up: [F; 3]) -> [F; 4] {
-    assert!(dot(fwd, up).abs() < 1e-4);
-    let r0 = quat_from_to([1., 0., 0.], fwd);
-    let r1 = quat_from_to(quat_rot([0., 1., 0.], r0), up);
-    quat_mul(r1, r0)
+    quat_from_basis(fwd, up, [1., 0., 0.], [0., 1., 0.])
 }
 
 pub fn quat_from_basis(fwd: [F; 3], up: [F; 3], b0: [F; 3], b1: [F; 3]) -> [F; 4] {
-    assert!(dot(fwd, up).abs() < 1e-4);
+    assert!(dot(fwd, up).abs() < 1e-6);
     let r0 = quat_from_to(b0, fwd);
-    let r1 = quat_from_to(quat_rot(b1, r0), up);
+    let rot_b1 = quat_rot(b1, r0);
+    let r1 = quat_from_to(rot_b1, up);
+    //quat_mul(r1, r0)
     quat_mul(r1, r0)
 }
 
@@ -100,6 +101,36 @@ pub fn quat_to_mat([x, y, z, w]: [F; 4]) -> [[F; 3]; 3] {
         [2. * (qxy + qwz), 1. - 2. * (qxx + qzz), 2. * (qyz - qwx)],
         [2. * (qxz - qwy), 2. * (qyz + qwx), 1. - 2. * (qxx + qyy)],
     ]
+}
+
+// https://github.com/blender/blender/blob/756538b4a117cb51a15e848fa6170143b6aafcd8/source/blender/blenlib/intern/math_rotation.c#L272
+pub fn quat_from_mat(
+    [
+        [m00, m01, m02], //
+        [m10, m11, m12],
+        [m20, m21, m22],
+    ]: [[F; 3]; 3],
+) -> [F; 4] {
+    // note: t is the trace
+    let mut q = if m22 < 0. {
+        if m00 > m11 {
+            let t = 1. + m00 - m11 - m22;
+            [t, m01 + m10, m20 + m02, m12 - m21]
+        } else {
+            let t = 1. - m00 + m11 - m22;
+            [m01 + m10, t, m12 + m21, m20 - m02]
+        }
+    } else {
+        if m00 < -m11 {
+            let t = 1. - m00 - m11 + m22;
+            [m20 + m02, m12 + m21, t, m01 - m10]
+        } else {
+            let t = 1. + m00 + m11 + m22;
+            [m12 - m21, m20 - m02, m01 - m10, t]
+        }
+    };
+    q[3] = -q[3];
+    normalize(q)
 }
 
 #[test]
@@ -148,4 +179,30 @@ fn test_identity_quat() {
     let n = normalize([1.; 3]);
     let q = quat_from_to(n, n);
     assert_eq!(quat_rot(n, q), n);
+}
+
+#[test]
+fn test_quat_from_standard_edge_case_1() {
+    let t0 = [
+        -0.3191037331835984,
+        0.9251381500104652,
+        -0.20565062780852295,
+    ];
+    let t1 = [
+        0.9243583848111964,
+        0.25593881156730747,
+        -0.28294322931868354,
+    ];
+    /*
+    use super::dist;
+    let qft0 = quat_from_to([1., 0., 0.], t0);
+    assert!(dist(quat_rot([1., 0., 0.], qft0), t0) < 1e-5);
+
+    let rb1 = quat_rot([0., 1., 0.], qft0);
+    let qft1 = quat_from_to(rb1, t1);
+    assert_eq!(quat_rot(rb1, qft1), t1);
+    */
+
+    let q = quat_from_standard(t0, t1);
+    assert_eq!(t0, quat_rot([1., 0., 0.], q));
 }
