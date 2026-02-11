@@ -616,6 +616,17 @@ pub fn matmul<const N: usize>(ta: [[F; N]; N], tb: [[F; N]; N]) -> [[F; N]; N] {
     out
 }
 
+/// Transposes a matrix
+pub fn transpose<T: Copy, const N: usize>(a: [[T; N]; N]) -> [[T; N]; N] {
+    std::array::from_fn(|i| std::array::from_fn(|j| a[j][i]))
+}
+
+#[test]
+fn test_transpose() {
+    let v = [[1, 2], [3, 4]];
+    assert_eq!(transpose(v), [[1, 3], [2, 4]]);
+}
+
 /// Computes the value `t` such that `s + (s-e)t = nearest point to p on line`
 pub fn nearest_on_line<const N: usize>(p: [F; N], [s, e]: [[F; N]; 2]) -> F {
     let dir = sub(e, s);

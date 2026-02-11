@@ -115,23 +115,38 @@ pub fn quat_from_mat(
     let mut q = if m22 < 0. {
         if m00 > m11 {
             let t = 1. + m00 - m11 - m22;
-            [t, m01 + m10, m20 + m02, m12 - m21]
+            let mut s = 2. * t.sqrt();
+            if m12 < m21 {
+                s = -s;
+            }
+            [0.25 * s, (m01 + m10) / s, (m20 + m02) / s, (m12 - m21) / s]
         } else {
             let t = 1. - m00 + m11 - m22;
-            [m01 + m10, t, m12 + m21, m20 - m02]
+            let mut s = 2. * t.sqrt();
+            if m20 < m02 {
+                s = -s;
+            }
+            [(m01 + m10) / s, 0.25 * s, (m12 + m21) / s, (m20 - m02) / s]
         }
     } else {
         if m00 < -m11 {
             let t = 1. - m00 - m11 + m22;
-            [m20 + m02, m12 + m21, t, m01 - m10]
+            let mut s = 2. * t.sqrt();
+            if m01 < m10 {
+                s = -s;
+            }
+            [(m20 + m02) / s, (m12 + m21) / s, 0.25 * s, (m01 - m10) / s]
         } else {
             let t = 1. + m00 + m11 + m22;
-            [m12 - m21, m20 - m02, m01 - m10, t]
+            let s = 2. * t.sqrt();
+            [(m12 - m21) / s, (m20 - m02) / s, (m01 - m10) / s, 0.25 * s]
         }
     };
     q[3] = -q[3];
     normalize(q)
 }
+
+// TODO measure angle between quaternions
 
 #[test]
 fn test_quat() {
