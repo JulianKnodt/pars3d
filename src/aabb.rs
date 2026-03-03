@@ -1,4 +1,4 @@
-use super::{F, add, kmul, sub};
+use super::{F, OrdFloat, add, kmul, sub};
 use core::ops::Range;
 use std::array::from_fn;
 
@@ -41,10 +41,20 @@ impl<const N: usize> AABB<F, N> {
         }
         s
     }
+    /// Conservatively converts this AABB to use i32.
     pub fn round_to_i32(&self) -> AABB<i32, N> {
         AABB {
             min: self.min.map(|i| i.floor() as i32),
             max: self.max.map(|i| i.ceil() as i32),
+        }
+    }
+
+    /// Conservatively converts this AABB to have usize, if values are negative they will be
+    /// clamped to 0.
+    pub fn round_to_usize(&self) -> AABB<usize, N> {
+        AABB {
+            min: self.min.map(|i| i.floor().max(0.) as usize),
+            max: self.max.map(|i| i.ceil().max(0.) as usize),
         }
     }
     pub fn scale_by(&mut self, x: F, y: F) {
@@ -158,21 +168,8 @@ impl AABB<F, 2> {
         false
     }
 
+    /// Intersects this 2D AABB with a triangle, and output indices into poly.
     pub fn intersects_tri_poly(&self, tri: [[F; 2]; 3], poly: &mut Vec<[F; 2]>) {
-        #[derive(PartialEq)]
-        struct OrdFloat(F);
-
-        impl Eq for OrdFloat {}
-        impl Ord for OrdFloat {
-            fn cmp(&self, o: &Self) -> std::cmp::Ordering {
-                self.0.partial_cmp(&o.0).unwrap()
-            }
-        }
-        impl PartialOrd for OrdFloat {
-            fn partial_cmp(&self, o: &Self) -> Option<std::cmp::Ordering> {
-                Some(self.cmp(o))
-            }
-        }
         poly.clear();
 
         // check if any points of the aabb are contained in the tri
@@ -335,5 +332,24 @@ impl AABB<i32, 2> {
             min: from_fn(|i| self.min[i].max(o.min[i])),
             max: from_fn(|i| self.max[i].min(o.max[i])),
         }
+    }
+}
+
+impl AABB<usize, 2> {
+    /// Width of this AABB, if it has max < min, will return 0.
+    #[inline]
+    pub fn width(&self) -> usize {
+        self.max[0].saturating_sub(self.min[0])
+    }
+    /// Height of this AABB, if it has max < min, will return 0.
+    #[inline]
+    pub fn height(&self) -> usize {
+        self.max[1].saturating_sub(self.min[1])
+    }
+    #[inline]
+    pub fn iter_coords(&self) -> impl Iterator<Item = [usize; 2]> + '_ {
+        let [lx, ly] = self.min;
+        let [hx, hy] = self.max;
+        (ly..hy).flat_map(move |y| (lx..hx).map(move |x| [x, y]))
     }
 }

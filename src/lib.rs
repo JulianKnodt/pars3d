@@ -101,6 +101,9 @@ pub mod mesh;
 /// Geometry processing on meshes. Often allocates.
 pub mod geom_processing;
 
+/// UV processing algorithms.
+pub mod uv;
+
 /// Grid operations.
 pub mod grid;
 
@@ -120,6 +123,9 @@ pub use mesh::Scene;
 pub mod tri_to_quad;
 
 pub mod util;
+
+/// Writing ppm image files.
+pub mod ppm;
 
 /// Quaternion related stuff
 pub mod quat;
@@ -621,6 +627,12 @@ pub fn transpose<T: Copy, const N: usize>(a: [[T; N]; N]) -> [[T; N]; N] {
     std::array::from_fn(|i| std::array::from_fn(|j| a[j][i]))
 }
 
+/// Computes the triple product (a dot (b x c)) or equivalently the determinant of
+/// this 3x3 matrix.
+pub fn triple_product([a, b, c]: [[F; 3]; 3]) -> F {
+    dot(a, cross(b, c))
+}
+
 #[test]
 fn test_transpose() {
     let v = [[1, 2], [3, 4]];
@@ -765,4 +777,19 @@ pub(crate) fn inverse([[a, b, c], [d, e, f], [g, h, i]]: [[F; 3]; 3]) -> [[F; 3]
 
 pub(crate) fn matvecmul3(rs: [[F; 3]; 3], v: [F; 3]) -> [F; 3] {
     rs.map(|r| dot(r, v))
+}
+
+#[derive(PartialEq)]
+struct OrdFloat(F);
+
+impl Eq for OrdFloat {}
+impl Ord for OrdFloat {
+    fn cmp(&self, o: &Self) -> std::cmp::Ordering {
+        self.0.partial_cmp(&o.0).unwrap()
+    }
+}
+impl PartialOrd for OrdFloat {
+    fn partial_cmp(&self, o: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(o))
+    }
 }
