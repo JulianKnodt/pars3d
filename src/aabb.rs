@@ -334,6 +334,23 @@ impl AABB<i32, 2> {
         }
     }
 }
+impl<const N: usize> AABB<usize, N> {
+    pub fn new_usize() -> Self {
+        Self {
+            min: [usize::MAX; N],
+            max: [0; N],
+        }
+    }
+    pub fn add_point(&mut self, p: [usize; N]) {
+        for i in 0..N {
+            self.min[i] = self.min[i].min(p[i]);
+            self.max[i] = self.max[i].max(p[i]);
+        }
+    }
+    pub fn contains(&self, p: [usize; N]) -> bool {
+        (0..N).all(|i| (self.min[i]..self.max[i]).contains(&p[i]))
+    }
+}
 
 impl AABB<usize, 2> {
     /// Width of this AABB, if it has max < min, will return 0.

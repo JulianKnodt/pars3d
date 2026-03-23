@@ -112,7 +112,7 @@ pub fn quat_from_mat(
     ]: [[F; 3]; 3],
 ) -> [F; 4] {
     // note: t is the trace
-    let mut q = if m22 < 0. {
+    let /*mut*/ q = if m22 < 0. {
         if m00 > m11 {
             let t = 1. + m00 - m11 - m22;
             let mut s = 2. * t.sqrt();
@@ -142,7 +142,7 @@ pub fn quat_from_mat(
             [(m12 - m21) / s, (m20 - m02) / s, (m01 - m10) / s, 0.25 * s]
         }
     };
-    q[3] = -q[3];
+    //q[3] = -q[3];
     normalize(q)
 }
 

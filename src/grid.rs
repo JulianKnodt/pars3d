@@ -1,4 +1,5 @@
 use super::{F, add};
+use crate::aabb::AABB;
 
 /// Construct a new explicit grid from a given width and height
 /// Returns 2D coordinates, along side quads that represent each grid cell.
@@ -151,6 +152,19 @@ impl<T, const ORD: bool> Arr2D<T, ORD> {
             (xy, v)
         })
     }
+    pub fn iter_enumerate_region(
+        &self,
+        aabb: &AABB<usize, 2>,
+    ) -> impl Iterator<Item = ([usize; 2], &T)> {
+        self.data.iter().enumerate().filter_map(move |(i, v)| {
+            let xy = if ORD {
+                [i % self.w, i / self.w]
+            } else {
+                [i / self.h, i % self.h]
+            };
+            aabb.contains(xy).then_some((xy, v))
+        })
+    }
 
     pub fn iter_mut_enumerate(&mut self) -> impl Iterator<Item = ([usize; 2], &mut T)> {
         self.data.iter_mut().enumerate().map(|(i, v)| {
@@ -218,6 +232,7 @@ impl<T, const ORD: bool> Arr2D<T, ORD> {
     }
 }
 
+/*
 fn gcd(mut a: usize, mut b: usize) -> usize {
     while b != 0 {
         // [a,b] = [b, a % b]
@@ -227,53 +242,7 @@ fn gcd(mut a: usize, mut b: usize) -> usize {
     }
     a
 }
-
-fn lcm(a: usize, b: usize) -> usize {
-    (a / gcd(a, b)) * b
-}
-
-use rustfft::FftPlanner;
-use rustfft::num_complex::Complex;
-
-impl<const ORD: bool> Arr2D<Complex<F>, ORD> {
-    /// Resizes a vec so that it can be used as scratch during FFT
-    pub fn fft_scratch_vec(&self, v: &mut Vec<Complex<F>>) {
-        v.resize_with(
-            lcm(self.w, self.h).max(self.w).max(self.h),
-            Default::default,
-        );
-    }
-    pub fn fft(&self, planner: &mut FftPlanner<F>, dst: &mut Self) {
-        assert_eq!(self.w, dst.w);
-        assert_eq!(self.h, dst.h);
-        let w = self.w;
-        let h = self.h;
-
-        let mut scratch = vec![];
-        self.fft_scratch_vec(&mut scratch);
-        let fft_x = planner.plan_fft_forward(w);
-        let fft_y = planner.plan_fft_forward(h);
-        fft_x.process_immutable_with_scratch(&self.data, &mut dst.data, &mut scratch);
-        transpose::transpose_inplace(&mut dst.data, &mut scratch, w, h);
-        fft_y.process_immutable_with_scratch(&self.data, &mut dst.data, &mut scratch);
-        transpose::transpose_inplace(&mut dst.data, &mut scratch, w, h);
-    }
-    pub fn ifft(&self, planner: &mut FftPlanner<F>, dst: &mut Self) {
-        assert_eq!(self.w, dst.w);
-        assert_eq!(self.h, dst.h);
-        let w = self.w;
-        let h = self.h;
-
-        let mut scratch = vec![];
-        self.fft_scratch_vec(&mut scratch);
-        let fft_x = planner.plan_fft_inverse(w);
-        let fft_y = planner.plan_fft_inverse(h);
-        fft_x.process_immutable_with_scratch(&self.data, &mut dst.data, &mut scratch);
-        transpose::transpose_inplace(&mut dst.data, &mut scratch, w, h);
-        fft_y.process_immutable_with_scratch(&self.data, &mut dst.data, &mut scratch);
-        transpose::transpose_inplace(&mut dst.data, &mut scratch, w, h);
-    }
-}
+*/
 
 impl<T> Arr2D<T, true> {
     pub fn row(&self, y: usize) -> &[T] {
@@ -328,6 +297,17 @@ impl<const ORD: bool> Arr2D<bool, ORD> {
     pub fn any(&self) -> bool {
         self.data.iter().any(|&v| v)
     }
+    /// Returns the region where any value is true
+    pub fn true_aabb(&self) -> AABB<usize, 2> {
+        let mut out = AABB::new_usize();
+        for (ij, v) in self.iter_enumerate() {
+            if !v {
+                continue;
+            }
+            out.add_point(ij);
+        }
+        return out;
+    }
     pub fn union<const OORD: bool>(&mut self, o: &Arr2D<bool, OORD>, [ox, oy]: [usize; 2]) {
         for ([x, y], &src) in o.iter_enumerate() {
             let Some(dst) = self.get_mut([x + ox, y + oy]) else {
@@ -337,8 +317,7 @@ impl<const ORD: bool> Arr2D<bool, ORD> {
         }
     }
 
-    /// Convolves two boolean signals, where if either contains `true` in range
-    /// the output will have true.
+    /// Convolves two boolean signals.
     pub fn convolve<const ORD1: bool, const ORD2: bool>(
         &self,
         kernel: &Arr2D<bool, ORD1>,
@@ -346,9 +325,11 @@ impl<const ORD: bool> Arr2D<bool, ORD> {
     ) {
         assert_eq!(self.shape(), dst.shape());
         dst.fill(false);
-        if !kernel.any() {
+        if !kernel.any() || !self.any() {
             return;
         }
+
+        let true_aabb = kernel.true_aabb();
         // for each true, mark region in surrounding area as true
         // OR for each cell check nearby region?
 
@@ -357,7 +338,49 @@ impl<const ORD: bool> Arr2D<bool, ORD> {
             if *d {
                 continue;
             }
-            for ([ki, kj], ov) in kernel.iter_enumerate() {
+            for ([ki, kj], ov) in kernel.iter_enumerate_region(&true_aabb) {
+                if !ov {
+                    continue;
+                }
+                let Some(sv) = self.get([i + ki, j + kj]) else {
+                    continue;
+                };
+                if !sv {
+                    continue;
+                }
+                *d = true;
+                break;
+            }
+        }
+    }
+
+    /// Convolves two boolean signals, where if either contains `true` in range
+    /// the output will have true.
+    pub fn minkowski_sum<const ORD1: bool, const ORD2: bool>(
+        &self,
+        kernel: &Arr2D<bool, ORD1>,
+        dst: &mut Arr2D<bool, ORD2>,
+    ) {
+        assert_eq!(self.shape(), dst.shape());
+        dst.fill(false);
+        if !kernel.any() || !self.any() {
+            return;
+        }
+
+        // TODO how to handle even-size kernel?
+        let true_aabb = kernel.true_aabb();
+        // for each true, mark region in surrounding area as true
+        // OR for each cell check nearby region?
+
+        for ([i, j], v) in self.iter_enumerate() {
+            if !v {
+              continue;
+            }
+            let d = dst.get_mut([i, j]).unwrap();
+            if *d {
+                continue;
+            }
+            for ([ki, kj], ov) in kernel.iter_enumerate_region(&true_aabb) {
                 if !ov {
                     continue;
                 }
