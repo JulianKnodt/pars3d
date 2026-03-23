@@ -1,8 +1,9 @@
-use std::fs::File;
-use std::io::{BufReader, BufWriter};
-use std::path::PathBuf;
-
+#[cfg(feature = "fbx")]
 fn main() -> std::io::Result<()> {
+    use std::fs::File;
+    use std::io::{BufReader, BufWriter};
+    use std::path::PathBuf;
+
     let mut fbx_files = vec![];
     for f in std::env::args().skip(1) {
         if !f.ends_with(".fbx") {
@@ -29,4 +30,9 @@ fn main() -> std::io::Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(not(feature = "fbx"))]
+fn main() {
+    eprintln!("Not compiled with FBX support");
 }

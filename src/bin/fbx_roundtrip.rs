@@ -1,6 +1,7 @@
-use pars3d::fbx;
-
+#[cfg(feature = "fbx")]
 fn main() {
+    use pars3d::fbx;
+
     let mut src = None;
     let mut dst = None;
     for v in std::env::args().skip(1) {
@@ -62,4 +63,9 @@ fn main() {
     );
     let out = std::fs::File::create(dst).expect("Failed to create file");
     fbx::export::export_fbx(&scene, std::io::BufWriter::new(out)).expect("Failed to save scene");
+}
+
+#[cfg(not(feature = "fbx"))]
+fn main() {
+    eprintln!("Not compiled with FBX support");
 }

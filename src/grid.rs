@@ -374,7 +374,7 @@ impl<const ORD: bool> Arr2D<bool, ORD> {
 
         for ([i, j], v) in self.iter_enumerate() {
             if !v {
-              continue;
+                continue;
             }
             let d = dst.get_mut([i, j]).unwrap();
             if *d {

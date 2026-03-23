@@ -148,7 +148,11 @@ pub fn load(v: impl AsRef<Path>) -> std::io::Result<mesh::Scene> {
     use util::FileFormat::*;
     let scene = match util::extension_to_format(&v) {
         OBJ => obj::parse(v, false, false)?.into(),
+
+        #[cfg(feature = "fbx")]
         FBX => fbx::parser::load(v)?.into(),
+        #[cfg(not(feature = "fbx"))]
+        FBX => return Err(std::io::Error::other("Not compiled with FBX support")),
 
         #[cfg(feature = "gltf")]
         GLB => gltf::load(v).map_err(std::io::Error::other)?.into(),
@@ -172,6 +176,7 @@ pub fn save(v: impl AsRef<Path>, scene: &mesh::Scene) -> std::io::Result<()> {
             |mtl_file| obj::OutputKind::New(mtl_file.into()),
             |_tk, s| obj::OutputKind::New(s.into()),
         ),
+        #[cfg(feature = "fbx")]
         FBX => {
             let scene: mesh::Scene = scene.clone();
             let fbx_scene: fbx::FBXScene = scene.into();
@@ -179,6 +184,8 @@ pub fn save(v: impl AsRef<Path>, scene: &mesh::Scene) -> std::io::Result<()> {
             let buf = std::io::BufWriter::new(f);
             fbx::export::export_fbx(&fbx_scene, buf)
         }
+        #[cfg(not(feature = "fbx"))]
+        FBX => Err(std::io::Error::other("Not compiled with FBX support")),
         #[cfg(feature = "gltf")]
         GLB => {
             let f = std::fs::File::create(v)?;
