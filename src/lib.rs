@@ -160,7 +160,10 @@ pub fn load(v: impl AsRef<Path>) -> std::io::Result<mesh::Scene> {
         GLB => return Err(std::io::Error::other("Not compiled with GLTF support")),
 
         PLY => mesh::Mesh::from(ply::Ply::read_from_file(v)?).into_scene(),
-        STL => mesh::Mesh::from(stl::read_from_file(v)?).into_scene(),
+        STL => {
+            let s = stl::read_from_file(&v).or_else(|_| stl::STL::read_from_file_binary(v))?;
+            mesh::Mesh::from(s).into_scene()
+        }
         OFF => mesh::Mesh::from(off::read_from_file(v)?).into_scene(),
         Unknown => return Err(std::io::Error::other("Don't know how to load")),
     };

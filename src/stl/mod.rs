@@ -8,6 +8,8 @@ use std::collections::HashMap;
 
 pub mod to_mesh;
 
+pub mod binary;
+
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct STL {
     name: String,
