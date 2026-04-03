@@ -310,7 +310,7 @@ pub fn instant_mesh(
         let mut out_tmp = crate::visualization::wireframe_to_mesh(wf);
         out_tmp.denormalize(args.s, args.t);
         let tmp_scene = out_tmp.into_scene();
-        if let Err(_) = crate::save(&args.save_grid, &tmp_scene) {
+        if let Err(_) = crate::save(&args.save_grid, &tmp_scene, true) {
             eprintln!("[WARN]: Failed to save edge grid to {}", args.save_grid);
         }
     }

@@ -170,7 +170,7 @@ pub fn load(v: impl AsRef<Path>) -> std::io::Result<mesh::Scene> {
     Ok(scene)
 }
 
-pub fn save(v: impl AsRef<Path>, scene: &mesh::Scene) -> std::io::Result<()> {
+pub fn save(v: impl AsRef<Path>, scene: &mesh::Scene, binary: bool) -> std::io::Result<()> {
     use util::FileFormat::*;
     match util::extension_to_format(&v) {
         OBJ => obj::save_obj(
@@ -203,7 +203,7 @@ pub fn save(v: impl AsRef<Path>, scene: &mesh::Scene) -> std::io::Result<()> {
             let buf = std::io::BufWriter::new(f);
             let p: ply::Ply = scene.into_flattened_mesh().into();
             //p.write(buf, ply::FormatKind::Ascii) // for debugging.
-            let fmt = if p.vertex_attrs.sph_harmonic_coeff.is_empty() {
+            let fmt = if !binary && p.vertex_attrs.sph_harmonic_coeff.is_empty() {
                 ply::FormatKind::Ascii
             } else {
                 ply::FormatKind::BinLil

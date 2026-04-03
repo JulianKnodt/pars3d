@@ -9,6 +9,8 @@ fn main() -> std::io::Result<()> {
         => output : String = String::new(),
       Triangulate("--triangulate"; "Triangulate the input mesh")
         => triangulate : bool = false => true,
+      Binary("--binary"; "Force binary mode for certain formats (i.e. PLY)")
+        => binary : bool = false => true,
     );
     let src = args.input;
     let dst = args.output;
@@ -24,5 +26,5 @@ fn main() -> std::io::Result<()> {
             m.triangulate(0);
         }
     }
-    save(dst, &scene)
+    save(dst, &scene, args.binary)
 }
