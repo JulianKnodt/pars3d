@@ -37,7 +37,7 @@ impl STL {
         let faces = (0..num_tris)
             .map(|_| {
                 let normal = [read_f32!(), read_f32!(), read_f32!()];
-                let pos: [[f32; 3]; 3] = [
+                let pos: [[F; 3]; 3] = [
                     [read_f32!(), read_f32!(), read_f32!()],
                     [read_f32!(), read_f32!(), read_f32!()],
                     [read_f32!(), read_f32!(), read_f32!()],
