@@ -5,10 +5,10 @@ use crate::aabb::AABB;
 /// Returns 2D coordinates, along side quads that represent each grid cell.
 pub fn new_grid(w: u32, h: u32) -> (Vec<[F; 2]>, Vec<[usize; 4]>) {
     let mut verts = vec![];
-    for i in 0..w {
-        let x = i as F / w as F;
-        for j in 0..h {
-            let y = j as F / h as F;
+    for j in 0..h {
+        let y = j as F / h as F;
+        for i in 0..w {
+            let x = i as F / w as F;
             verts.push([x, y]);
         }
     }
