@@ -53,5 +53,5 @@ fn main() -> std::io::Result<()> {
         assert!(adj.degree(vi) <= 3);
     }
 
-    pars3d::save(&args.output, &m.into_scene())
+    pars3d::save(&args.output, &m.into_scene(), false)
 }

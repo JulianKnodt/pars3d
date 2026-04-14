@@ -38,5 +38,5 @@ fn main() -> std::io::Result<()> {
     let out_mesh = pars3d::visualization::wireframe_to_mesh(wf);
     let out_scene = out_mesh.into_scene();
 
-    save(dst, &out_scene)
+    save(dst, &out_scene, true)
 }

@@ -53,12 +53,12 @@ fn main() -> std::io::Result<()> {
 
     if !args.save_input.is_empty() {
         println!("[INFO]: Saving post-processed input to {}", args.save_input);
-        pars3d::save(&args.save_input, &input.clone().into_scene())?;
+        pars3d::save(&args.save_input, &input.clone().into_scene(), false)?;
     }
 
     println!("[INFO]: Saving output to {}", args.output);
     let new_verts = hc_v.iter().map(|&[x, y]| [x, y, 0.]).collect();
     let mut m = Mesh::new_geometry(new_verts, hc_f);
     m.uv[0] = hc_v;
-    return pars3d::save(args.output, &m.into_scene());
+    return pars3d::save(args.output, &m.into_scene(), false);
 }

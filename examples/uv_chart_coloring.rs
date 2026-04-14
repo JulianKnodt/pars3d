@@ -77,6 +77,6 @@ fn main() -> std::io::Result<()> {
         m.vert_colors = coloring;
     }
 
-    save(dst, &scene).expect("Failed to save output");
+    save(dst, &scene, true).expect("Failed to save output");
     Ok(())
 }

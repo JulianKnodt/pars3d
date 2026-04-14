@@ -23,7 +23,7 @@ fn main() -> std::io::Result<()> {
         }
     }
 
-    pars3d::save(&args.output, &input)
+    pars3d::save(&args.output, &input, true)
 }
 
 fn sigmoid(x: F) -> F {
