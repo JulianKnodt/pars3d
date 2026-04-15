@@ -378,7 +378,7 @@ fn main() -> std::io::Result<()> {
             .map(|&d| kmul(0.5, add(d, [1.; 3])))
             .collect::<Vec<_>>();
         wf.denormalize(s, t);
-        save(&save_arrows, &wf.into_scene())?;
+        save(&save_arrows, &wf.into_scene(), true)?;
     }
 
     use pars3d::geom_processing::instant_meshes as im;
@@ -439,12 +439,12 @@ fn main() -> std::io::Result<()> {
         wf.vert_colors = c;
         */
         wf.denormalize(s, t);
-        save(&save_arrows, &wf.into_scene())?;
+        save(&save_arrows, &wf.into_scene(), true)?;
     }
 
     m.v = new_v;
     m.f = new_f;
 
     m.denormalize(s, t);
-    save(dst, &m.into_scene())
+    save(dst, &m.into_scene(), true)
 }

@@ -10,6 +10,8 @@ fn main() -> std::io::Result<()> {
         => input : String = String::new(),
       Width("--width"; "Output Width") => width : u32 = 1024,
       Height("--height"; "Output Height") => height : u32 = 1024,
+      Res("--scale"; "Scale by a fraction instead of absolute (neg = unset)")
+        => scale : F = -1.,
       Output("-o", "--output"; "Output Mesh") => output : String = String::new(),
       Stats("--stats"; "Unused") => stats: String = String::new(),
       Triangulate("--triangulate"; "Triangulate output") => tri : bool = false => true,
@@ -22,13 +24,30 @@ fn main() -> std::io::Result<()> {
     let (iw, ih) = input.dimensions();
     let ar = iw as F / ih as F;
 
-    let (gv, gf) = new_grid(args.width, args.height);
+    let w = if args.scale > 0. {
+        (args.scale * iw as F).round() as u32
+    } else {
+        args.width
+    };
+    let h = if args.scale > 0. {
+        (args.scale * ih as F).round() as u32
+    } else {
+        args.height
+    };
+    println!(
+        "Converting {} to w x h = {w} x {h} image at {}",
+        args.input, args.output
+    );
+
+    let (gv, gf) = new_grid(w + 1, h + 1);
     let faces = gf.into_iter().map(FaceKind::Quad).collect::<Vec<_>>();
     let verts = gv
         .iter()
         .copied()
         .map(|[u, v]| [u * ar, v, 0.])
         .collect::<Vec<_>>();
+
+    assert_eq!(faces.len() as u32, w * h);
 
     let nv = gv.len();
     let mut mesh = Mesh::new_geometry(verts, faces);

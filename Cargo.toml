@@ -18,7 +18,7 @@ rand = { version = "0.9.1", optional = true, features = ["small_rng"] }
 union-find = { git = "https://github.com/JulianKnodt/union-find.git", version = "0.1.0" }
 
 [features]
-default = ["gltf", "fbx", "strict_fbx"]
+default = ["gltf", "fbx", "strict_fbx", "rand"]
 # formats:
 f64 = []
 gltf = ["dep:gltf", "dep:gltf-json"]

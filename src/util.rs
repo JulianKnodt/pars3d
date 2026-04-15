@@ -244,6 +244,16 @@ macro_rules! parse_args {
       }}
     }
 
+    /*
+    $(
+      $(
+        const _ : () = {
+          assert_ne!($flags, "-h", "Cannot use `-h` for user flags since it conflicts with help");
+        };
+      )+
+    )+
+    */
+
     let mut args = Args::default();
     let mut state = State::Empty;
 

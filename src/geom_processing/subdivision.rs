@@ -12,10 +12,13 @@ pub enum BarycentricRepr {
     Edge([usize; 2], [F; 2]),
     /// This vertex corresponds to an interpolation on along a tri
     Tri([usize; 3], [F; 3]),
+
+    /// This vertex corresponds to an interpolation along a quad
+    Quad([usize; 4], [F; 4]),
 }
 
 impl BarycentricRepr {
-    pub fn from_triple(a: [usize; 3], ws: [F; 3]) -> Self {
+    pub(crate) fn from_triple(a: [usize; 3], ws: [F; 3]) -> Self {
         match (ws, a) {
             ([v, 0., 0.], [vi, _, _]) | ([0., v, 0.], [_, vi, _]) | ([0., 0., v], [_, _, vi]) => {
                 assert_eq!(v, 1.);
@@ -33,19 +36,20 @@ impl BarycentricRepr {
             }
         }
     }
-    pub fn to_triple(self) -> ([usize; 3], [F; 3]) {
+    pub(crate) fn to_array(self) -> ([usize; 4], [F; 4]) {
         match self {
-            Self::Vertex(vi) => ([vi, usize::MAX, usize::MAX], [1., 0., 0.]),
-            Self::Edge([ai, bi], [a, b]) => ([ai, bi, usize::MAX], [a, b, 0.]),
-            Self::Tri([ai, bi, ci], [a, b, c]) => ([ai, bi, ci], [a, b, c]),
+            Self::Vertex(vi) => ([vi, usize::MAX, usize::MAX, usize::MAX], [1., 0., 0., 0.]),
+            Self::Edge([ai, bi], [a, b]) => ([ai, bi, usize::MAX, usize::MAX], [a, b, 0., 0.]),
+            Self::Tri([ai, bi, ci], [a, b, c]) => ([ai, bi, ci, usize::MAX], [a, b, c, 0.]),
+            Self::Quad(idxs, ws) => (idxs, ws),
         }
     }
     /// Given a set of values, computes the interpolated value for this barycentric
     /// representation.
     pub fn eval<const N: usize>(self, vs: &[[F; N]]) -> [F; N] {
-        let (idxs, ws) = self.to_triple();
+        let (idxs, ws) = self.to_array();
         let mut out = [0.; N];
-        for i in 0..3 {
+        for i in 0..4 {
             if idxs[i] == usize::MAX {
                 continue;
             }
@@ -55,15 +59,15 @@ impl BarycentricRepr {
     }
 }
 
-fn add_triples(
-    a_idxs: [usize; 3],
-    a_ws: [F; 3],
-    b_idxs: [usize; 3],
-    b_ws: [F; 3],
-) -> ([usize; 3], [F; 3]) {
-    let mut out_idxs = [usize::MAX; 3];
-    let mut out_ws = [0.; 3];
-    for i in 0..3 {
+fn add_arrays(
+    a_idxs: [usize; 4],
+    a_ws: [F; 4],
+    b_idxs: [usize; 4],
+    b_ws: [F; 4],
+) -> ([usize; 4], [F; 4]) {
+    let mut out_idxs = [usize::MAX; 4];
+    let mut out_ws = [0.; 4];
+    for i in 0..4 {
         if b_ws[i] == 0. {
             continue;
         }
@@ -74,7 +78,7 @@ fn add_triples(
         out_idxs[out_slot] = a_idxs[i];
         out_ws[out_slot] += a_ws[i];
     }
-    for i in 0..3 {
+    for i in 0..4 {
         if b_ws[i] == 0. {
             continue;
         }
@@ -88,7 +92,7 @@ fn add_triples(
     (out_idxs, out_ws)
 }
 
-/// For a given set of vertices, triangles, and vertex colors, compute the loop subdivided version
+/// For a given set of vertices, triangles, compute the loop subdivided version
 /// of the input mesh. Note that the output vertices will be in barycentric form, and extracted
 /// values such as position, uv, and color can be computed by calling `eval` for each one.
 /// To get the face index of the original triangle that corresponds to a new triangle call
@@ -158,16 +162,19 @@ pub fn compose_barycentric_repr<'a: 'c, 'b: 'c, 'c>(
     assert!(subdiv.len() > base.len());
 
     subdiv.iter().map(|br| {
-        let (idxs, ws) = br.to_triple();
-        let (new_idxs, new_ws) = (0..3).fold(([usize::MAX; 3], [0.; 3]), |(acc_i, acc_w), i| {
+        let (idxs, ws) = br.to_array();
+        let (new_idxs, new_ws) = (0..3).fold(([usize::MAX; 4], [0.; 4]), |(acc_i, acc_w), i| {
             if ws[i] == 0. {
                 return (acc_i, acc_w);
             }
             assert_ne!(idxs[i], usize::MAX);
-            let (n_i, n_w) = base[idxs[i]].to_triple();
-            add_triples(acc_i, acc_w, n_i, kmul(ws[i], n_w))
+            let (n_i, n_w) = base[idxs[i]].to_array();
+            add_arrays(acc_i, acc_w, n_i, kmul(ws[i], n_w))
         });
-        BarycentricRepr::from_triple(new_idxs, new_ws)
+        BarycentricRepr::from_triple(
+            std::array::from_fn(|i| new_idxs[i]),
+            std::array::from_fn(|i| new_ws[i]),
+        )
     })
 }
 
@@ -214,6 +221,15 @@ fn test_loop_subdiv() {
 
 fn tri_edges_ord([vi0, vi1, vi2]: [usize; 3]) -> [[usize; 2]; 3] {
     [minmax(vi0, vi1), minmax(vi1, vi2), minmax(vi0, vi2)]
+}
+
+fn quad_edges_ord([vi0, vi1, vi2, vi3]: [usize; 4]) -> [[usize; 2]; 4] {
+    [
+        minmax(vi0, vi1),
+        minmax(vi1, vi2),
+        minmax(vi2, vi3),
+        minmax(vi3, vi0),
+    ]
 }
 
 fn tri_incident_edges([vi0, vi1, vi2]: [usize; 3]) -> [[usize; 3]; 3] {
@@ -471,4 +487,63 @@ pub fn honeycomb_tet(
     out_poly.append(&mut vertex_poly);
 
     (out_verts, out_poly, out_edges)
+}
+
+pub fn quad_subdiv(qs: &[[usize; 4]]) -> (Vec<BarycentricRepr>, Vec<[usize; 4]>) {
+    let nv = qs
+        .iter()
+        .flat_map(|t| t.iter().copied().map(|vi| vi + 1))
+        .max()
+        .unwrap_or(0);
+
+    let mut out_vs = vec![];
+    // each original vertex
+    out_vs.extend((0..nv).map(BarycentricRepr::Vertex));
+    let mut out_qs = vec![];
+
+    let mut edge_q_map = BTreeMap::new();
+
+    for (qi, &q) in qs.iter().enumerate() {
+        for e in quad_edges_ord(q) {
+            edge_q_map
+                .entry(e)
+                .or_insert_with(EdgeKind::empty)
+                .insert(qi);
+        }
+    }
+
+    let mut counter = out_vs.len();
+    let mut edge_vi_map: BTreeMap<[usize; 2], _> = BTreeMap::new();
+
+    // for each edge, insert a new vertex
+    for &e @ [e0, e1] in edge_q_map.keys() {
+        edge_vi_map.insert(e, counter);
+        counter += 1;
+        out_vs.push(BarycentricRepr::Edge([e0, e1], [0.5; 2]));
+    }
+
+    for &q in qs.iter() {
+        // center quad vert
+        let curr = out_vs.len();
+        out_vs.push(BarycentricRepr::Quad(q, [0.25; 4]));
+
+        let quad_edges = quad_edges_ord(q);
+        for i in 0..4 {
+            let ec = quad_edges[i];
+            let ec_vi = edge_vi_map[&ec];
+            let en = quad_edges[(i + 1) % 4];
+            let en_vi = edge_vi_map[&en];
+            let s = shared(ec, en);
+            out_qs.push([ec_vi, curr, en_vi, s]);
+        }
+    }
+
+    (out_vs, out_qs)
+}
+
+fn shared(a: [usize; 2], b: [usize; 2]) -> usize {
+    match (a, b) {
+        ([x, _] | [_, x], [_, y] | [y, _]) if x == y => x,
+        _ => todo!(),
+    }
 }
