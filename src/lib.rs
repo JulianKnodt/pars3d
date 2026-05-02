@@ -2,12 +2,9 @@
 #![feature(array_try_map)]
 #![feature(iter_array_chunks)]
 #![feature(cmp_minmax)]
-#![feature(binary_heap_into_iter_sorted)]
 #![feature(ascii_char)]
 #![feature(ascii_char_variants)]
-#![feature(assert_matches)]
 #![feature(iter_map_windows)]
-#![feature(if_let_guard)]
 #![feature(btree_set_entry)]
 
 #[cfg(not(feature = "f64"))]
