@@ -216,7 +216,7 @@ fn test_loop_subdiv() {
         ..Default::default()
     };
     let scene = m.into_scene();
-    crate::save("test_loop_subdiv.ply", &scene).expect("Failed to save scene");
+    crate::save("test_loop_subdiv.ply", &scene, true).expect("Failed to save scene");
 }
 
 fn tri_edges_ord([vi0, vi1, vi2]: [usize; 3]) -> [[usize; 2]; 3] {

@@ -1,5 +1,3 @@
-#![feature(cmp_minmax)]
-
 use pars3d::{F, load, parse_args, save};
 use std::collections::BTreeSet;
 

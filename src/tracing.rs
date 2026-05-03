@@ -279,7 +279,7 @@ fn test_trace() {
     let mut wf = super::visualization::wireframe_to_mesh((curve_v, black_verts, curve_f));
     m.append(&mut wf);
 
-    super::save("curve_test.ply", &m.into_scene()).expect("Failed to save");
+    super::save("curve_test.ply", &m.into_scene(), true).expect("Failed to save");
 }
 
 #[test]
@@ -311,5 +311,5 @@ fn test_trace_sphere() {
     m.uv[0].clear();
     m.n.clear();
 
-    super::save("sphere_curve_test.ply", &m.into_scene()).expect("Failed to save");
+    super::save("sphere_curve_test.ply", &m.into_scene(), true).expect("Failed to save");
 }

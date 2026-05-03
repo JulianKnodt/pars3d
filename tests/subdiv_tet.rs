@@ -37,5 +37,5 @@ fn test_subdiv_tet() -> std::io::Result<()> {
         .map(|[e0, e1]| Line::new_from_endpoints(e0, e1));
     mesh.l = new_lines.collect();
 
-    pars3d::save("tet_subdiv_tmp.obj", &mesh.into_scene())
+    pars3d::save("tet_subdiv_tmp.obj", &mesh.into_scene(), true)
 }
