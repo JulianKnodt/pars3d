@@ -300,7 +300,9 @@ impl super::mesh::Mesh {
                         let new_pos = new_v.len();
                         new_v.push(self.v[v]);
                         new_vc.push(color);
-                        new_uv.push(self.uv[0][v]);
+                        if !self.uv[0].is_empty() {
+                            new_uv.push(self.uv[0][v]);
+                        }
                         empty.insert(new_pos);
                         new_f.insert(new_pos);
                     }

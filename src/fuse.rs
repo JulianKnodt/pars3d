@@ -1,11 +1,13 @@
-use super::{F, Vec3};
+use super::F;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 
 use super::I;
 
 /// Returns mapping between original vertex coordinate and new vertex coordinate
-pub fn fuse_vertices(vertices: &[Vec3], dist: F) -> Vec<usize> {
+pub fn fuse_vertices(vertices: &[[F; 3]], dist: F) -> Vec<usize> {
+    fuse_attrib_vertices(vertices.len(), |vi| vertices[vi], dist)
+    /*
     let mut out = (0..vertices.len()).collect::<Vec<_>>();
     if dist < 0. {
         return out;
@@ -13,7 +15,7 @@ pub fn fuse_vertices(vertices: &[Vec3], dist: F) -> Vec<usize> {
     let mut spatial_hash = HashMap::new();
     let inv_dist = dist.recip();
 
-    let to_hash = |v: Vec3| {
+    let to_hash = |v: [F; 3]| {
         if dist == 0. || inv_dist.is_nan() {
             return v.map(|v| v.to_bits().cast_signed());
         }
@@ -23,6 +25,42 @@ pub fn fuse_vertices(vertices: &[Vec3], dist: F) -> Vec<usize> {
 
     for (i, v) in vertices.iter().enumerate() {
         let h = to_hash(*v);
+        match spatial_hash.entry(h) {
+            Entry::Occupied(o) => {
+                out[i] = *o.get();
+            }
+            Entry::Vacant(v) => {
+                v.insert(i);
+            }
+        }
+    }
+    out
+    */
+}
+
+/// Returns mapping between original vertex coordinate and new vertex coordinate
+pub fn fuse_attrib_vertices<const N: usize>(
+    num_vertices: usize,
+    vertices: impl Fn(usize) -> [F; N],
+    dist: F,
+) -> Vec<usize> {
+    let mut out = (0..num_vertices).collect::<Vec<_>>();
+    if dist < 0. {
+        return out;
+    }
+    let mut spatial_hash = HashMap::new();
+    let inv_dist = dist.recip();
+
+    let to_hash = |v: [F; N]| {
+        if dist == 0. || inv_dist.is_nan() {
+            return v.map(|v| v.to_bits().cast_signed());
+        }
+
+        v.map(|v| f64::from(v * inv_dist) as I)
+    };
+
+    for i in 0..num_vertices {
+        let h = to_hash(vertices(i));
         match spatial_hash.entry(h) {
             Entry::Occupied(o) => {
                 out[i] = *o.get();
