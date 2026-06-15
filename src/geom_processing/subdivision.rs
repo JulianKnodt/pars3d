@@ -489,6 +489,18 @@ pub fn honeycomb_tet(
     (out_verts, out_poly, out_edges)
 }
 
+/// Converts a set of faces into barycentric repr
+pub fn ident_subdiv(nv: usize) -> Vec<BarycentricRepr> {
+    (0..nv).map(BarycentricRepr::Vertex).collect()
+}
+
+/// Returns the original tri index that corresponds to this triangle.
+/// Assumes the triangles were not shuffled, and that "subdivision" refers to the
+/// `quad_subdivision` function.
+pub fn original_quad_index(fi: usize, num_subdivs: usize) -> usize {
+    (0..num_subdivs).fold(fi, |acc, _| acc / 4)
+}
+
 pub fn quad_subdiv(qs: &[[usize; 4]]) -> (Vec<BarycentricRepr>, Vec<[usize; 4]>) {
     let nv = qs
         .iter()

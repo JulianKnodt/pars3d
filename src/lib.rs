@@ -120,6 +120,7 @@ pub use mesh::Scene;
 pub mod tri_to_quad;
 
 pub mod util;
+pub use parse_args::parse_args;
 
 /// Writing ppm image files.
 pub mod ppm;

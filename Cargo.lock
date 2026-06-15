@@ -328,11 +328,16 @@ dependencies = [
  "gltf-json",
  "image 0.24.9",
  "kdtree",
+ "parse_args",
  "rand",
  "svg",
  "union-find",
  "zune-inflate",
 ]
+
+[[package]]
+name = "parse_args"
+version = "0.1.0"
 
 [[package]]
 name = "png"

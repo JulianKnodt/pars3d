@@ -34,8 +34,8 @@ fn main() -> std::io::Result<()> {
     for (fi, f) in m.f.iter().enumerate() {
         let aabb = f.aabb(&m.v);
         let [x, y, _] = aabb.min;
-        let x = (x * 500.).round() as u32;
-        let y = (y * 500.).round() as u32;
+        let x = (x * 1000.).round() as u32;
+        let y = (y * 1000.).round() as u32;
         x_coords.insert(x);
         y_coords.insert(y);
         assert_eq!(None, xy_to_face.insert([x, y], fi));
@@ -47,11 +47,13 @@ fn main() -> std::io::Result<()> {
     let w = x_coords.len() as u32;
     let h = y_coords.len() as u32;
     assert_eq!(w * h, m.f.len() as u32);
+    println!("Writing {} to {} at {w} x {h}", args.input, args.output);
 
+    const N: usize = 512;
     let mut per_fi_color = vec![[0.; 3]; m.f.len()];
     for (fi, f) in m.f.iter().enumerate() {
         let uv_f = f.map_kind(|vi| m.uv[0][vi]);
-        for _ in 0..1024 {
+        for _ in 0..N {
             let u: F = rand::random();
             let v: F = rand::random();
             let [u, v] = if u + v > 1. { [1. - u, 1. - v] } else { [u, v] };
@@ -66,7 +68,7 @@ fn main() -> std::io::Result<()> {
             let p = [p[0], p[1], p[2]].map(|v| v as F / 255.);
             per_fi_color[fi] = add(per_fi_color[fi], p);
         }
-        per_fi_color[fi] = divk(per_fi_color[fi], 1024.);
+        per_fi_color[fi] = divk(per_fi_color[fi], N as F);
     }
 
     let out_img = image::RgbImage::from_fn(w, h, |x, y| {
