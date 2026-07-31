@@ -617,6 +617,14 @@ impl Mesh {
             .then_some(mat0)
     }
 
+    /// Stores the indices of all materials in out.
+    pub fn mats(&self, out: &mut Vec<usize>) {
+        out.clear();
+        out.extend(self.face_mat_idx.iter().map(|v| v.1));
+        out.sort_unstable();
+        out.dedup();
+    }
+
     /// Assigns a single material to this mesh.
     /// Should correspond to a material in the scene.
     pub fn assign_single_mat(&mut self, mati: usize) {

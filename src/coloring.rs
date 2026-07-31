@@ -77,6 +77,26 @@ pub fn magma(v: F) -> [F; 3] {
     add(kmul(1. - delta, MAGMA[below]), kmul(delta, MAGMA[above]))
 }
 
+pub fn red_blue(v: F) -> [F; 3] {
+    assert!(
+        (-1.0..=1.0).contains(&v),
+        "Red Blue values should be in the 0-1 range, got {v}"
+    );
+
+    let red = [220., 20., 60.];
+    let blue = [28., 28., 240.];
+    let mid = [11., 2., 1.];
+
+    if v < 0. {
+        let v = -v;
+        std::array::from_fn(|i| blue[i] * v + mid[i] * (1. - v))
+    } else if v > 0. {
+        std::array::from_fn(|i| red[i] * v + mid[i] * (1. - v))
+    } else {
+        mid
+    }
+}
+
 const MAGMA: [[F; 3]; 256] = [
     [0.001462, 0.000466, 0.013866],
     [0.002258, 0.001295, 0.018331],

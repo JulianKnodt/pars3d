@@ -1,5 +1,5 @@
 use super::barycentric_areas;
-use crate::{F, FaceKind, dot, normalize, sub};
+use crate::{F, FaceKind, add, dot, kmul, normalize, sub, tri_area};
 
 /// Compute gaussian curvature at each vertex.
 pub fn gaussian_curvature(fs: &[FaceKind], vs: &[[F; 3]], dst: &mut Vec<F>) {
@@ -23,6 +23,38 @@ pub fn gaussian_curvature(fs: &[FaceKind], vs: &[[F; 3]], dst: &mut Vec<F>) {
             dst[vi] = 0.;
         } else {
             dst[vi] /= buf[vi];
+        }
+    }
+}
+
+/// Compute the mean curvature at each vertex
+pub fn mean_curvature(fs: &[FaceKind], vs: &[[F; 3]], dst: &mut Vec<[F; 3]>) {
+    dst.resize(vs.len(), [0.; 3]);
+    let mut bary_areas = vec![0.; vs.len()];
+    for f in fs.iter() {
+        for pcn in f.incident_edges() {
+            let [p, c, n] = pcn.map(|vi| vs[vi]);
+            let [pi, ci, ni] = pcn;
+
+            let area = tri_area([p, c, n]) / 3.;
+            for i in pcn {
+                bary_areas[i] += area;
+            }
+            let pc = normalize(sub(p, c));
+            let pn = normalize(sub(p, n));
+            let cn = normalize(sub(c, n));
+            let p_cot = dot(pc, pn).acos().tan().recip();
+            let n_cot = dot(cn, pn).acos().tan().recip();
+            let c_cot = dot(pc, cn.map(|v| -v)).acos().tan().recip();
+
+            dst[ci] = add(dst[ci], kmul(p_cot / 2., sub(n, c)));
+            dst[ni] = add(dst[ni], kmul(p_cot / 2., sub(c, n)));
+
+            dst[ci] = add(dst[ci], kmul(n_cot / 2., sub(p, c)));
+            dst[pi] = add(dst[pi], kmul(n_cot / 2., sub(c, p)));
+
+            dst[ni] = add(dst[ni], kmul(c_cot / 2., sub(p, n)));
+            dst[pi] = add(dst[pi], kmul(c_cot / 2., sub(n, p)));
         }
     }
 }
