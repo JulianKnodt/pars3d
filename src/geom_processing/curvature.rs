@@ -58,3 +58,14 @@ pub fn mean_curvature(fs: &[FaceKind], vs: &[[F; 3]], dst: &mut Vec<[F; 3]>) {
         }
     }
 }
+
+pub fn mean_curvature_signed_norm(vns: &[[F; 3]], mean_curvature: &[[F; 3]], dst: &mut Vec<F>) {
+    assert_eq!(mean_curvature.len(), vns.len());
+
+    let nv = vns.len();
+    dst.resize(nv, 0.);
+    for i in 0..nv {
+        let sign = dot(vns[i], mean_curvature[i]).signum();
+        dst[i] = sign * crate::length(mean_curvature[i]);
+    }
+}
