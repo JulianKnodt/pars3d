@@ -105,15 +105,15 @@ fn write_mtls(
                             }
                             OutputKind::New(f) => {
                                 let f: &Path = f.as_ref();
+                                let fname = f.file_name().unwrap();
                                 let mtl_p: &Path = mtl_path.as_ref();
-                                let img_dst = mtl_p.with_file_name(f);
-                                let img_path = mtl_p.with_file_name(f);
-                                match img.save(&img_path) {
+                                let img_dst = mtl_p.with_file_name(fname);
+                                match img.save(&img_dst) {
                                     Ok(()) => {}
                                     Err(image::ImageError::IoError(err)) => {
                                       eprintln!(
                                         "Failed to save output image (should be specified just as file name, got {})",
-                                        img_path.display()
+                                        img_dst.display()
                                       );
                                       return Err(err)
                                     },
