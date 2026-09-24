@@ -401,6 +401,18 @@ impl KVs {
         match_children!(
           self, kvi,
           "Version", &[Data::I32(_)] => |_| {},
+          "Properties70", &[] => |c| match_children!(
+            self, c,
+            "P", &[
+              Data::String(_), Data::String(_), Data::String(_), Data::String(_),
+              Data::F64(_)
+            ] => |c: usize| {
+              let vals = &self.kvs[c].values;
+              match vals[0].as_str().unwrap() {
+                x => todo_if_strict!("{x}"),
+              }
+            }
+          ),
           "Indexes", &[Data::I32Arr(_)] => |c: usize| {
             let idxs = self.kvs[c].values[0].as_i32_arr().unwrap();
             out.indices.extend(idxs.iter().map(|&v| v as usize));
@@ -757,10 +769,15 @@ impl KVs {
               &[
                 Data::String(_), Data::String(_), Data::String(_), Data::String(_),
                 Data::F64(_), Data::F64(_), Data::F64(_)
-              ] => |c:usize| {
+              ] | &[
+                Data::String(_), Data::String(_), Data::String(_), Data::String(_),
+                Data::F64(_),
+              ]
+              => |c:usize| {
                 let vals = &self.kvs[c].values;
                 match vals[0].as_str().unwrap() {
                   "Color" => {},
+                  "Small" => {},
                   x => todo_if_strict!("Unknown mesh property {x:?}"),
                 }
               },
