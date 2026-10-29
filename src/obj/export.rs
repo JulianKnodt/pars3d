@@ -223,6 +223,9 @@ pub fn save_obj(
         // TODO need to write materials here
         let mut curr_mat_idx = None;
         for (fi, f) in m.f.iter().enumerate() {
+            if f.is_empty() {
+                continue;
+            }
             match curr_mat_idx {
                 None => {
                     if let Some((mat_range, mi)) = m.face_mat_idx.first()
